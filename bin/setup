@@ -7,8 +7,9 @@ trap 'echo error: line $LINENO >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Install mise if missing, then install Go+Node from .tool-versions and activate shims.
-install_toolchain() {
+# shellcheck shell=bash
+# Installs mise if missing, runs mise install, activates shims in PATH. Always call first.
+toolchain() {
   if ! command -v mise &>/dev/null; then
     curl https://mise.run | sh
     export PATH="$HOME/.local/bin:$PATH"
@@ -17,19 +18,19 @@ install_toolchain() {
   export PATH="$HOME/.local/share/mise/shims:$PATH"
 }
 
-setup_gpg_signing() {
-  if [ -z "${GPG_PRIVATE_KEY:-}" ]; then
-    echo "bin/setup: GPG_PRIVATE_KEY not set, skipping"
+# shellcheck shell=bash
+# Imports GPG key and configures git signing; skips if no key.
+commit_signing() {
+  if [[ -z "${GPG_PRIVATE_KEY:-}" ]]; then
+    echo "bin/setup: GPG_PRIVATE_KEY not set, skipping" >&2
     return 0
   fi
 
   mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
-
-  # Allow non-interactive signing
   echo "allow-loopback-pinentry" >~/.gnupg/gpg-agent.conf
   gpg-connect-agent reloadagent /bye >/dev/null 2>&1 || true
 
-  if [ -n "${GPG_PASSPHRASE:-}" ]; then
+  if [[ -n "${GPG_PASSPHRASE:-}" ]]; then
     echo "${GPG_PRIVATE_KEY}" | base64 --decode |
       gpg --batch --passphrase "${GPG_PASSPHRASE}" --pinentry-mode loopback --import
   else
@@ -44,8 +45,7 @@ setup_gpg_signing() {
   git config --global gpg.format openpgp
   git config --global gpg.program gpg
 
-  # If a passphrase is set, wrap gpg to supply it non-interactively
-  if [ -n "${GPG_PASSPHRASE:-}" ]; then
+  if [[ -n "${GPG_PASSPHRASE:-}" ]]; then
     cat >/usr/local/bin/gpg-passphrase-wrapper <<'WRAPPER'
 #!/usr/bin/env bash
 exec gpg --batch --passphrase "${GPG_PASSPHRASE}" --pinentry-mode loopback "$@"
@@ -54,15 +54,17 @@ WRAPPER
     git config --global gpg.program /usr/local/bin/gpg-passphrase-wrapper
   fi
 
-  echo "bin/setup: GPG signing configured (${FINGERPRINT})"
+  echo "bin/setup: GPG signing configured (${FINGERPRINT})" >&2
 }
 
-fix_run_permissions() {
-  if [ -f "$SCRIPT_DIR/../run" ]; then
-    chmod u+x "$SCRIPT_DIR/../run" "$SCRIPT_DIR/setup" 2>/dev/null || true
-  fi
+# shellcheck shell=bash
+# Makes run and bin/setup executable; no-op if run is absent.
+run_permissions() {
+  chmod u+x "$SCRIPT_DIR/../run" "$SCRIPT_DIR/setup" 2>/dev/null || true
 }
 
-fix_run_permissions
-setup_gpg_signing
-install_toolchain
+toolchain
+commit_signing
+run_permissions
+
+echo "setup complete"
