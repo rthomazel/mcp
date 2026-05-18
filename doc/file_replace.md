@@ -43,6 +43,10 @@ Both accept a batch of replacements applied sequentially in memory with a single
           },
           "required": ["find", "replace"]
         }
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Optional. If true, validate and compute the diff without writing to disk. Returns the same unified diff as a real run."
       }
     },
     "required": ["path", "replacements"]
@@ -88,6 +92,10 @@ Both accept a batch of replacements applied sequentially in memory with a single
           },
           "required": ["find", "replace"]
         }
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Optional. If true, validate and compute the diff without writing to disk. Returns the same unified diff as a real run."
       }
     },
     "required": ["path", "replacements"]
@@ -133,7 +141,7 @@ All errors that identify match locations include 1 line of file context before a
 Both tools share the same outer structure; the inner match step differs.
 
 ```python
-def handle_file_replace(path, replacements):
+def handle_file_replace(path, replacements, dry_run=False):
     # 1. Input guards (no lock needed — pure validation)
     if path == "":
         return Error("path must not be empty.")
@@ -224,19 +232,24 @@ def handle_file_replace(path, replacements):
 
         working = replace_exact(working, r.find, r.replace)
 
-    # 6. External-modification check before committing
+    # 6. Dry-run exit — return diff without writing
+    if dry_run:
+        release(lock)
+        return compute_myers_diff(path, file_content, working)
+
+    # 7. External-modification check before committing
     if sha256(read_file(path)) != checksum:
         release(lock)
         return Error("Edit aborted: file was modified externally between read and write.")
 
-    # 7. Atomic write — preserve original file permissions
+    # 8. Atomic write — preserve original file permissions
     original_mode = stat(path).mode
     tmp_path = path + ".tmp"
     write_to_disk(tmp_path, working, mode=original_mode)
     rename(tmp_path, path)  # POSIX-atomic
     release(lock)
 
-    # 8. Return unified diff
+    # 9. Return unified diff
     return compute_myers_diff(path, file_content, working)
 ```
 
@@ -292,3 +305,11 @@ The existing file-write workflow shells out Python/bash and redirects text into 
 2. **Verification overhead:** the model must follow up with `cat` or `grep` to confirm the write applied correctly, adding a round-trip.
 
 `file_replace` and `file_replace_all` eliminate both: writes happen in-process (no shell), and the returned diff is immediate proof of what changed.
+
+## Known limitations
+
+**Substring matching is structurally fragile**
+Both tools match exact substrings — byte-for-byte, including indentation and whitespace. Small formatting changes (reordered imports, auto-formatter runs, generated comment additions) can invalidate a `find` block that was valid moments before. This is an accepted V1 tradeoff. Future extensions worth considering: indentation-aware matching, line-based patches, or AST-aware edits for structured languages.
+
+**Durability guarantees**
+A successful response means the rename completed — the replacement is visible to subsequent reads on the same filesystem. It does not guarantee durable persistence to stable storage (e.g. after a crash on a network-mounted filesystem). For the target use case (local or container-mounted filesystems in agentic loops) this is sufficient.
