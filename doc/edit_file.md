@@ -7,7 +7,7 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
 ```json
 {
   "name": "edit_file",
-  "description": "Surgically modify a file with a search-and-replace. Returns a unified diff confirming the applied change.",
+  "description": "Replace an exact substring in a file. Returns a unified diff.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -17,7 +17,7 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
       },
       "old_text": {
         "type": "string",
-        "description": "The exact text to replace. Matched as a substring — may start or end anywhere within a line. Must match the file character-for-character including whitespace and indentation. Must match exactly once (globally if line_number is omitted, or at the given line if provided). If ambiguous, supply line_number or widen old_text to include more surrounding context."
+        "description": "Exact substring to replace, matched character-for-character including whitespace. Must occur exactly once (globally, or at line_number if given)."
       },
       "new_text": {
         "type": "string",
@@ -25,7 +25,7 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
       },
       "line_number": {
         "type": "integer",
-        "description": "Optional. When provided, only matches that include this line number are considered. Use this to target a short or common string (e.g. a number, a keyword) that would otherwise be ambiguous across the file. If old_text still matches more than once at the given line, the error returns the character positions of each match."
+        "description": "Optional line number to narrow the match. Use when old_text alone is ambiguous across the file."
       }
     },
     "required": ["path", "old_text", "new_text"]
@@ -37,7 +37,7 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
 
 | Constraint | Value | Rationale |
 | --- | --- | --- |
-| `new_text` max lines | **50** | Hard cap; keeps edits surgical regardless of file size |
+| `new_text` max lines | **50** (env: `JAIL_MCP_EDIT_MAX_LINES`) | Hard cap; keeps edits surgical regardless of file size |
 | Match uniqueness | exactly 1 | Must resolve to a single occurrence; error content depends on how ambiguity manifests (see error matrix below) |
 
 ## Error matrix
