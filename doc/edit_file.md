@@ -7,13 +7,22 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
 ```json
 {
   "name": "edit_file",
-  "description": "Surgically modify a file using a search-and-replace block. old_text must be a unique segment of the file including surrounding context lines. The replacement is limited to 50 lines. Returns a unified diff of the applied change.",
+  "description": "Surgically modify a file with a search-and-replace. Finds the exact old_text block, replaces it with new_text, and returns a unified diff confirming the change. Limits: old_text must be ≥5 lines (≥1 if the file has <5 lines total); new_text must be ≤50 lines; old_text must match exactly once in the file.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "path":     { "type": "string", "description": "Absolute path to the file." },
-      "old_text": { "type": "string", "description": "Exact unique segment of text to replace. Must be at least 5 lines (or 1 line if the file has fewer than 5 lines total). Include 1-2 lines of unchanged surrounding context to ensure uniqueness." },
-      "new_text": { "type": "string", "description": "Replacement text. Limited to 50 lines." }
+      "path": {
+        "type": "string",
+        "description": "Absolute path to the file to edit."
+      },
+      "old_text": {
+        "type": "string",
+        "description": "The exact block of text to find and replace. Must match the file character-for-character including whitespace. Must be unique in the file — include 1-2 lines of unchanged surrounding context if needed. Minimum 5 lines (minimum 1 line if the file has fewer than 5 lines total). The server rejects edits where old_text matches zero or more than one location."
+      },
+      "new_text": {
+        "type": "string",
+        "description": "The replacement text. Maximum 50 lines. Can be empty to delete the matched block."
+      }
     },
     "required": ["path", "old_text", "new_text"]
   }
