@@ -17,11 +17,15 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
       },
       "old_text": {
         "type": "string",
-        "description": "The exact block of text to find and replace. Must match the file character-for-character including whitespace. Must be unique in the file — include 1-2 lines of unchanged surrounding context if needed. Minimum 5 lines (minimum 1 line if the file has fewer than 5 lines total). The server rejects edits where old_text matches zero or more than one location."
+        "description": "The exact text to replace. Matched as a substring — may start or end anywhere within a line. Must match the file character-for-character including whitespace and indentation. Must match exactly once (globally if line_number is omitted, or at the given line if provided). If ambiguous, supply line_number or widen old_text to include more surrounding context."
       },
       "new_text": {
         "type": "string",
-        "description": "The replacement text. Maximum 50 lines. Can be empty to delete the matched block."
+        "description": "The replacement text. Maximum 50 lines. Empty string deletes the matched block."
+      },
+      "line_number": {
+        "type": "integer",
+        "description": "Optional. When provided, only matches that include this line number are considered. Use this to target a short or common string (e.g. a number, a keyword) that would otherwise be ambiguous across the file. If old_text still matches more than once at the given line, the error returns the character positions of each match."
       }
     },
     "required": ["path", "old_text", "new_text"]
@@ -34,13 +38,22 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
 | Constraint | Value | Rationale |
 | --- | --- | --- |
 | `new_text` max lines | **50** | Hard cap; keeps edits surgical regardless of file size |
-| `old_text` min lines | **5** (or **1** if file < 5 lines) | Forces surrounding context; prevents single-line ambiguity |
-| Match uniqueness | exactly 1 | Ambiguous matches are rejected; error lists the line number of each match |
+| Match uniqueness | exactly 1 | Must resolve to a single occurrence; error content depends on how ambiguity manifests (see error matrix below) |
+
+## Error matrix
+
+| Matches | `line_number` | Error content |
+| --- | --- | --- |
+| 0 | omitted | First line of `old_text` searched across file; if found, reports which lines and shows surrounding context; if not found, says so and points to whitespace/indentation |
+| 0 | provided | "`old_text` not found at line N" + shows what is actually on line N |
+| >1 | omitted | "matched at lines X, Y, Z — add `line_number` or widen `old_text` for uniqueness" |
+| >1 | provided, spread across multiple lines | "matched at lines X, Y — `line_number` N did not narrow to one match" |
+| >1 | provided, all on same line | "ambiguous at line N, matched at chars X and Y — replace the whole line to target a specific occurrence" |
 
 ## Execution flow
 
 ```python
-def handle_edit_file(path, old_text, new_text):
+def handle_edit_file(path, old_text, new_text, line_number=None):
     # 1. No-op guard
     if old_text == new_text:
         return Error("No changes: old_text and new_text are identical.")
@@ -50,59 +63,75 @@ def handle_edit_file(path, old_text, new_text):
 
     # 3. Read file
     file_content = read_file(path)
-    total_lines  = count_lines(file_content)
 
-    # 4. Enforce minimum context lines in old_text
-    min_context = 1 if total_lines < 5 else 5
-    if count_lines(old_text) < min_context:
-        release(lock)
-        return Error(f"old_text must be at least {min_context} lines for this file.")
-
-    # 5. Enforce 50-line cap on new_text (what actually gets written)
+    # 4. Enforce 50-line cap on new_text (what actually gets written)
     if count_lines(new_text) > 50:
         release(lock)
         return Error(f"Edit rejected: new_text is {count_lines(new_text)} lines. Max is 50.")
 
-    # 6. Exact-match uniqueness enforcement
-    matches = find_exact_matches(file_content, old_text)  # returns list of (start_line, end_line)
-    if len(matches) == 0:
-        # Help the model diagnose the mismatch: search for the first line of old_text alone.
-        # If it appears, the surrounding block diverged; report where and show context.
-        # If it doesn't appear at all, say so explicitly.
-        first_line = first_line_of(old_text)
-        partial = find_line_matches(file_content, first_line)
-        if partial:
-            context_snippets = [excerpt(file_content, ln, radius=3) for ln in partial]
+    # 5. Find all substring matches; each match records (start_line, end_line, start_char)
+    all_matches = find_substring_matches(file_content, old_text)
+
+    # 6. Narrow by line_number if provided
+    if line_number is not None:
+        candidates = [m for m in all_matches if m.start_line <= line_number <= m.end_line]
+    else:
+        candidates = all_matches
+
+    # 7. Uniqueness enforcement with targeted diagnostics
+    if len(candidates) == 0:
+        if line_number is not None:
             release(lock)
             return Error(
-                f"Patch failed: first line of old_text found at line(s) {partial} "
-                f"but surrounding block did not match. File context around each:\n"
-                + join(context_snippets)
+                f"old_text not found at line {line_number}. "
+                f"Line {line_number} contains:\n{get_line(file_content, line_number)}"
             )
         else:
-            release(lock)
-            return Error(
-                f"Patch failed: first line of old_text not found anywhere in file. "
-                f"Check for whitespace or indentation differences."
-            )
-    if len(matches) > 1:
-        release(lock)
-        return Error(
-            f"Patch failed: old_text matched {len(matches)} locations "
-            f"(starting at lines {[m.start_line for m in matches]}). "
-            f"Add more unique surrounding context to make the block unambiguous."
-        )
+            # Search for first line of old_text to help diagnose the mismatch
+            first_line = first_line_of(old_text)
+            partial = find_substring_matches(file_content, first_line)
+            if partial:
+                snippets = [excerpt(file_content, m.start_line, radius=3) for m in partial]
+                release(lock)
+                return Error(
+                    f"Patch failed: first line of old_text found at line(s) "
+                    f"{[m.start_line for m in partial]} but surrounding block did not match.\n"
+                    + join(snippets)
+                )
+            else:
+                release(lock)
+                return Error(
+                    "Patch failed: first line of old_text not found in file. "
+                    "Check for whitespace or indentation differences."
+                )
 
-    # 7. replace_exact: uniqueness pre-validated above; guaranteed single substitution
+    if len(candidates) > 1:
+        release(lock)
+        all_on_one_line = all(m.start_line == candidates[0].start_line for m in candidates)
+        if line_number is not None and all_on_one_line:
+            char_positions = [m.start_char for m in candidates]
+            return Error(
+                f"Ambiguous at line {line_number}: old_text matched {len(candidates)} times "
+                f"at characters {char_positions}. Replace the whole line to target a specific occurrence."
+            )
+        else:
+            match_lines = [m.start_line for m in candidates]
+            hint = " Provide line_number to narrow the search." if line_number is None else ""
+            return Error(
+                f"Patch failed: old_text matched {len(candidates)} locations "
+                f"(starting at lines {match_lines}).{hint}"
+            )
+
+    # 8. replace_exact: uniqueness pre-validated above; guaranteed single substitution
     updated_content = replace_exact(file_content, old_text, new_text)
 
-    # 8. Atomic write — temp file + rename prevents partial-write corruption
+    # 9. Atomic write — temp file + rename prevents partial-write corruption
     tmp_path = path + ".tmp"
     write_to_disk(tmp_path, updated_content)
     rename(tmp_path, path)  # POSIX-atomic
     release(lock)
 
-    # 9. Return unified diff — confirms the patch without a secondary read
+    # 10. Return unified diff — confirms the patch without a secondary read
     return compute_myers_diff(path, file_content, updated_content)
 ```
 
