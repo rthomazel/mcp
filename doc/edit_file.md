@@ -1,6 +1,6 @@
 # edit_file tool
 
-Surgically modify a file using a search-and-replace block. Designed to bypass shell quote-escaping traps and eliminate secondary `cat` verification calls by returning a unified diff of the applied change.
+Edit a file using a precise search and replace block. Designed to bypass shell quote escaping and offer guarantees.
 
 ## Tool schema
 
@@ -42,56 +42,71 @@ Surgically modify a file using a search-and-replace block. Designed to bypass sh
 
 ## Error matrix
 
+All errors that identify match locations include 1 line of file context before and after each match.
+
 | Matches | `line_number` | Error content |
 | --- | --- | --- |
-| 0 | omitted | First line of `old_text` searched across file; if found, reports which lines and shows surrounding context; if not found, says so and points to whitespace/indentation |
-| 0 | provided | "`old_text` not found at line N" + shows what is actually on line N |
-| >1 | omitted | "matched at lines X, Y, Z — add `line_number` or widen `old_text` for uniqueness" |
-| >1 | provided, spread across multiple lines | "matched at lines X, Y — `line_number` N did not narrow to one match" |
-| >1 | provided, all on same line | "ambiguous at line N, matched at chars X and Y — replace the whole line to target a specific occurrence" |
+| 0 | omitted | Searches for first line of `old_text`; if found, reports line numbers with 1-line context around each hit; if not found anywhere, says so and points to whitespace/indentation |
+| 0 | provided | "`old_text` not found at line N" + shows line N with 1-line context |
+| >1 | omitted | Lists starting line of each match with 1-line context; suggests `line_number` or widening `old_text` |
+| >1 | provided, spread | Lists starting line of each candidate with 1-line context; notes `line_number` N did not narrow to one |
+| >1 | provided, same line | Char positions of each match + line content; suggests replacing the whole line |
 
 ## Execution flow
 
 ```python
 def handle_edit_file(path, old_text, new_text, line_number=None):
-    # 1. No-op guard
+    # 1. Input guards (no lock needed — pure validation)
+    if path == "":
+        return Error("path must not be empty.")
+    if old_text == "":
+        return Error("old_text must not be empty.")
     if old_text == new_text:
         return Error("No changes: old_text and new_text are identical.")
+    if "\x00" in old_text or "\x00" in new_text:
+        return Error("Null bytes detected; binary files are not supported.")
+    if line_number is not None and line_number < 1:
+        return Error(f"line_number must be ≥ 1, got {line_number}.")
 
     # 2. Acquire exclusive per-file lock (held until after rename)
     lock = acquire_file_lock(path)
 
     # 3. Read file
     file_content = read_file(path)
+    total_lines = count_lines(file_content)
 
-    # 4. Enforce 50-line cap on new_text (what actually gets written)
-    if count_lines(new_text) > 50:
+    # 4. Validate line_number range now that we know the file length
+    if line_number is not None and line_number > total_lines:
         release(lock)
-        return Error(f"Edit rejected: new_text is {count_lines(new_text)} lines. Max is 50.")
+        return Error(f"line_number {line_number} is out of range (file has {total_lines} lines).")
 
-    # 5. Find all substring matches; each match records (start_line, end_line, start_char)
+    # 5. Enforce 50-line cap on new_text (what actually gets written)
+    if count_lines(new_text) > MAX_LINES:
+        release(lock)
+        return Error(f"Edit rejected: new_text is {count_lines(new_text)} lines. Max is {MAX_LINES}.")
+
+    # 6. Find all substring matches; each match records (start_line, end_line, start_char)
     all_matches = find_substring_matches(file_content, old_text)
 
-    # 6. Narrow by line_number if provided
+    # 7. Narrow by line_number if provided
     if line_number is not None:
         candidates = [m for m in all_matches if m.start_line <= line_number <= m.end_line]
     else:
         candidates = all_matches
 
-    # 7. Uniqueness enforcement with targeted diagnostics
+    # 8. Uniqueness enforcement with targeted diagnostics
     if len(candidates) == 0:
         if line_number is not None:
             release(lock)
             return Error(
-                f"old_text not found at line {line_number}. "
-                f"Line {line_number} contains:\n{get_line(file_content, line_number)}"
+                f"old_text not found at line {line_number}.\n"
+                + excerpt(file_content, line_number, radius=1)
             )
         else:
-            # Search for first line of old_text to help diagnose the mismatch
             first_line = first_line_of(old_text)
             partial = find_substring_matches(file_content, first_line)
             if partial:
-                snippets = [excerpt(file_content, m.start_line, radius=3) for m in partial]
+                snippets = [excerpt(file_content, m.start_line, radius=1) for m in partial]
                 release(lock)
                 return Error(
                     f"Patch failed: first line of old_text found at line(s) "
@@ -112,32 +127,34 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
             char_positions = [m.start_char for m in candidates]
             return Error(
                 f"Ambiguous at line {line_number}: old_text matched {len(candidates)} times "
-                f"at characters {char_positions}. Replace the whole line to target a specific occurrence."
+                f"at characters {char_positions}. Replace the whole line to target a specific occurrence.\n"
+                + excerpt(file_content, line_number, radius=1)
             )
         else:
-            match_lines = [m.start_line for m in candidates]
+            snippets = [excerpt(file_content, m.start_line, radius=1) for m in candidates]
             hint = " Provide line_number to narrow the search." if line_number is None else ""
             return Error(
                 f"Patch failed: old_text matched {len(candidates)} locations "
-                f"(starting at lines {match_lines}).{hint}"
+                f"(starting at lines {[m.start_line for m in candidates]}).{hint}\n"
+                + join(snippets)
             )
 
-    # 8. replace_exact: uniqueness pre-validated above; guaranteed single substitution
+    # 9. replace_exact: uniqueness pre-validated above; guaranteed single substitution
     updated_content = replace_exact(file_content, old_text, new_text)
 
-    # 9. Atomic write — temp file + rename prevents partial-write corruption
+    # 10. Atomic write — temp file + rename prevents partial-write corruption
     tmp_path = path + ".tmp"
     write_to_disk(tmp_path, updated_content)
     rename(tmp_path, path)  # POSIX-atomic
     release(lock)
 
-    # 10. Return unified diff — confirms the patch without a secondary read
+    # 11. Return unified diff — confirms the patch without a secondary read
     return compute_myers_diff(path, file_content, updated_content)
 ```
 
 ## Implementation notes
 
-- **Diff library:** `github.com/hexops/gotextdiff` (Myers algorithm), same as planned for other diff output in the server.
+- **Diff algorithm:** Myers diff, returned as a standard unified diff string.
 - **Atomic write:** write to `<filename>.tmp` in the same directory, then `os.Rename`. Same-directory placement guarantees both paths are on the same filesystem, making the rename atomic on POSIX.
 - **Per-file locking:** a `sync.Map` of `sync.Mutex` keyed by absolute path, acquired before the read and released after the rename. Prevents two concurrent clients from racing on the same file.
 - **replace_exact** is a single-substitution call (`strings.Replace(s, old, new, 1)`). The name signals that uniqueness is pre-validated — it is not a "first match wins" fallback.
