@@ -1,11 +1,12 @@
 #! /usr/bin/env bash
+# Copyright 2025-present R. Thomazella. All rights reserved.
+# Use of this source code is governed by the BSD-3-Clause
+# license that can be found in the LICENSE file and online
+# at https://opensource.org/license/BSD-3-clause.
 
 set -euo pipefail
 shopt -s globstar
 trap 'echo error: line $LINENO >&2' ERR
-# AGENTS: run bin/setup at session start if not already done — it is idempotent.
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck shell=bash
 # Installs mise if missing, runs mise install, activates shims in PATH. Always call first.
@@ -60,7 +61,9 @@ WRAPPER
 # shellcheck shell=bash
 # Makes run and bin/setup executable; no-op if run is absent.
 run_permissions() {
-  chmod u+x "$SCRIPT_DIR/../run" "$SCRIPT_DIR/setup" 2>/dev/null || true
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  chmod u+x "$script_dir/../run" "$script_dir/setup" 2>/dev/null || true
 }
 
 toolchain
