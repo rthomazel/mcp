@@ -160,22 +160,31 @@ def handle_file_replace(path, replacements, dry_run=False):
         if r.line_number is not None and r.line_number < 1:
             return Error(f"{label}: line_number must be ≥ 1.")
 
-    # 2. Acquire exclusive per-file lock (refcounted; entry removed when refcount reaches 0)
+    # 2. Resolve symlinks — lock and operate on the real path
+    path = resolve_symlinks(path)
+
+    # 3. Acquire exclusive per-file lock (refcounted; entry removed when refcount reaches 0)
     lock = acquire_file_lock(path)
 
-    # 3. Read file and snapshot checksum for external-modification detection
+    # 4. Read file and snapshot checksum; reject binary content
     file_content = read_file(path)
+    if contains_null_bytes(file_content):
+        release(lock)
+        return Error("Binary files are not supported.")
     checksum = sha256(file_content)
     total_lines = count_lines(file_content)
 
-    # 4. Validate line_number ranges against actual file length
+    # 5. Validate line_number ranges against actual file length
     for i, r in enumerate(replacements):
         if r.line_number is not None and r.line_number > total_lines:
             release(lock)
             return Error(f"Replacement {i+1}: line_number {r.line_number} out of range (file has {total_lines} lines).")
 
-    # 5. Apply replacements sequentially in memory — fail-fast, nothing written on any error
+    # 6. Apply replacements sequentially in memory — fail-fast, nothing written on any error
+    # line_number values are relative to the original file; line_offset tracks cumulative line
+    # shift as prior replacements add or remove lines.
     working = file_content
+    line_offset = 0
     for i, r in enumerate(replacements):
         label = f"Replacement {i+1} of {len(replacements)}"
         progress = f"({i} applied in memory, nothing written.)"
@@ -186,14 +195,14 @@ def handle_file_replace(path, replacements, dry_run=False):
 
         all_matches = find_substring_matches(working, r.find)
         candidates = (
-            [m for m in all_matches if m.start_line <= r.line_number <= m.end_line]
+            [m for m in all_matches if m.start_line <= r.line_number + line_offset <= m.end_line]
             if r.line_number is not None else all_matches
         )
 
         if len(candidates) == 0:
             release(lock)
             if r.line_number is not None:
-                ctx = excerpt(working, r.line_number, radius=1)
+                ctx = excerpt(working, r.line_number + line_offset, radius=1)
                 return Error(f"{label} failed: find not found at line {r.line_number}.\n{ctx}\n{progress}")
             first_line = first_line_of(r.find)
             partial = find_substring_matches(working, first_line)
@@ -212,7 +221,7 @@ def handle_file_replace(path, replacements, dry_run=False):
                 same_line = all(m.start_line == candidates[0].start_line for m in candidates)
                 if same_line:
                     char_positions = [m.start_char for m in candidates]
-                    ctx = excerpt(working, r.line_number, radius=1)
+                    ctx = excerpt(working, r.line_number + line_offset, radius=1)
                     return Error(
                         f"{label} failed: ambiguous at line {r.line_number}: find matched"
                         f" {len(candidates)} times at characters {char_positions}. Replace the whole line.\n{ctx}\n{progress}"
@@ -230,47 +239,72 @@ def handle_file_replace(path, replacements, dry_run=False):
                 f" Provide line_number or widen find.\n{join(snippets)}\n{progress}"
             )
 
-        working = replace_exact(working, r.find, r.replace)
+        working = replace_at(working, candidates[0], r.replace)
+        line_offset += count_lines(r.replace) - count_lines(r.find)
 
-    # 6. Dry-run exit — return diff without writing
+    # 7. Dry-run exit — return diff without writing
     if dry_run:
         release(lock)
         return compute_myers_diff(path, file_content, working)
 
-    # 7. External-modification check before committing
+    # 8. External-modification check before committing
     if sha256(read_file(path)) != checksum:
         release(lock)
         return Error("Edit aborted: file was modified externally between read and write.")
 
-    # 8. Atomic write — preserve original file permissions
+    # 9. Atomic write — preserve original file permissions
     original_mode = stat(path).mode
-    tmp_path = path + ".tmp"
+    tmp_path = path + ".tmp." + current_time_ns()
     write_to_disk(tmp_path, working, mode=original_mode)
     rename(tmp_path, path)  # POSIX-atomic
     release(lock)
 
-    # 9. Return unified diff
+    # 10. Return unified diff
     return compute_myers_diff(path, file_content, working)
 ```
 
-`handle_file_replace_all` is identical except the inner loop of step 5:
+`handle_file_replace_all` is identical to `handle_file_replace` except:
+
+**1.** The step 1 guard loop additionally validates `start_line` and `end_line`:
+
+```python
+        if r.start_line is not None and r.start_line < 1:
+            return Error(f"{label}: start_line must be ≥ 1.")
+        if r.end_line is not None and r.end_line < 1:
+            return Error(f"{label}: end_line must be ≥ 1.")
+        if r.start_line is not None and r.end_line is not None and r.end_line < r.start_line:
+            return Error(f"{label}: end_line must be ≥ start_line.")
+```
+
+**2.** Step 5 additionally checks `end_line` against the file length:
+
+```python
+        if r.end_line is not None and r.end_line > total_lines:
+            release(lock)
+            return Error(f"Replacement {i+1}: end_line {r.end_line} out of range (file has {total_lines} lines).")
+```
+
+**3.** The inner match/replace block in step 6:
 
 ```python
         all_matches = find_substring_matches(working, r.find)
+        # start_line/end_line are relative to the original file; adjust to working's coordinate space
+        adjusted_start = (r.start_line + line_offset) if r.start_line is not None else None
+        adjusted_end = (r.end_line + line_offset) if r.end_line is not None else None
         candidates = [
             m for m in all_matches
-            if (r.start_line is None or m.start_line >= r.start_line) and
-               (r.end_line is None or m.end_line <= r.end_line)
+            if (adjusted_start is None or m.start_line >= adjusted_start) and
+               (adjusted_end is None or m.end_line <= adjusted_end)
         ]
 
         if len(candidates) == 0:
             release(lock)
             if r.start_line is not None or r.end_line is not None:
-                scope_start = r.start_line if r.start_line is not None else 1
-                scope_end = r.end_line if r.end_line is not None else total_lines
+                scope_start = adjusted_start if adjusted_start is not None else 1
+                scope_end = adjusted_end if adjusted_end is not None else total_lines + line_offset
                 ctx = excerpt(working, scope_start, end_line=scope_end)
                 return Error(
-                    f"{label} failed: find not found between lines {scope_start}–{scope_end}.\n{ctx}\n{progress}"
+                    f"{label} failed: find not found between lines {r.start_line or 1}–{r.end_line or total_lines}.\n{ctx}\n{progress}"
                 )
             first_line = first_line_of(r.find)
             partial = find_substring_matches(working, first_line)
@@ -284,17 +318,20 @@ def handle_file_replace(path, replacements, dry_run=False):
             return Error(f"{label} failed: find not found in file (check whitespace or CRLF endings). {progress}")
 
         # Replace all candidates (descending position order to preserve offsets)
-        working = replace_all_occurrences(working, r.find, r.replace, scope=(r.start_line, r.end_line))
+        working = replace_all_occurrences(working, r.find, r.replace, scope=(adjusted_start, adjusted_end))
+        line_offset += len(candidates) * (count_lines(r.replace) - count_lines(r.find))
 ```
 
 ## Implementation notes
 
 - **Diff algorithm:** Myers diff, returned as a standard unified diff string.
-- **Atomic write:** write to `<filename>.tmp` in the same directory, then `os.Rename`. Same-directory placement guarantees both paths are on the same filesystem, making the rename atomic on POSIX. The temp file is created with the original file's mode (`os.Stat` before write, `os.Chmod` before rename) to preserve execute bits and other permissions.
+- **Atomic write:** the temp file uses a unique name (`<filename>.tmp.<nanosecond timestamp>`) to avoid colliding with an existing file or stale temp. After writing, `os.Rename` makes the replacement atomic on POSIX (same-directory placement guarantees both paths are on the same filesystem). The temp file is created with the original file's mode (`os.Stat` before write, `os.Chmod` before rename) to preserve execute bits and other permissions. On failure after the temp file is written, the temp file is removed.
 - **Per-file locking:** a `sync.Map` of `{sync.Mutex, refcount}` keyed by absolute path. Refcount is incremented on acquire and decremented on release; the entry is deleted from the map when it reaches zero. Prevents unbounded map growth while avoiding the race where a waiting goroutine holds a reference to a mutex that was already removed.
 - **External-modification detection:** SHA-256 of the file content is computed immediately after the read. Before writing, the file is re-read and its hash compared. A mismatch means an external process modified the file during the edit — the operation fails rather than silently overwriting unrelated changes.
 - **Line endings:** matching is byte-exact. The server assumes LF (`\n`). Files with CRLF line endings will fail to match `find` supplied with LF — the not-found error surfaces this hint explicitly.
-- **replace_exact** is a single-substitution call (`strings.Replace(s, old, new, 1)`). Uniqueness is pre-validated — this is a guaranteed single substitution, not a "first match wins" fallback.
+- **Substring matching:** `find_substring_matches` returns non-overlapping matches in left-to-right order, consistent with Go's `strings.Index`/`strings.Count` behavior. Example: `"aa"` in `"aaa"` yields one match at offset 0, not two overlapping matches.
+- **replace_at** performs a positional splice using the matched candidate's byte offsets: `s[:m.start_byte] + replace + s[m.end_byte:]`. This guarantees the correct occurrence is replaced even when `find` appears multiple times and `line_number` was used to narrow to one candidate.
+- **Symlink handling:** the path is resolved via `filepath.EvalSymlinks` before locking. The lock key and write target are the real path. This ensures two calls through different symlinks to the same file serialize correctly, and that `rename` operates on the real file rather than replacing the symlink itself.
 - **No shell involvement:** the entire operation is in-process Go. No `exec`, no escaping.
 
 ## Why not exec_sync?
