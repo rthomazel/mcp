@@ -71,10 +71,11 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
         return Error(f"line_number must be ≥ 1, got {line_number}.")
 
     # 2. Acquire exclusive per-file lock (held until after rename)
-    lock = acquire_file_lock(path)
+    lock = acquire_file_lock(path)  # refcounted; entry removed from map when refcount reaches 0
 
-    # 3. Read file
+    # 3. Read file and snapshot checksum for external-modification detection
     file_content = read_file(path)
+    checksum = sha256(file_content)
     total_lines = count_lines(file_content)
 
     # 4. Validate line_number range now that we know the file length
@@ -146,13 +147,19 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
     # 9. replace_exact: uniqueness pre-validated above; guaranteed single substitution
     updated_content = replace_exact(file_content, old_text, new_text)
 
-    # 10. Atomic write — copy original permissions, then temp file + rename
+    # 10. External-modification check — re-read and compare checksum before committing
+    if sha256(read_file(path)) != checksum:
+        release(lock)
+        return Error("Edit aborted: file was modified externally between read and write.")
+
+    # 11. Atomic write — copy original permissions, then temp file + rename
     original_mode = stat(path).mode
+    tmp_path = path + ".tmp"
     write_to_disk(tmp_path, updated_content, mode=original_mode)
     rename(tmp_path, path)  # POSIX-atomic
     release(lock)
 
-    # 11. Return unified diff — confirms the patch without a secondary read
+    # 12. Return unified diff — confirms the patch without a secondary read
     return compute_myers_diff(path, file_content, updated_content)
 ```
 
@@ -160,7 +167,8 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
 
 - **Diff algorithm:** Myers diff, returned as a standard unified diff string.
 - **Atomic write:** write to `<filename>.tmp` in the same directory, then `os.Rename`. Same-directory placement guarantees both paths are on the same filesystem, making the rename atomic on POSIX. The temp file is created with the original file's mode (`os.Stat` before write, `os.Chmod` before rename) to preserve execute bits and other permissions.
-- **Per-file locking:** a `sync.Map` of `sync.Mutex` keyed by absolute path, acquired before the read and released after the rename. Prevents two concurrent clients from racing on the same file.
+- **Per-file locking:** a `sync.Map` of `{sync.Mutex, refcount}` keyed by absolute path. Refcount is incremented on acquire and decremented on release; the entry is deleted from the map when it reaches zero. This prevents unbounded map growth while avoiding the race where a waiting goroutine holds a reference to a mutex that was already removed.
+- **External-modification detection:** SHA-256 of the file content is computed immediately after the read. Before writing, the file is re-read and its hash compared. A mismatch means an external process modified the file during the edit — the operation fails rather than silently overwriting unrelated changes.
 - **Line endings:** matching is byte-exact. The server assumes LF (`\n`). Files with CRLF line endings will fail to match `old_text` supplied with LF — the not-found error surfaces this hint explicitly.
 - **replace_exact** is a single-substitution call (`strings.Replace(s, old, new, 1)`). The name signals that uniqueness is pre-validated — it is not a "first match wins" fallback.
 - **No shell involvement:** the entire operation is in-process Go. No `exec`, no escaping.
