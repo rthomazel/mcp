@@ -34,7 +34,7 @@ Both accept a batch of replacements applied sequentially in memory with a single
             },
             "replace": {
               "type": "string",
-              "description": "Replacement text. Max 50 lines. Empty string deletes the match."
+              "description": "Replacement text. Subject to a configurable line limit. Empty string deletes the match."
             },
             "line_number": {
               "type": "integer",
@@ -75,7 +75,7 @@ Both accept a batch of replacements applied sequentially in memory with a single
             },
             "replace": {
               "type": "string",
-              "description": "Replacement text. Max 50 lines. Empty string deletes each match."
+              "description": "Replacement text. Empty string deletes each match."
             },
             "start_line": {
               "type": "integer",
@@ -184,10 +184,43 @@ def handle_file_replace(path, replacements):
 
         if len(candidates) == 0:
             release(lock)
-            return Error(f"{label} failed: [not-found diagnostics]. {progress}")
+            if r.line_number is not None:
+                ctx = excerpt(working, r.line_number, radius=1)
+                return Error(f"{label} failed: find not found at line {r.line_number}.\n{ctx}\n{progress}")
+            first_line = first_line_of(r.find)
+            partial = find_substring_matches(working, first_line)
+            if partial:
+                snippets = [excerpt(working, m.start_line, radius=1) for m in partial]
+                locs = [m.start_line for m in partial]
+                return Error(
+                    f"{label} failed: first line of find matched at {locs} but full find did not match"
+                    f" (check indentation or whitespace).\n{join(snippets)}\n{progress}"
+                )
+            return Error(f"{label} failed: find not found in file (check whitespace or CRLF endings). {progress}")
+
         if len(candidates) > 1:
             release(lock)
-            return Error(f"{label} failed: [ambiguity diagnostics]. {progress}")
+            if r.line_number is not None:
+                same_line = all(m.start_line == candidates[0].start_line for m in candidates)
+                if same_line:
+                    char_positions = [m.start_char for m in candidates]
+                    ctx = excerpt(working, r.line_number, radius=1)
+                    return Error(
+                        f"{label} failed: ambiguous at line {r.line_number}: find matched"
+                        f" {len(candidates)} times at characters {char_positions}. Replace the whole line.\n{ctx}\n{progress}"
+                    )
+                locs = [m.start_line for m in candidates]
+                snippets = [excerpt(working, m.start_line, radius=1) for m in candidates]
+                return Error(
+                    f"{label} failed: line_number {r.line_number} did not narrow to one match"
+                    f" (at lines {locs}).\n{join(snippets)}\n{progress}"
+                )
+            locs = [m.start_line for m in candidates]
+            snippets = [excerpt(working, m.start_line, radius=1) for m in candidates]
+            return Error(
+                f"{label} failed: find matched {len(candidates)} locations (lines {locs})."
+                f" Provide line_number or widen find.\n{join(snippets)}\n{progress}"
+            )
 
         working = replace_exact(working, r.find, r.replace)
 
