@@ -14,5 +14,4 @@ Read `doc/` .md files for architecture and project documentation before making c
 - Add tests only when asked; focus on code that is complex or prone to bugs
 - Write functions in call order — entry point first, then what it calls
 - Do not start background jobs on your own; wait to be asked
-- This is a jujutsu repo — do not make commits
 - Go packages should have a doc.go file with a // Package Foo ... go doc command
