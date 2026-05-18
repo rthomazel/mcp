@@ -252,7 +252,23 @@ def handle_file_replace(path, replacements):
 
         if len(candidates) == 0:
             release(lock)
-            return Error(f"{label} failed: [not-found diagnostics]. {progress}")
+            if r.start_line is not None or r.end_line is not None:
+                scope_start = r.start_line if r.start_line is not None else 1
+                scope_end = r.end_line if r.end_line is not None else total_lines
+                ctx = excerpt(working, scope_start, end_line=scope_end)
+                return Error(
+                    f"{label} failed: find not found between lines {scope_start}–{scope_end}.\n{ctx}\n{progress}"
+                )
+            first_line = first_line_of(r.find)
+            partial = find_substring_matches(working, first_line)
+            if partial:
+                snippets = [excerpt(working, m.start_line, radius=1) for m in partial]
+                locs = [m.start_line for m in partial]
+                return Error(
+                    f"{label} failed: first line of find matched at {locs} but full find did not match"
+                    f" (check indentation or whitespace).\n{join(snippets)}\n{progress}"
+                )
+            return Error(f"{label} failed: find not found in file (check whitespace or CRLF endings). {progress}")
 
         # Replace all candidates (descending position order to preserve offsets)
         working = replace_all_occurrences(working, r.find, r.replace, scope=(r.start_line, r.end_line))
