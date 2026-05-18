@@ -65,6 +65,8 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
         return Error("No changes: old_text and new_text are identical.")
     if "\x00" in old_text or "\x00" in new_text:
         return Error("Null bytes detected; binary files are not supported.")
+    if not is_valid_utf8(old_text) or not is_valid_utf8(new_text):
+        return Error("old_text and new_text must be valid UTF-8.")
     if line_number is not None and line_number < 1:
         return Error(f"line_number must be ≥ 1, got {line_number}.")
 
@@ -117,7 +119,9 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
                 release(lock)
                 return Error(
                     "Patch failed: first line of old_text not found in file. "
-                    "Check for whitespace or indentation differences."
+                    "Check for whitespace or indentation differences. "
+                    "If the file originated on Windows, line endings may be CRLF (\\r\\n) "
+                    "while old_text uses LF (\\n) — matching is byte-exact."
                 )
 
     if len(candidates) > 1:
@@ -142,9 +146,9 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
     # 9. replace_exact: uniqueness pre-validated above; guaranteed single substitution
     updated_content = replace_exact(file_content, old_text, new_text)
 
-    # 10. Atomic write — temp file + rename prevents partial-write corruption
-    tmp_path = path + ".tmp"
-    write_to_disk(tmp_path, updated_content)
+    # 10. Atomic write — copy original permissions, then temp file + rename
+    original_mode = stat(path).mode
+    write_to_disk(tmp_path, updated_content, mode=original_mode)
     rename(tmp_path, path)  # POSIX-atomic
     release(lock)
 
@@ -155,8 +159,9 @@ def handle_edit_file(path, old_text, new_text, line_number=None):
 ## Implementation notes
 
 - **Diff algorithm:** Myers diff, returned as a standard unified diff string.
-- **Atomic write:** write to `<filename>.tmp` in the same directory, then `os.Rename`. Same-directory placement guarantees both paths are on the same filesystem, making the rename atomic on POSIX.
+- **Atomic write:** write to `<filename>.tmp` in the same directory, then `os.Rename`. Same-directory placement guarantees both paths are on the same filesystem, making the rename atomic on POSIX. The temp file is created with the original file's mode (`os.Stat` before write, `os.Chmod` before rename) to preserve execute bits and other permissions.
 - **Per-file locking:** a `sync.Map` of `sync.Mutex` keyed by absolute path, acquired before the read and released after the rename. Prevents two concurrent clients from racing on the same file.
+- **Line endings:** matching is byte-exact. The server assumes LF (`\n`). Files with CRLF line endings will fail to match `old_text` supplied with LF — the not-found error surfaces this hint explicitly.
 - **replace_exact** is a single-substitution call (`strings.Replace(s, old, new, 1)`). The name signals that uniqueness is pre-validated — it is not a "first match wins" fallback.
 - **No shell involvement:** the entire operation is in-process Go. No `exec`, no escaping.
 
