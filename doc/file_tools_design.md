@@ -130,7 +130,8 @@ All errors that identify match locations include 1 line of file context before a
 ### handle_file_replace
 
 ```python
-MAX_SHOWN = 5  # max matches shown in diagnostic output
+MAX_SHOWN = 5  # max matches shown in diagnostic output; shared by both handlers
+
 
 def handle_file_replace(path, replacements, dry_run=False):
     # 1. Input guards (no lock needed — pure validation)
@@ -274,7 +275,10 @@ def handle_file_replace(path, replacements, dry_run=False):
         remove(tmp)
         release(lock)
         return Error(f"Write failed: {err}")
-    chmod(tmp, original_mode)
+    if err := chmod(tmp, original_mode); err != nil:
+        remove(tmp)
+        release(lock)
+        return Error(f"Chmod failed: {err}")
     if err := rename(tmp, path); err != nil:  # POSIX-atomic
         remove(tmp)
         release(lock)
@@ -391,7 +395,10 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
         remove(tmp)
         release(lock)
         return Error(f"Write failed: {err}")
-    chmod(tmp, original_mode)
+    if err := chmod(tmp, original_mode); err != nil:
+        remove(tmp)
+        release(lock)
+        return Error(f"Chmod failed: {err}")
     if err := rename(tmp, path); err != nil:  # POSIX-atomic
         remove(tmp)
         release(lock)
@@ -404,6 +411,8 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
 
 ## Implementation notes
 
+- **I/O error handling:** All I/O primitives (`resolve_symlinks`, `is_regular_file`, `read_file`, `stat`, `os_create_temp`, and the external-modification re-read) can fail. Any such failure is returned immediately as a tool error. If the lock is held at the time of failure, it is released before returning.
+- **`count_lines`:** editor-style line count — `strings.Count(s, "\n")`, plus 1 if `s` is non-empty and does not end with `\n`. Returns 0 for an empty string. Used for range validation (`total_lines`); distinct from `count_newlines` which is used only for the `replace` line-limit guard.
 - **Diff algorithm:** Myers diff, returned as a standard unified diff string.
 - **Atomic write:** `os.CreateTemp` in the same directory creates a uniquely named temp file with `O_CREATE|O_EXCL` at mode `0600`. Contents are written and flushed, then `os.Chmod` sets the original file’s mode, then `os.Rename` replaces the original atomically on POSIX. Writing at `0600` before chmod prevents a window where the temp file is world-readable. On any write, chmod, or rename failure, the temp file is removed before returning the error. Same-directory placement guarantees both paths are on the same filesystem.
 - **Per-file locking:** a `sync.Map` of `{sync.Mutex, refcount}` keyed by absolute path. `acquire`: lock the map, get or create the entry and increment refcount, unlock the map, then lock the entry mutex. `release`: unlock the entry mutex, then lock the map, decrement refcount, delete the entry if refcount reaches zero, unlock the map. Decrement-then-delete happens under the map lock so that a new goroutine cannot grab a stale pointer to an entry that is being removed.
