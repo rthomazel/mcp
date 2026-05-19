@@ -171,7 +171,7 @@ def handle_file_replace(path, replacements, dry_run=False):
 
     # 4. Read file and snapshot checksum; reject binary content
     file_content = read_file(path)
-    if contains_null_bytes(file_content):
+    if contains_null_bytes(file_content) or not is_valid_utf8(file_content):
         release(lock)
         return Error("Binary files are not supported.")
     checksum = sha256(file_content)
@@ -354,7 +354,10 @@ def handle_file_replace(path, replacements, dry_run=False):
                 f"in the original file."
             )
 
-    # Apply in descending byte order
+    # Apply in descending byte order.
+    # At this point the shape of all_edits is identical to the located list in
+    # handle_file_replace: a flat sequence of (item, replacement, single_match).
+    # Implementations may extract a shared apply_edits helper used by both tools.
     working = file_content
     for _, r, m in reversed(all_edits):
         working = working[:m.start_byte] + r.replace + working[m.end_byte:]
@@ -364,7 +367,7 @@ def handle_file_replace(path, replacements, dry_run=False):
 
 - **Diff algorithm:** Myers diff, returned as a standard unified diff string.
 - **Atomic write:** `os.CreateTemp` in the same directory creates a uniquely named temp file with `O_CREATE|O_EXCL`, guaranteeing no collision. After writing, the temp file's permissions are set to match the original via `os.Chmod`, then `os.Rename` replaces the original atomically on POSIX. Same-directory placement guarantees both paths are on the same filesystem. On any failure after the temp file is created, it is removed.
-- **Per-file locking:** a `sync.Map` of `{sync.Mutex, refcount}` keyed by absolute path. Refcount is incremented on acquire and decremented on release; the entry is deleted from the map when it reaches zero. Prevents unbounded map growth while avoiding the race where a waiting goroutine holds a reference to a mutex that was already removed.
+- **Per-file locking:** a `sync.Map` of `{sync.Mutex, refcount}` keyed by absolute path. `acquire`: lock the map, get or create the entry and increment refcount, unlock the map, then lock the entry mutex. `release`: unlock the entry mutex, then lock the map, decrement refcount, delete the entry if refcount reaches zero, unlock the map. Decrement-then-delete happens under the map lock so that a new goroutine cannot grab a stale pointer to an entry that is being removed. Prevents unbounded map growth while avoiding the race where a waiting goroutine holds a reference to a mutex that was already removed.
 - **External-modification detection:** SHA-256 of the file content is computed immediately after the read. Before writing, the file is re-read and its hash compared. A mismatch means an external process modified the file during the edit — the operation fails rather than silently overwriting unrelated changes. This is best-effort: a modification occurring between the second read and the rename would not be detected.
 - **Line endings:** matching is byte-exact. The server assumes LF (`\n`). Files with CRLF line endings will fail to match `find` supplied with LF — the not-found error surfaces this hint explicitly.
 - **Substring matching:** `find_substring_matches` returns non-overlapping matches in left-to-right order, consistent with Go's `strings.Index`/`strings.Count` behavior. Example: `"aa"` in `"aaa"` yields one match at offset 0, not two overlapping matches.
