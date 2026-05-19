@@ -1,6 +1,6 @@
-# file_replace and file_replace_all
+# File Tools Design
 
-Find-and-replace tools for precise file editing, built on the same mental model as editor tooling.
+Specification and implementation guide for `file_replace` and `file_replace_all`.
 
 - **`file_replace`** — replaces each `find` exactly once per item (unique match required); accepts a batch
 - **`file_replace_all`** — replaces every occurrence of a single `find`
@@ -95,25 +95,27 @@ Find-and-replace tools for precise file editing, built on the same mental model 
 
 | Constraint | Value | Rationale |
 | --- | --- | --- |
-| `replace` max lines | **50** (env: `JAIL_MCP_EDIT_MAX_LINES`) | Keeps individual replacements surgical |
+| Max newlines in `replace` | **50** (env: `JAIL_MCP_EDIT_MAX_LINES`) | Keeps individual replacements surgical |
 | `file_replace` match count | exactly 1 per item | Fails loudly on ambiguity |
 | `file_replace_all` match count | ≥ 1 | Zero matches is an error |
 | Chaining within a `file_replace` call | not supported | All `find` values are matched against the original file content before any replacement is applied. To target text produced by a prior replacement, issue a second call. |
 
 ## Error behavior
 
-`file_replace` is **fail-fast**: all items are validated in a pre-pass against the original file content before any edits are applied. If any item fails, nothing is written to disk.
+`file_replace` is **fail-fast**: all items are validated in a single pre-pass against the original file content before any edits are applied. If any item fails, nothing is written to disk.
+
+`file_replace_all` validates its single find/replace pair and either applies all matches or writes nothing.
 
 ### file_replace error matrix
 
-All errors that identify match locations include 1 line of file context before and after each match.
+All errors that identify match locations include 1 line of file context before and after each match. Diagnostic output is capped at 5 matches; when more exist the error notes “showing first 5 of N.”
 
 | Matches | `line_number` | Error content |
 | --- | --- | --- |
 | 0 | omitted | Searches for first non-empty line of `find`; if found, reports line(s) with 1-line context; if not found, says so and points to whitespace/indentation or CRLF line endings |
 | 0 | provided | "`find` not found at line N" + shows line N with 1-line context |
-| >1 | omitted | Lists starting line of each match with 1-line context; suggests `line_number` or widening `find` |
-| >1 | provided, spread | Lists starting line of each candidate with 1-line context; notes `line_number` N did not narrow to one |
+| >1 | omitted | Lists starting line of each match with 1-line context (capped at 5); suggests `line_number` or widening `find` |
+| >1 | provided, spread | Lists starting line of each candidate with 1-line context (capped at 5); notes `line_number` N did not narrow to one |
 | >1 | provided, same line | Char positions of each match + line content; suggests replacing the whole line |
 
 ### file_replace_all error cases
@@ -121,13 +123,15 @@ All errors that identify match locations include 1 line of file context before a
 | Situation | Error content |
 | --- | --- |
 | 0 matches, no scope | "`find` not found in file" + first non-empty line diagnostic with 1-line context |
-| 0 matches, with scope | "`find` not found between lines X–Y" + shows that range |
+| 0 matches, with scope | "`find` not found between lines X–Y" + up to 10 lines of that range |
 
 ## Execution flow
 
 ### handle_file_replace
 
 ```python
+MAX_SHOWN = 5  # max matches shown in diagnostic output
+
 def handle_file_replace(path, replacements, dry_run=False):
     # 1. Input guards (no lock needed — pure validation)
     if not is_absolute(path):
@@ -145,17 +149,21 @@ def handle_file_replace(path, replacements, dry_run=False):
         if not is_valid_utf8(r.find) or not is_valid_utf8(r.replace):
             return Error(f"{label}: find and replace must be valid UTF-8.")
         if r.line_number is not None and r.line_number < 1:
-            return Error(f"{label}: line_number must be ≥ 1.")
+            return Error(f"{label}: line_number must be \u2265 1.")
         if count_newlines(r.replace) > MAX_LINES:
-            return Error(f"{label}: replace exceeds the {MAX_LINES}-line limit.")
+            return Error(f"{label}: replace exceeds the {MAX_LINES}-newline limit.")
 
     # 2. Resolve symlinks — lock and operate on the real path
     path = resolve_symlinks(path)
 
-    # 3. Acquire exclusive per-file lock
+    # 3. Verify resolved path is a regular file
+    if not is_regular_file(path):
+        return Error(f"path must point to a regular file.")
+
+    # 4. Acquire exclusive per-file lock
     lock = acquire_file_lock(path)
 
-    # 4. Read file and snapshot checksum; reject binary content
+    # 5. Read file; reject binary content
     file_content = read_file(path)
     if contains_null_bytes(file_content) or not is_valid_utf8(file_content):
         release(lock)
@@ -163,13 +171,13 @@ def handle_file_replace(path, replacements, dry_run=False):
     checksum = sha256(file_content)
     total_lines = count_lines(file_content)
 
-    # 5. Validate line_number ranges against actual file length
+    # 6. Validate line_number ranges against actual file length
     for i, r in enumerate(replacements):
         if r.line_number is not None and r.line_number > total_lines:
             release(lock)
             return Error(f"Replacement {i+1}: line_number {r.line_number} out of range (file has {total_lines} lines).")
 
-    # 6. Pre-pass: locate each replacement's unique candidate in the original content.
+    # 7. Pre-pass: locate each replacement's unique candidate in the original content.
     # All searches run on file_content. Chaining is not supported within a call;
     # use a second call to target text produced by a prior replacement.
     located = []  # list of (original_index, replacement, candidate_match)
@@ -191,10 +199,12 @@ def handle_file_replace(path, replacements, dry_run=False):
             if first_line is not None:
                 partial = find_substring_matches(file_content, first_line)
                 if partial:
-                    snippets = [excerpt(file_content, m.start_line, radius=1) for m in partial]
-                    locs = [m.start_line for m in partial]
+                    shown = partial[:MAX_SHOWN]
+                    snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
+                    locs = [m.start_line for m in shown]
+                    suffix = f" (showing first {MAX_SHOWN} of {len(partial)})" if len(partial) > MAX_SHOWN else ""
                     return Error(
-                        f"{label} failed: first line of find matched at {locs} but full find did not match"
+                        f"{label} failed: first line of find matched at {locs}{suffix} but full find did not match"
                         f" (check indentation or whitespace).\n{join(snippets)}"
                     )
             return Error(f"{label} failed: find not found in file (check whitespace or CRLF endings).")
@@ -210,22 +220,26 @@ def handle_file_replace(path, replacements, dry_run=False):
                         f"{label} failed: ambiguous at line {r.line_number}: find matched"
                         f" {len(candidates)} times at characters {char_positions}. Replace the whole line.\n{ctx}"
                     )
-                locs = [m.start_line for m in candidates]
-                snippets = [excerpt(file_content, m.start_line, radius=1) for m in candidates]
+                shown = candidates[:MAX_SHOWN]
+                locs = [m.start_line for m in shown]
+                snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
+                suffix = f" (showing first {MAX_SHOWN} of {len(candidates)})" if len(candidates) > MAX_SHOWN else ""
                 return Error(
                     f"{label} failed: line_number {r.line_number} did not narrow to one match"
-                    f" (at lines {locs}).\n{join(snippets)}"
+                    f" (at lines {locs}{suffix}).\n{join(snippets)}"
                 )
-            locs = [m.start_line for m in candidates]
-            snippets = [excerpt(file_content, m.start_line, radius=1) for m in candidates]
+            shown = candidates[:MAX_SHOWN]
+            locs = [m.start_line for m in shown]
+            snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
+            suffix = f" (showing first {MAX_SHOWN} of {len(candidates)})" if len(candidates) > MAX_SHOWN else ""
             return Error(
-                f"{label} failed: find matched {len(candidates)} locations (lines {locs})."
+                f"{label} failed: find matched {len(candidates)} locations (lines {locs}{suffix})."
                 f" Provide line_number or widen find.\n{join(snippets)}"
             )
 
         located.append((i, r, candidates[0]))
 
-    # 7. Sort by start_byte ascending; reject overlapping candidates
+    # 8. Sort by start_byte ascending; reject overlapping candidates
     located.sort(key=lambda x: x[2].start_byte)
     for j in range(1, len(located)):
         prev_idx, _, prev_m = located[j-1]
@@ -237,31 +251,37 @@ def handle_file_replace(path, replacements, dry_run=False):
                 f"in the original file."
             )
 
-    # 8. Apply in descending byte order — later-in-file edits first so that
+    # 9. Apply in descending byte order — later-in-file edits first so that
     # byte offsets of earlier edits remain valid throughout.
     working = file_content
     for _, r, m in reversed(located):
         working = working[:m.start_byte] + r.replace + working[m.end_byte:]
 
-    # 9. Dry-run exit — return diff without writing
+    # 10. Dry-run exit — return diff without writing
     if dry_run:
         release(lock)
         return compute_myers_diff(path, file_content, working)
 
-    # 10. External-modification check before committing
+    # 11. External-modification check before committing
     if sha256(read_file(path)) != checksum:
         release(lock)
         return Error("Edit aborted: file was modified externally between read and write.")
 
-    # 11. Atomic write — preserve original file permissions
+    # 12. Atomic write — preserve original file permissions
     original_mode = stat(path).mode
-    tmp = os_create_temp(dir=dirname(path))  # O_CREATE|O_EXCL; unique name guaranteed
+    tmp = os_create_temp(dir=dirname(path))  # O_CREATE|O_EXCL|0600; unique name guaranteed
+    if err := write_to_disk(tmp, working); err != nil:
+        remove(tmp)
+        release(lock)
+        return Error(f"Write failed: {err}")
     chmod(tmp, original_mode)
-    write_to_disk(tmp, working)
-    rename(tmp, path)  # POSIX-atomic
+    if err := rename(tmp, path); err != nil:  # POSIX-atomic
+        remove(tmp)
+        release(lock)
+        return Error(f"Rename failed: {err}")
     release(lock)
 
-    # 12. Return unified diff
+    # 13. Return unified diff
     return compute_myers_diff(path, file_content, working)
 ```
 
@@ -281,21 +301,25 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
     if not is_valid_utf8(find) or not is_valid_utf8(replace):
         return Error("find and replace must be valid UTF-8.")
     if count_newlines(replace) > MAX_LINES:
-        return Error(f"replace exceeds the {MAX_LINES}-line limit.")
+        return Error(f"replace exceeds the {MAX_LINES}-newline limit.")
     if start_line is not None and start_line < 1:
-        return Error("start_line must be ≥ 1.")
+        return Error("start_line must be \u2265 1.")
     if end_line is not None and end_line < 1:
-        return Error("end_line must be ≥ 1.")
+        return Error("end_line must be \u2265 1.")
     if start_line is not None and end_line is not None and end_line < start_line:
-        return Error("end_line must be ≥ start_line.")
+        return Error("end_line must be \u2265 start_line.")
 
     # 2. Resolve symlinks — lock and operate on the real path
     path = resolve_symlinks(path)
 
-    # 3. Acquire exclusive per-file lock
+    # 3. Verify resolved path is a regular file
+    if not is_regular_file(path):
+        return Error(f"path must point to a regular file.")
+
+    # 4. Acquire exclusive per-file lock
     lock = acquire_file_lock(path)
 
-    # 4. Read file and snapshot checksum; reject binary content
+    # 5. Read file; reject binary content
     file_content = read_file(path)
     if contains_null_bytes(file_content) or not is_valid_utf8(file_content):
         release(lock)
@@ -303,7 +327,7 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
     checksum = sha256(file_content)
     total_lines = count_lines(file_content)
 
-    # 5. Validate scope against file length
+    # 6. Validate scope against file length
     if start_line is not None and start_line > total_lines:
         release(lock)
         return Error(f"start_line {start_line} out of range (file has {total_lines} lines).")
@@ -311,7 +335,10 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
         release(lock)
         return Error(f"end_line {end_line} out of range (file has {total_lines} lines).")
 
-    # 6. Find all matches within scope
+    # 7. Find all matches within scope.
+    # A match is included only if it is fully contained within the scope:
+    # m.start_line >= start_line AND m.end_line <= end_line.
+    # Multi-line matches that cross either boundary are not replaced.
     all_matches = find_substring_matches(file_content, find)
     candidates = [
         m for m in all_matches
@@ -324,58 +351,69 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
         if start_line is not None or end_line is not None:
             scope_start = start_line or 1
             scope_end = end_line or total_lines
-            ctx = excerpt(file_content, scope_start, end_line=scope_end)
-            return Error(f"find not found between lines {scope_start}–{scope_end}.\n{ctx}")
+            ctx = excerpt(file_content, scope_start, end_line=scope_end, max_lines=10)
+            return Error(f"find not found between lines {scope_start}\u2013{scope_end}.\n{ctx}")
         first_line = first_nonempty_line_of(find)
         if first_line is not None:
             partial = find_substring_matches(file_content, first_line)
             if partial:
-                snippets = [excerpt(file_content, m.start_line, radius=1) for m in partial]
-                locs = [m.start_line for m in partial]
+                shown = partial[:MAX_SHOWN]
+                snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
+                locs = [m.start_line for m in shown]
+                suffix = f" (showing first {MAX_SHOWN} of {len(partial)})" if len(partial) > MAX_SHOWN else ""
                 return Error(
-                    f"first line of find matched at {locs} but full find did not match"
+                    f"first line of find matched at {locs}{suffix} but full find did not match"
                     f" (check indentation or whitespace).\n{join(snippets)}"
                 )
         return Error("find not found in file (check whitespace or CRLF endings).")
 
-    # 7. Apply in descending byte order — candidates from find_substring_matches are
-    # already non-overlapping and ascending; reversing gives correct descending order.
+    # 8. Apply in descending byte order — candidates are non-overlapping by construction
+    # (find_substring_matches returns non-overlapping results) so no overlap check is needed.
+    # Replacement text is not re-searched; this matches strings.ReplaceAll semantics.
     working = file_content
     for m in reversed(candidates):
         working = working[:m.start_byte] + replace + working[m.end_byte:]
 
-    # 8. Dry-run exit — return diff without writing
+    # 9. Dry-run exit — return diff without writing
     if dry_run:
         release(lock)
         return compute_myers_diff(path, file_content, working)
 
-    # 9. External-modification check before committing
+    # 10. External-modification check before committing
     if sha256(read_file(path)) != checksum:
         release(lock)
         return Error("Edit aborted: file was modified externally between read and write.")
 
-    # 10. Atomic write — preserve original file permissions
+    # 11. Atomic write — preserve original file permissions
     original_mode = stat(path).mode
-    tmp = os_create_temp(dir=dirname(path))  # O_CREATE|O_EXCL; unique name guaranteed
+    tmp = os_create_temp(dir=dirname(path))  # O_CREATE|O_EXCL|0600; unique name guaranteed
+    if err := write_to_disk(tmp, working); err != nil:
+        remove(tmp)
+        release(lock)
+        return Error(f"Write failed: {err}")
     chmod(tmp, original_mode)
-    write_to_disk(tmp, working)
-    rename(tmp, path)  # POSIX-atomic
+    if err := rename(tmp, path); err != nil:  # POSIX-atomic
+        remove(tmp)
+        release(lock)
+        return Error(f"Rename failed: {err}")
     release(lock)
 
-    # 11. Return unified diff
+    # 12. Return unified diff
     return compute_myers_diff(path, file_content, working)
 ```
 
 ## Implementation notes
 
 - **Diff algorithm:** Myers diff, returned as a standard unified diff string.
-- **Atomic write:** `os.CreateTemp` in the same directory creates a uniquely named temp file with `O_CREATE|O_EXCL`, guaranteeing no collision. After writing, the temp file’s permissions are set to match the original via `os.Chmod`, then `os.Rename` replaces the original atomically on POSIX. Same-directory placement guarantees both paths are on the same filesystem. On any failure after the temp file is created, it is removed.
-- **Per-file locking:** a `sync.Map` of `{sync.Mutex, refcount}` keyed by absolute path. `acquire`: lock the map, get or create the entry and increment refcount, unlock the map, then lock the entry mutex. `release`: unlock the entry mutex, then lock the map, decrement refcount, delete the entry if refcount reaches zero, unlock the map. Decrement-then-delete happens under the map lock so that a new goroutine cannot grab a stale pointer to an entry that is being removed. Prevents unbounded map growth while avoiding the race where a waiting goroutine holds a reference to a mutex that was already removed.
+- **Atomic write:** `os.CreateTemp` in the same directory creates a uniquely named temp file with `O_CREATE|O_EXCL` at mode `0600`. Contents are written and flushed, then `os.Chmod` sets the original file’s mode, then `os.Rename` replaces the original atomically on POSIX. Writing at `0600` before chmod prevents a window where the temp file is world-readable. On any write, chmod, or rename failure, the temp file is removed before returning the error. Same-directory placement guarantees both paths are on the same filesystem.
+- **Per-file locking:** a `sync.Map` of `{sync.Mutex, refcount}` keyed by absolute path. `acquire`: lock the map, get or create the entry and increment refcount, unlock the map, then lock the entry mutex. `release`: unlock the entry mutex, then lock the map, decrement refcount, delete the entry if refcount reaches zero, unlock the map. Decrement-then-delete happens under the map lock so that a new goroutine cannot grab a stale pointer to an entry that is being removed.
 - **External-modification detection:** SHA-256 of the file content is computed immediately after the read. Before writing, the file is re-read and its hash compared. A mismatch means an external process modified the file during the edit — the operation fails rather than silently overwriting unrelated changes. This is best-effort: a modification occurring between the second read and the rename would not be detected.
 - **Line endings:** matching is byte-exact. The server assumes LF (`\n`). Files with CRLF line endings will fail to match `find` supplied with LF — the not-found error surfaces this hint explicitly.
-- **Substring matching:** `find_substring_matches` returns non-overlapping matches in left-to-right order, consistent with Go’s `strings.Index`/`strings.Count` behavior. Example: `"aa"` in `"aaa"` yields one match at offset 0, not two overlapping matches. Because `file_replace_all` finds all occurrences of the same string, non-overlapping matching guarantees candidates are already disjoint — no separate overlap check is needed.
+- **Substring matching:** `find_substring_matches` returns non-overlapping matches in left-to-right order, consistent with Go’s `strings.Index`/`strings.Count` behavior. Example: `"aa"` in `"aaa"` yields one match at offset 0, not two overlapping matches.
 - **Line-span semantics:** a match’s `end_line` is the line on which its last byte resides. A trailing newline is the terminator for its own line: `"foo\n"` on line 3 has `end_line == 3`, not `4`. `count_newlines` used in the line-limit guard is `strings.Count(s, "\n")`.
-- **Symlink handling:** the path is resolved via `filepath.EvalSymlinks` before locking. The lock key and write target are the real path. This ensures two calls through different symlinks to the same file serialize correctly, and that `rename` operates on the real file rather than replacing the symlink itself.
+- **`file_replace_all` scope containment:** a match is selected only if it falls fully within `[start_line, end_line]`. A multi-line match that crosses either boundary is not replaced. This matches the least-surprising interpretation of “restrict to this range.”
+- **`file_replace_all` non-recursive:** replacement text is not re-searched even if it contains `find`. This matches `strings.ReplaceAll` semantics and is consistent with the pre-pass approach used by `file_replace`.
+- **Symlink handling:** the path is resolved via `filepath.EvalSymlinks` before locking. The resolved target is then verified to be a regular file (`os.Stat` + `Mode().IsRegular()`). The lock key and write target are the real path. This ensures two calls through different symlinks to the same file serialize correctly, and that `rename` operates on the real file rather than replacing the symlink itself.
 - **No shell involvement:** the entire operation is in-process Go. No `exec`, no escaping.
 
 ## Why not exec_sync?
@@ -387,10 +425,13 @@ The existing file-write workflow shells out Python/bash and redirects text into 
 
 `file_replace` and `file_replace_all` eliminate both: writes happen in-process (no shell), and the returned diff is immediate proof of what changed.
 
-## Known limitations
+## Out of scope
 
-**Substring matching is structurally fragile**
-Both tools match exact substrings — byte-for-byte, including indentation and whitespace. Small formatting changes (reordered imports, auto-formatter runs, generated comment additions) can invalidate a `find` block that was valid moments before. This is an accepted V1 tradeoff. Future extensions worth considering: indentation-aware matching, line-based patches, or AST-aware edits for structured languages.
+**Workspace boundary**
+Path confinement to an allowed root (e.g. the jail volume) is enforced at the server level by existing middleware, not per-tool. These tools operate on any regular file the server process can reach after symlink resolution. Adding a per-tool allowlist would duplicate that logic.
+
+**Substring matching is byte-exact**
+Both tools match substrings byte-for-byte, including indentation and whitespace. Auto-formatter runs, import reordering, or generated comment additions can invalidate a `find` block that was valid moments before. This is the intended behavior for a precise surgical tool — indentation-aware matching, line-based patches, or AST-aware edits are different tools for a different purpose.
 
 **Durability guarantees**
 A successful response means the rename completed — the replacement is visible to subsequent reads on the same filesystem. It does not guarantee durable persistence to stable storage (e.g. after a crash on a network-mounted filesystem). For the target use case (local or container-mounted filesystems in agentic loops) this is sufficient.
