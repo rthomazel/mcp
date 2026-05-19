@@ -7,11 +7,12 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 
+	"github.com/rthomazel/jail-mcp/internal"
 	"github.com/rthomazel/jail-mcp/internal/xml"
 )
 
 func (h *Handler) HandleStatus(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ids, ok := xml.ParseStringSlice(req.Params.Arguments["job_ids"])
+	ids, ok := internal.ParseStringSlice(req.Params.Arguments["job_ids"])
 	if !ok || len(ids) == 0 {
 		return mcp.NewToolResultError("missing required parameter: job_ids"), nil
 	}

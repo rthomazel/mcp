@@ -25,7 +25,7 @@ type commandResult struct {
 }
 
 func (h *Handler) HandleExec(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	commands, ok := xml.ParseStringSlice(req.Params.Arguments["commands"])
+	commands, ok := internal.ParseStringSlice(req.Params.Arguments["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil
 	}
