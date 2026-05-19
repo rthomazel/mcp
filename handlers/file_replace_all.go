@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rthomazel/jail-mcp/internal/fileops"
+	"github.com/rthomazel/jail-mcp/internal/file"
 )
 
 // HandleFileReplaceAll replaces every occurrence of find in a file, optionally
@@ -59,13 +59,13 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	if find == replace {
 		return "", "find and replace are identical — no change would be made."
 	}
-	if fileops.ContainsNullBytes(find) || fileops.ContainsNullBytes(replace) {
+	if file.ContainsNullBytes(find) || file.ContainsNullBytes(replace) {
 		return "", "null bytes detected; binary files are not supported."
 	}
-	if !fileops.IsValidUTF8(find) || !fileops.IsValidUTF8(replace) {
+	if !file.IsValidUTF8(find) || !file.IsValidUTF8(replace) {
 		return "", "find and replace must be valid UTF-8."
 	}
-	if fileops.CountNewlines(replace) > maxLines {
+	if file.CountNewlines(replace) > maxLines {
 		return "", fmt.Sprintf("replace exceeds the %d-newline limit.", maxLines)
 	}
 	if startLine != 0 && startLine < 1 {
@@ -94,8 +94,8 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	}
 
 	// 4. Acquire exclusive per-file lock.
-	lock := fileops.AcquireLock(realPath)
-	defer fileops.ReleaseLock(realPath, lock)
+	lock := file.AcquireLock(realPath)
+	defer file.ReleaseLock(realPath, lock)
 
 	// 5. Read file; reject binary content.
 	raw, err := os.ReadFile(realPath)
@@ -103,11 +103,11 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 		return "", fmt.Sprintf("read file: %v", err)
 	}
 	fileContent := string(raw)
-	if fileops.ContainsNullBytes(fileContent) || !fileops.IsValidUTF8(fileContent) {
+	if file.ContainsNullBytes(fileContent) || !file.IsValidUTF8(fileContent) {
 		return "", "Binary files are not supported."
 	}
-	checksum := fileops.SHA256Sum(fileContent)
-	totalLines := fileops.CountLines(fileContent)
+	checksum := file.SHA256Sum(fileContent)
+	totalLines := file.CountLines(fileContent)
 
 	// 6. Validate scope against file length.
 	if startLine != 0 && startLine > totalLines {
@@ -119,8 +119,8 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 
 	// 7. Find all matches within scope.
 	hasScope := startLine != 0 || endLine != 0
-	allMatches := fileops.FindMatches(fileContent, find)
-	candidates := make([]fileops.Match, 0, len(allMatches))
+	allMatches := file.FindMatches(fileContent, find)
+	candidates := make([]file.Match, 0, len(allMatches))
 	for _, m := range allMatches {
 		if startLine != 0 && m.StartLine < startLine {
 			continue
@@ -141,11 +141,11 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 			if el == 0 {
 				el = totalLines
 			}
-			snip := fileops.ExcerptRange(fileContent, sl, el, 10)
+			snip := file.ExcerptRange(fileContent, sl, el, 10)
 			return "", fmt.Sprintf("find not found between lines %d\u2013%d.\n%s", sl, el, snip)
 		}
-		if firstLine := fileops.FirstNonemptyLine(find); firstLine != "" {
-			partial := fileops.FindMatches(fileContent, firstLine)
+		if firstLine := file.FirstNonemptyLine(find); firstLine != "" {
+			partial := file.FindMatches(fileContent, firstLine)
 			if len(partial) > 0 {
 				shown := partial
 				if len(shown) > maxCandidates {
@@ -155,7 +155,7 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 				snippets := make([]string, len(shown))
 				for i, m := range shown {
 					locs[i] = fmt.Sprintf("%d", m.StartLine)
-					snippets[i] = fileops.Excerpt(fileContent, m.StartLine, 1)
+					snippets[i] = file.Excerpt(fileContent, m.StartLine, 1)
 				}
 				suffix := ""
 				if len(partial) > maxCandidates {
@@ -179,7 +179,7 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 
 	// 9. Dry-run exit.
 	if dryRun {
-		return fileops.ComputeDiff(realPath, fileContent, working), ""
+		return file.ComputeDiff(realPath, fileContent, working), ""
 	}
 
 	// 10. External-modification check.
@@ -187,15 +187,15 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	if err != nil {
 		return "", fmt.Sprintf("re-read for checksum: %v", err)
 	}
-	if fileops.SHA256Sum(string(recheck)) != checksum {
+	if file.SHA256Sum(string(recheck)) != checksum {
 		return "", "Edit aborted: file was modified externally between read and write."
 	}
 
 	// 11. Atomic write — preserve original permissions.
-	if err = fileops.AtomicWrite(realPath, working, info.Mode()); err != nil {
+	if err = file.AtomicWrite(realPath, working, info.Mode()); err != nil {
 		return "", fmt.Sprintf("write failed: %v", err)
 	}
 
 	// 12. Return unified diff.
-	return fileops.ComputeDiff(realPath, fileContent, working), ""
+	return file.ComputeDiff(realPath, fileContent, working), ""
 }

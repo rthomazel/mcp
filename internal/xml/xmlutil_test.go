@@ -1,4 +1,4 @@
-package xmlutil
+package xml
 
 import (
 	"testing"

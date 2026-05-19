@@ -7,17 +7,17 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/rthomazel/jail-mcp/internal/xmlutil"
+	"github.com/rthomazel/jail-mcp/internal/xml"
 )
 
 func (h *Handler) HandleStatus(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ids, ok := xmlutil.ParseStringSlice(req.Params.Arguments["job_ids"])
+	ids, ok := xml.ParseStringSlice(req.Params.Arguments["job_ids"])
 	if !ok || len(ids) == 0 {
 		return mcp.NewToolResultError("missing required parameter: job_ids"), nil
 	}
 
 	multi := len(ids) > 1
-	var b xmlutil.Builder
+	var b xml.Builder
 
 	for i, id := range ids {
 		if multi {
@@ -34,7 +34,7 @@ func (h *Handler) HandleStatus(_ context.Context, req mcp.CallToolRequest) (*mcp
 	return mcp.NewToolResultText(b.String()), nil
 }
 
-func formatJobStatus(b *xmlutil.Builder, h *Handler, id string, includeCommand bool) {
+func formatJobStatus(b *xml.Builder, h *Handler, id string, includeCommand bool) {
 	h.mu.RLock()
 	j, exists := h.jobs[id]
 	h.mu.RUnlock()

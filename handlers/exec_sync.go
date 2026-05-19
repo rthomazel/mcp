@@ -12,7 +12,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/jail-mcp/internal"
-	"github.com/rthomazel/jail-mcp/internal/xmlutil"
+	"github.com/rthomazel/jail-mcp/internal/xml"
 )
 
 type commandResult struct {
@@ -25,7 +25,7 @@ type commandResult struct {
 }
 
 func (h *Handler) HandleExec(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	commands, ok := xmlutil.ParseStringSlice(req.Params.Arguments["commands"])
+	commands, ok := xml.ParseStringSlice(req.Params.Arguments["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil
 	}
@@ -50,7 +50,7 @@ func (h *Handler) HandleExec(ctx context.Context, req mcp.CallToolRequest) (*mcp
 }
 
 func formatExecResults(results []*commandResult, multi bool) string {
-	var b xmlutil.Builder
+	var b xml.Builder
 
 	for i, r := range results {
 		if multi {
