@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -67,7 +65,7 @@ type locatedReplacement struct {
 	m       file.Match
 }
 
-//nolint:cyclop,funlen
+//nolint:cyclop
 func (h *Handler) handleFileReplace(path string, replacements []replacement, dryRun bool) (result, toolErr string) {
 	maxCandidates := h.cfg.MaxCandidates
 	maxLines := h.cfg.EditMaxLines
@@ -94,60 +92,36 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 			return "", fmt.Sprintf("%s: find and replace must be valid UTF-8.", label)
 		}
 		if r.lineNumber != 0 && r.lineNumber < 1 {
-			return "", fmt.Sprintf("%s: line_number must be \u2265 1.", label)
+			return "", fmt.Sprintf("%s: line_number must be ≥ 1.", label)
 		}
 		if file.CountNewlines(r.replace) > maxLines {
 			return "", fmt.Sprintf("%s: replace exceeds the %d-newline limit.", label, maxLines)
 		}
 	}
 
-	// 2. Resolve symlinks.
-	realPath, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", fmt.Sprintf("resolve path: %v", err)
+	// 2–5. Resolve symlinks, stat, lock, read, validate binary.
+	ef, toolErr := openFileForEdit(path)
+	if toolErr != "" {
+		return "", toolErr
 	}
-
-	// 3. Verify regular file.
-	info, err := os.Stat(realPath)
-	if err != nil {
-		return "", fmt.Sprintf("stat: %v", err)
-	}
-	if !info.Mode().IsRegular() {
-		return "", "path must point to a regular file."
-	}
-
-	// 4. Acquire exclusive per-file lock.
-	lock := file.AcquireLock(realPath)
-	defer file.ReleaseLock(realPath, lock)
-
-	// 5. Read file; reject binary content.
-	raw, err := os.ReadFile(realPath)
-	if err != nil {
-		return "", fmt.Sprintf("read file: %v", err)
-	}
-	fileContent := string(raw)
-	if strings.Contains(fileContent, "\x00") || !utf8.ValidString(fileContent) {
-		return "", "Binary files are not supported."
-	}
-	checksum := sha256.Sum256([]byte(fileContent))
-	totalLines := file.CountLines(fileContent)
+	defer file.ReleaseLock(ef.realPath, ef.lock)
 
 	// 6. Validate line_number ranges against actual file length.
 	for i, r := range replacements {
-		if r.lineNumber != 0 && r.lineNumber > totalLines {
+		if r.lineNumber != 0 && r.lineNumber > ef.lines {
 			return "", fmt.Sprintf(
 				"Replacement %d: line_number %d out of range (file has %d lines).",
-				i+1, r.lineNumber, totalLines,
+				i+1, r.lineNumber, ef.lines,
 			)
 		}
 	}
 
-	// 7. Pre-pass: locate each replacement's unique candidate in original content.
+	// 7. Pre-pass: locate each replacement’s unique candidate in original content.
 	located := make([]locatedReplacement, 0, len(replacements))
 	for i, r := range replacements {
 		label := fmt.Sprintf("Replacement %d of %d", i+1, len(replacements))
 
-		allMatches := file.FindMatches(fileContent, r.find)
+		allMatches := file.FindMatches(ef.content, r.find)
 		var candidates []file.Match
 		if r.lineNumber != 0 {
 			for _, m := range allMatches {
@@ -161,11 +135,11 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 
 		switch len(candidates) {
 		case 0:
-			return "", zeroMatchError(label, r, fileContent, maxCandidates)
+			return "", zeroMatchError(label, r, ef.content, maxCandidates)
 		case 1:
 			located = append(located, locatedReplacement{origIdx: i, r: r, m: candidates[0]})
 		default:
-			return "", multiMatchError(label, r, candidates, fileContent, maxCandidates)
+			return "", multiMatchError(label, r, candidates, ef.content, maxCandidates)
 		}
 	}
 
@@ -184,69 +158,30 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 	}
 
 	// 9. Apply in descending byte order.
-	working := fileContent
+	working := ef.content
 	for i := len(located) - 1; i >= 0; i-- {
 		l := located[i]
 		working = working[:l.m.StartByte] + l.r.replace + working[l.m.EndByte:]
 	}
 
-	// 10. Dry-run exit.
-	if dryRun {
-		return file.ComputeDiff(realPath, fileContent, working), ""
-	}
-
-	// 11. External-modification check.
-	recheck, err := os.ReadFile(realPath)
-	if err != nil {
-		return "", fmt.Sprintf("re-read for checksum: %v", err)
-	}
-	if sha256.Sum256([]byte(recheck)) != checksum {
-		return "", "Edit aborted: file was modified externally between read and write."
-	}
-
-	// 12. Atomic write — preserve original permissions.
-	if err = file.AtomicWrite(realPath, working, info.Mode()); err != nil {
-		return "", fmt.Sprintf("write failed: %v", err)
-	}
-
-	// 13. Return unified diff.
-	return file.ComputeDiff(realPath, fileContent, working), ""
+	// 10–13. Dry-run, external-mod check, atomic write, return diff.
+	return ef.commit(working, dryRun)
 }
 
 // zeroMatchError builds the diagnostic for a find that matched zero times.
-func zeroMatchError(label string, r replacement, fileContent string, maxCandidates int) string {
+func zeroMatchError(label string, r replacement, content string, maxCandidates int) string {
 	if r.lineNumber != 0 {
-		snip := file.Excerpt(fileContent, r.lineNumber, 1)
+		snip := file.Excerpt(content, r.lineNumber, 1)
 		return fmt.Sprintf("%s failed: find not found at line %d.\n%s", label, r.lineNumber, snip)
 	}
-	if firstLine := file.FirstNonEmptyLine(r.find); firstLine != "" {
-		partial := file.FindMatches(fileContent, firstLine)
-		if len(partial) > 0 {
-			shown := partial
-			if len(shown) > maxCandidates {
-				shown = shown[:maxCandidates]
-			}
-			locs := make([]string, len(shown))
-			snippets := make([]string, len(shown))
-			for i, m := range shown {
-				locs[i] = fmt.Sprintf("%d", m.StartLine)
-				snippets[i] = file.Excerpt(fileContent, m.StartLine, 1)
-			}
-			suffix := ""
-			if len(partial) > maxCandidates {
-				suffix = fmt.Sprintf(" (showing first %d of %d)", maxCandidates, len(partial))
-			}
-			return fmt.Sprintf(
-				"%s failed: first line of find matched at [%s]%s but full find did not match (check indentation or whitespace).\n%s",
-				label, strings.Join(locs, ", "), suffix, strings.Join(snippets, ""),
-			)
-		}
+	if hint := partialMatchDiagnostic(r.find, content, maxCandidates); hint != "" {
+		return fmt.Sprintf("%s failed: %s", label, hint)
 	}
 	return fmt.Sprintf("%s failed: find not found in file (check whitespace or CRLF endings).", label)
 }
 
 // multiMatchError builds the diagnostic for a find that matched more than once.
-func multiMatchError(label string, r replacement, candidates []file.Match, fileContent string, maxCandidates int) string {
+func multiMatchError(label string, r replacement, candidates []file.Match, content string, maxCandidates int) string {
 	if r.lineNumber != 0 {
 		sameLine := true
 		for _, c := range candidates {
@@ -260,7 +195,7 @@ func multiMatchError(label string, r replacement, candidates []file.Match, fileC
 			for i, c := range candidates {
 				charPositions[i] = fmt.Sprintf("%d", c.StartChar)
 			}
-			snip := file.Excerpt(fileContent, r.lineNumber, 1)
+			snip := file.Excerpt(content, r.lineNumber, 1)
 			return fmt.Sprintf(
 				"%s failed: ambiguous at line %d: find matched %d times at characters [%s]. Replace the whole line.\n%s",
 				label, r.lineNumber, len(candidates), strings.Join(charPositions, ", "), snip,
@@ -274,7 +209,7 @@ func multiMatchError(label string, r replacement, candidates []file.Match, fileC
 		snippets := make([]string, len(shown))
 		for i, m := range shown {
 			locs[i] = fmt.Sprintf("%d", m.StartLine)
-			snippets[i] = file.Excerpt(fileContent, m.StartLine, 1)
+			snippets[i] = file.Excerpt(content, m.StartLine, 1)
 		}
 		suffix := ""
 		if len(candidates) > maxCandidates {
@@ -293,7 +228,7 @@ func multiMatchError(label string, r replacement, candidates []file.Match, fileC
 	snippets := make([]string, len(shown))
 	for i, m := range shown {
 		locs[i] = fmt.Sprintf("%d", m.StartLine)
-		snippets[i] = file.Excerpt(fileContent, m.StartLine, 1)
+		snippets[i] = file.Excerpt(content, m.StartLine, 1)
 	}
 	suffix := ""
 	if len(candidates) > maxCandidates {

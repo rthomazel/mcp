@@ -7,7 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/hexops/gotextdiff"
+	"github.com/hexops/gotextdiff/myers"
+	"github.com/hexops/gotextdiff/span"
 )
 
 // Match describes a single non-overlapping occurrence of a substring within file content.
@@ -136,106 +138,12 @@ func ExcerptRange(content string, startLine, endLine, maxLines int) string {
 	return b.String()
 }
 
-// ComputeDiff returns a unified diff of the changes from before to after.
+// ComputeDiff returns a unified diff of the changes from before to after,
+// using the Myers diff algorithm.
 func ComputeDiff(path, before, after string) string {
-	dmp := diffmatchpatch.New()
-	a, b, lineArray := dmp.DiffLinesToChars(before, after)
-	diffs := dmp.DiffMain(a, b, false)
-	diffs = dmp.DiffCharsToLines(diffs, lineArray)
-	return unifiedDiff(path, diffs)
-}
-
-// unifiedDiff formats line-level diffs as a standard unified diff string.
-// Returns an empty string when before == after.
-func unifiedDiff(path string, diffs []diffmatchpatch.Diff) string {
-	const ctx = 3
-
-	type lineEntry struct {
-		op   diffmatchpatch.Operation
-		text string
-	}
-
-	// Flatten multi-line diff entries into individual lines.
-	var flat []lineEntry
-	for _, d := range diffs {
-		for _, l := range strings.SplitAfter(d.Text, "\n") {
-			if l == "" {
-				continue
-			}
-			flat = append(flat, lineEntry{d.Type, l})
-		}
-	}
-
-	// Compute 1-based line numbers in the original and new file for each entry.
-	origNums := make([]int, len(flat))
-	newNums := make([]int, len(flat))
-	o, n := 1, 1
-	for i, e := range flat {
-		origNums[i] = o
-		newNums[i] = n
-		if e.op != diffmatchpatch.DiffInsert {
-			o++
-		}
-		if e.op != diffmatchpatch.DiffDelete {
-			n++
-		}
-	}
-
-	// Build hunk spans: each changed line expands ctx lines on each side.
-	// Adjacent or overlapping spans are merged.
-	type span struct{ lo, hi int }
-	var spans []span
-	for i, e := range flat {
-		if e.op == diffmatchpatch.DiffEqual {
-			continue
-		}
-		lo := i - ctx
-		if lo < 0 {
-			lo = 0
-		}
-		hi := i + ctx + 1
-		if hi > len(flat) {
-			hi = len(flat)
-		}
-		if len(spans) > 0 && spans[len(spans)-1].hi >= lo {
-			spans[len(spans)-1].hi = hi
-		} else {
-			spans = append(spans, span{lo, hi})
-		}
-	}
-
-	if len(spans) == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "--- %s\n+++ %s\n", path, path)
-
-	for _, s := range spans {
-		origCount, newCount := 0, 0
-		for _, e := range flat[s.lo:s.hi] {
-			if e.op != diffmatchpatch.DiffInsert {
-				origCount++
-			}
-			if e.op != diffmatchpatch.DiffDelete {
-				newCount++
-			}
-		}
-		fmt.Fprintf(&sb, "@@ -%d,%d +%d,%d @@\n", origNums[s.lo], origCount, newNums[s.lo], newCount)
-		for _, e := range flat[s.lo:s.hi] {
-			switch e.op {
-			case diffmatchpatch.DiffEqual:
-				sb.WriteByte(' ')
-			case diffmatchpatch.DiffInsert:
-				sb.WriteByte('+')
-			case diffmatchpatch.DiffDelete:
-				sb.WriteByte('-')
-			}
-			sb.WriteString(e.text)
-		}
-	}
-
-	return sb.String()
+	edits := myers.ComputeEdits(span.URIFromPath(path), before, after)
+	unified := gotextdiff.ToUnified(path, path, before, edits)
+	return fmt.Sprint(unified)
 }
 
 // AtomicWrite writes content to path atomically: creates a temp file in the
