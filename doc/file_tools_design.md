@@ -12,7 +12,7 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
 ```json
 {
   "name": "file_replace",
-  "description": "Find and replace exact substrings in a file. Each item must match exactly once. All replacements applied in one atomic write. Returns a unified diff.",
+  "description": "Find and replace unique substrings in a file. Returns a unified diff.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -22,13 +22,13 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
       },
       "replacements": {
         "type": "array",
-        "description": "One or more find/replace pairs. Order does not matter — the server sorts by file position.",
+        "description": "One or more find/replace pairs. Order does not matter.",
         "items": {
           "type": "object",
           "properties": {
             "find": {
               "type": "string",
-              "description": "Exact substring to find, matched character-for-character including whitespace. Must occur exactly once (globally, or at line_number if given)."
+              "description": "Unique substring to find, matched by character including whitespace."
             },
             "replace": {
               "type": "string",
@@ -44,7 +44,7 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
       },
       "dry_run": {
         "type": "boolean",
-        "description": "Optional. If true, validate and compute the diff without writing to disk. Returns the same unified diff as a real run."
+        "description": "Optional. If true, validate and compute the diff without writing to disk."
       }
     },
     "required": ["path", "replacements"]
@@ -57,7 +57,7 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
 ```json
 {
   "name": "file_replace_all",
-  "description": "Replace every occurrence of a substring in a file. Optionally scoped to a line range. Applied in one atomic write. Returns a unified diff.",
+  "description": "Replace all occurrences of a substring in a file. Returns a unified diff.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -83,7 +83,7 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
       },
       "dry_run": {
         "type": "boolean",
-        "description": "Optional. If true, validate and compute the diff without writing to disk. Returns the same unified diff as a real run."
+        "description": "Optional. If true, validate and compute the diff without writing to disk."
       }
     },
     "required": ["path", "find", "replace"]
@@ -96,6 +96,7 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
 | Constraint | Value | Rationale |
 | --- | --- | --- |
 | Max newlines in `replace` | **50** (env: `JAIL_MCP_EDIT_MAX_LINES`) | Keeps individual replacements surgical |
+| Max candidates in error output | **5** (env: `JAIL_MCP_MAX_CANDIDATES`) | Keeps error messages readable |
 | `file_replace` match count | exactly 1 per item | Fails loudly on ambiguity |
 | `file_replace_all` match count | ≥ 1 | Zero matches is an error |
 | Chaining within a `file_replace` call | not supported | All `find` values are matched against the original file content before any replacement is applied. To target text produced by a prior replacement, issue a second call. |
@@ -130,7 +131,7 @@ All errors that identify match locations include 1 line of file context before a
 ### handle_file_replace
 
 ```python
-MAX_SHOWN = 5  # max matches shown in diagnostic output; shared by both handlers
+MAX_CANDIDATES = env("JAIL_MCP_MAX_CANDIDATES", default=5)  # max candidates shown in diagnostic output; shared by both handlers
 
 
 def handle_file_replace(path, replacements, dry_run=False):
@@ -200,10 +201,10 @@ def handle_file_replace(path, replacements, dry_run=False):
             if first_line is not None:
                 partial = find_substring_matches(file_content, first_line)
                 if partial:
-                    shown = partial[:MAX_SHOWN]
+                    shown = partial[:MAX_CANDIDATES]
                     snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
                     locs = [m.start_line for m in shown]
-                    suffix = f" (showing first {MAX_SHOWN} of {len(partial)})" if len(partial) > MAX_SHOWN else ""
+                    suffix = f" (showing first {MAX_CANDIDATES} of {len(partial)})" if len(partial) > MAX_CANDIDATES else ""
                     return Error(
                         f"{label} failed: first line of find matched at {locs}{suffix} but full find did not match"
                         f" (check indentation or whitespace).\n{join(snippets)}"
@@ -221,18 +222,18 @@ def handle_file_replace(path, replacements, dry_run=False):
                         f"{label} failed: ambiguous at line {r.line_number}: find matched"
                         f" {len(candidates)} times at characters {char_positions}. Replace the whole line.\n{ctx}"
                     )
-                shown = candidates[:MAX_SHOWN]
+                shown = candidates[:MAX_CANDIDATES]
                 locs = [m.start_line for m in shown]
                 snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
-                suffix = f" (showing first {MAX_SHOWN} of {len(candidates)})" if len(candidates) > MAX_SHOWN else ""
+                suffix = f" (showing first {MAX_CANDIDATES} of {len(candidates)})" if len(candidates) > MAX_CANDIDATES else ""
                 return Error(
                     f"{label} failed: line_number {r.line_number} did not narrow to one match"
                     f" (at lines {locs}{suffix}).\n{join(snippets)}"
                 )
-            shown = candidates[:MAX_SHOWN]
+            shown = candidates[:MAX_CANDIDATES]
             locs = [m.start_line for m in shown]
             snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
-            suffix = f" (showing first {MAX_SHOWN} of {len(candidates)})" if len(candidates) > MAX_SHOWN else ""
+            suffix = f" (showing first {MAX_CANDIDATES} of {len(candidates)})" if len(candidates) > MAX_CANDIDATES else ""
             return Error(
                 f"{label} failed: find matched {len(candidates)} locations (lines {locs}{suffix})."
                 f" Provide line_number or widen find.\n{join(snippets)}"
@@ -361,10 +362,10 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
         if first_line is not None:
             partial = find_substring_matches(file_content, first_line)
             if partial:
-                shown = partial[:MAX_SHOWN]
+                shown = partial[:MAX_CANDIDATES]
                 snippets = [excerpt(file_content, m.start_line, radius=1) for m in shown]
                 locs = [m.start_line for m in shown]
-                suffix = f" (showing first {MAX_SHOWN} of {len(partial)})" if len(partial) > MAX_SHOWN else ""
+                suffix = f" (showing first {MAX_CANDIDATES} of {len(partial)})" if len(partial) > MAX_CANDIDATES else ""
                 return Error(
                     f"first line of find matched at {locs}{suffix} but full find did not match"
                     f" (check indentation or whitespace).\n{join(snippets)}"
