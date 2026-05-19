@@ -109,6 +109,41 @@ func run() error {
 		h.HandleSetup,
 	)
 
+	s.AddTool(
+		mcp.NewTool("file_replace_all",
+			mcp.WithDescription("Replace all occurrences of a substring in a file. Returns a unified diff."),
+			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
+			mcp.WithString("find", mcp.Required(), mcp.Description("Exact substring to find. All occurrences are replaced.")),
+			mcp.WithString("replace", mcp.Required(), mcp.Description("Replacement text. Empty string deletes each match.")),
+			mcp.WithNumber("start_line", mcp.Description("Optional. Restrict replacements to this line range, inclusive (original-file line numbers).")),
+			mcp.WithNumber("end_line", mcp.Description("Optional. Restrict replacements to this line range, inclusive (original-file line numbers).")),
+			mcp.WithBoolean("dry_run", mcp.Description("Optional. If true, validate and compute the diff without writing to disk.")),
+		),
+		h.HandleFileReplaceAll,
+	)
+
+	s.AddTool(
+		mcp.NewTool("file_replace",
+			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff."),
+			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
+			mcp.WithArray("replacements",
+				mcp.Required(),
+				mcp.Description("One or more find/replace pairs. Order does not matter."),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"find":        map[string]any{"type": "string", "description": "Unique substring to find, matched by character including whitespace."},
+						"replace":     map[string]any{"type": "string", "description": "Replacement text. Empty string deletes the match."},
+						"line_number": map[string]any{"type": "integer", "description": "Optional. Narrows the match to occurrences spanning this line (original-file line number)."},
+					},
+					"required": []any{"find", "replace"},
+				}),
+			),
+			mcp.WithBoolean("dry_run", mcp.Description("Optional. If true, validate and compute the diff without writing to disk.")),
+		),
+		h.HandleFileReplace,
+	)
+
 	slog.Info("serving on stdio")
 	if err := server.ServeStdio(s); err != nil {
 		return fmt.Errorf("server: %w", err)
