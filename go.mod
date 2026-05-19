@@ -9,9 +9,9 @@ tool (
 )
 
 require (
-	github.com/hexops/gotextdiff v1.0.3
 	github.com/mark3labs/mcp-go v0.18.0
 	github.com/samber/lo v1.53.0
+	github.com/sergi/go-diff v1.3.1
 )
 
 require (
@@ -111,6 +111,7 @@ require (
 	github.com/hashicorp/go-version v1.8.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/hexops/gotextdiff v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jgautheron/goconst v1.8.2 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect

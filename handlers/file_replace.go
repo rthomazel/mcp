@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/jail-mcp/internal/file"
@@ -85,10 +87,10 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 		if r.find == r.replace {
 			return "", fmt.Sprintf("%s: find and replace are identical — no change would be made.", label)
 		}
-		if file.ContainsNullBytes(r.find) || file.ContainsNullBytes(r.replace) {
+		if strings.Contains(r.find, "\x00") || strings.Contains(r.replace, "\x00") {
 			return "", fmt.Sprintf("%s: null bytes detected; binary files are not supported.", label)
 		}
-		if !file.IsValidUTF8(r.find) || !file.IsValidUTF8(r.replace) {
+		if !utf8.ValidString(r.find) || !utf8.ValidString(r.replace) {
 			return "", fmt.Sprintf("%s: find and replace must be valid UTF-8.", label)
 		}
 		if r.lineNumber != 0 && r.lineNumber < 1 {
@@ -124,10 +126,10 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 		return "", fmt.Sprintf("read file: %v", err)
 	}
 	fileContent := string(raw)
-	if file.ContainsNullBytes(fileContent) || !file.IsValidUTF8(fileContent) {
+	if strings.Contains(fileContent, "\x00") || !utf8.ValidString(fileContent) {
 		return "", "Binary files are not supported."
 	}
-	checksum := file.SHA256Sum(fileContent)
+	checksum := sha256.Sum256([]byte(fileContent))
 	totalLines := file.CountLines(fileContent)
 
 	// 6. Validate line_number ranges against actual file length.
@@ -198,7 +200,7 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 	if err != nil {
 		return "", fmt.Sprintf("re-read for checksum: %v", err)
 	}
-	if file.SHA256Sum(string(recheck)) != checksum {
+	if sha256.Sum256([]byte(recheck)) != checksum {
 		return "", "Edit aborted: file was modified externally between read and write."
 	}
 
@@ -217,7 +219,7 @@ func zeroMatchError(label string, r replacement, fileContent string, maxCandidat
 		snip := file.Excerpt(fileContent, r.lineNumber, 1)
 		return fmt.Sprintf("%s failed: find not found at line %d.\n%s", label, r.lineNumber, snip)
 	}
-	if firstLine := file.FirstNonemptyLine(r.find); firstLine != "" {
+	if firstLine := file.FirstNonEmptyLine(r.find); firstLine != "" {
 		partial := file.FindMatches(fileContent, firstLine)
 		if len(partial) > 0 {
 			shown := partial

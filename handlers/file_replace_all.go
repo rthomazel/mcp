@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/jail-mcp/internal/file"
@@ -59,10 +61,10 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	if find == replace {
 		return "", "find and replace are identical — no change would be made."
 	}
-	if file.ContainsNullBytes(find) || file.ContainsNullBytes(replace) {
+	if strings.Contains(find, "\x00") || strings.Contains(replace, "\x00") {
 		return "", "null bytes detected; binary files are not supported."
 	}
-	if !file.IsValidUTF8(find) || !file.IsValidUTF8(replace) {
+	if !utf8.ValidString(find) || !utf8.ValidString(replace) {
 		return "", "find and replace must be valid UTF-8."
 	}
 	if file.CountNewlines(replace) > maxLines {
@@ -103,10 +105,10 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 		return "", fmt.Sprintf("read file: %v", err)
 	}
 	fileContent := string(raw)
-	if file.ContainsNullBytes(fileContent) || !file.IsValidUTF8(fileContent) {
+	if strings.Contains(fileContent, "\x00") || !utf8.ValidString(fileContent) {
 		return "", "Binary files are not supported."
 	}
-	checksum := file.SHA256Sum(fileContent)
+	checksum := sha256.Sum256([]byte(fileContent))
 	totalLines := file.CountLines(fileContent)
 
 	// 6. Validate scope against file length.
@@ -144,7 +146,7 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 			snip := file.ExcerptRange(fileContent, sl, el, 10)
 			return "", fmt.Sprintf("find not found between lines %d\u2013%d.\n%s", sl, el, snip)
 		}
-		if firstLine := file.FirstNonemptyLine(find); firstLine != "" {
+		if firstLine := file.FirstNonEmptyLine(find); firstLine != "" {
 			partial := file.FindMatches(fileContent, firstLine)
 			if len(partial) > 0 {
 				shown := partial
@@ -187,7 +189,7 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	if err != nil {
 		return "", fmt.Sprintf("re-read for checksum: %v", err)
 	}
-	if file.SHA256Sum(string(recheck)) != checksum {
+	if sha256.Sum256([]byte(recheck)) != checksum {
 		return "", "Edit aborted: file was modified externally between read and write."
 	}
 
