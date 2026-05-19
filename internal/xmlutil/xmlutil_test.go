@@ -1,10 +1,10 @@
-package handlers
+package xmlutil
 
 import (
 	"testing"
 )
 
-func TestXMLBuilderOpenTag(t *testing.T) {
+func TestBuilderOpenTag(t *testing.T) {
 	useCases := []struct {
 		name  string
 		tag   string
@@ -32,8 +32,8 @@ func TestXMLBuilderOpenTag(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			var b xmlBuilder
-			b.openTag(u.tag, u.attrs...)
+			var b Builder
+			b.OpenTag(u.tag, u.attrs...)
 			if got := b.String(); got != u.want {
 				t.Errorf("got %q, want %q", got, u.want)
 			}
@@ -41,7 +41,7 @@ func TestXMLBuilderOpenTag(t *testing.T) {
 	}
 }
 
-func TestXMLBuilderCloseTag(t *testing.T) {
+func TestBuilderCloseTag(t *testing.T) {
 	useCases := []struct {
 		name    string
 		newline bool
@@ -61,8 +61,8 @@ func TestXMLBuilderCloseTag(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			var b xmlBuilder
-			b.closeTag("metadata", u.newline)
+			var b Builder
+			b.CloseTag("metadata", u.newline)
 			if got := b.String(); got != u.want {
 				t.Errorf("got %q, want %q", got, u.want)
 			}
@@ -70,7 +70,7 @@ func TestXMLBuilderCloseTag(t *testing.T) {
 	}
 }
 
-func TestXMLBuilderTag(t *testing.T) {
+func TestBuilderTag(t *testing.T) {
 	useCases := []struct {
 		name     string
 		tag      string
@@ -112,8 +112,8 @@ func TestXMLBuilderTag(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			var b xmlBuilder
-			b.tag(u.tag, u.contents, u.newline, u.attrs...)
+			var b Builder
+			b.Tag(u.tag, u.contents, u.newline, u.attrs...)
 			if got := b.String(); got != u.want {
 				t.Errorf("got %q, want %q", got, u.want)
 			}
@@ -154,7 +154,7 @@ func TestParseStringSlice(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			got, ok := parseStringSlice(u.input)
+			got, ok := ParseStringSlice(u.input)
 			if ok != u.ok {
 				t.Fatalf("ok = %v, want %v", ok, u.ok)
 			}

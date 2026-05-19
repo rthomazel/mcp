@@ -12,6 +12,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/jail-mcp/internal"
+	"github.com/rthomazel/jail-mcp/internal/xmlutil"
 )
 
 type commandResult struct {
@@ -24,7 +25,7 @@ type commandResult struct {
 }
 
 func (h *Handler) HandleExec(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	commands, ok := parseStringSlice(req.Params.Arguments["commands"])
+	commands, ok := xmlutil.ParseStringSlice(req.Params.Arguments["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil
 	}
@@ -49,26 +50,26 @@ func (h *Handler) HandleExec(ctx context.Context, req mcp.CallToolRequest) (*mcp
 }
 
 func formatExecResults(results []*commandResult, multi bool) string {
-	var b xmlBuilder
+	var b xmlutil.Builder
 
 	for i, r := range results {
 		if multi {
-			b.openTag("command", "index", strconv.Itoa(i))
+			b.OpenTag("command", "index", strconv.Itoa(i))
 		}
 
-		b.openTag("metadata")
+		b.OpenTag("metadata")
 		if multi {
 			b.WriteString("command: " + r.Command + "\n")
 		}
 
 		b.WriteString("exit: " + strconv.Itoa(r.ExitCode) + "\n")
 		b.WriteString("duration: " + r.Duration + "\n")
-		b.closeTag("metadata", true)
-		b.tag("stdout", r.Stdout, true)
-		b.tag("stderr", r.Stderr, false)
+		b.CloseTag("metadata", true)
+		b.Tag("stdout", r.Stdout, true)
+		b.Tag("stderr", r.Stderr, false)
 
 		if multi {
-			b.closeTag("command", true)
+			b.CloseTag("command", true)
 		}
 	}
 
