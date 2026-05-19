@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
@@ -46,7 +44,7 @@ func (h *Handler) HandleFileReplaceAll(_ context.Context, req mcp.CallToolReques
 	return mcp.NewToolResultText(result), nil
 }
 
-//nolint:cyclop,funlen
+//nolint:cyclop
 func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, endLine int, dryRun bool) (result, toolErr string) {
 	maxLines := h.cfg.EditMaxLines
 	maxCandidates := h.cfg.MaxCandidates
@@ -71,57 +69,33 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 		return "", fmt.Sprintf("replace exceeds the %d-newline limit.", maxLines)
 	}
 	if startLine != 0 && startLine < 1 {
-		return "", "start_line must be \u2265 1."
+		return "", "start_line must be ≥ 1."
 	}
 	if endLine != 0 && endLine < 1 {
-		return "", "end_line must be \u2265 1."
+		return "", "end_line must be ≥ 1."
 	}
 	if startLine != 0 && endLine != 0 && endLine < startLine {
-		return "", "end_line must be \u2265 start_line."
+		return "", "end_line must be ≥ start_line."
 	}
 
-	// 2. Resolve symlinks.
-	realPath, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", fmt.Sprintf("resolve path: %v", err)
+	// 2–5. Resolve symlinks, stat, lock, read, validate binary.
+	ef, toolErr := openFileForEdit(path)
+	if toolErr != "" {
+		return "", toolErr
 	}
-
-	// 3. Verify regular file.
-	info, err := os.Stat(realPath)
-	if err != nil {
-		return "", fmt.Sprintf("stat: %v", err)
-	}
-	if !info.Mode().IsRegular() {
-		return "", "path must point to a regular file."
-	}
-
-	// 4. Acquire exclusive per-file lock.
-	lock := file.AcquireLock(realPath)
-	defer file.ReleaseLock(realPath, lock)
-
-	// 5. Read file; reject binary content.
-	raw, err := os.ReadFile(realPath)
-	if err != nil {
-		return "", fmt.Sprintf("read file: %v", err)
-	}
-	fileContent := string(raw)
-	if strings.Contains(fileContent, "\x00") || !utf8.ValidString(fileContent) {
-		return "", "Binary files are not supported."
-	}
-	checksum := sha256.Sum256([]byte(fileContent))
-	totalLines := file.CountLines(fileContent)
+	defer file.ReleaseLock(ef.realPath, ef.lock)
 
 	// 6. Validate scope against file length.
-	if startLine != 0 && startLine > totalLines {
-		return "", fmt.Sprintf("start_line %d out of range (file has %d lines).", startLine, totalLines)
+	if startLine != 0 && startLine > ef.lines {
+		return "", fmt.Sprintf("start_line %d out of range (file has %d lines).", startLine, ef.lines)
 	}
-	if endLine != 0 && endLine > totalLines {
-		return "", fmt.Sprintf("end_line %d out of range (file has %d lines).", endLine, totalLines)
+	if endLine != 0 && endLine > ef.lines {
+		return "", fmt.Sprintf("end_line %d out of range (file has %d lines).", endLine, ef.lines)
 	}
 
 	// 7. Find all matches within scope.
 	hasScope := startLine != 0 || endLine != 0
-	allMatches := file.FindMatches(fileContent, find)
+	allMatches := file.FindMatches(ef.content, find)
 	candidates := make([]file.Match, 0, len(allMatches))
 	for _, m := range allMatches {
 		if startLine != 0 && m.StartLine < startLine {
@@ -135,69 +109,29 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 
 	if len(candidates) == 0 {
 		if hasScope {
-			sl := startLine
+			sl, el := startLine, endLine
 			if sl == 0 {
 				sl = 1
 			}
-			el := endLine
 			if el == 0 {
-				el = totalLines
+				el = ef.lines
 			}
-			snip := file.ExcerptRange(fileContent, sl, el, 10)
-			return "", fmt.Sprintf("find not found between lines %d\u2013%d.\n%s", sl, el, snip)
+			snip := file.ExcerptRange(ef.content, sl, el, 10)
+			return "", fmt.Sprintf("find not found between lines %d–%d.\n%s", sl, el, snip)
 		}
-		if firstLine := file.FirstNonEmptyLine(find); firstLine != "" {
-			partial := file.FindMatches(fileContent, firstLine)
-			if len(partial) > 0 {
-				shown := partial
-				if len(shown) > maxCandidates {
-					shown = shown[:maxCandidates]
-				}
-				locs := make([]string, len(shown))
-				snippets := make([]string, len(shown))
-				for i, m := range shown {
-					locs[i] = fmt.Sprintf("%d", m.StartLine)
-					snippets[i] = file.Excerpt(fileContent, m.StartLine, 1)
-				}
-				suffix := ""
-				if len(partial) > maxCandidates {
-					suffix = fmt.Sprintf(" (showing first %d of %d)", maxCandidates, len(partial))
-				}
-				return "", fmt.Sprintf(
-					"first line of find matched at [%s]%s but full find did not match (check indentation or whitespace).\n%s",
-					strings.Join(locs, ", "), suffix, strings.Join(snippets, ""),
-				)
-			}
+		if hint := partialMatchDiagnostic(find, ef.content, maxCandidates); hint != "" {
+			return "", hint
 		}
 		return "", "find not found in file (check whitespace or CRLF endings)."
 	}
 
 	// 8. Apply in descending byte order.
-	working := fileContent
+	working := ef.content
 	for i := len(candidates) - 1; i >= 0; i-- {
 		m := candidates[i]
 		working = working[:m.StartByte] + replace + working[m.EndByte:]
 	}
 
-	// 9. Dry-run exit.
-	if dryRun {
-		return file.ComputeDiff(realPath, fileContent, working), ""
-	}
-
-	// 10. External-modification check.
-	recheck, err := os.ReadFile(realPath)
-	if err != nil {
-		return "", fmt.Sprintf("re-read for checksum: %v", err)
-	}
-	if sha256.Sum256([]byte(recheck)) != checksum {
-		return "", "Edit aborted: file was modified externally between read and write."
-	}
-
-	// 11. Atomic write — preserve original permissions.
-	if err = file.AtomicWrite(realPath, working, info.Mode()); err != nil {
-		return "", fmt.Sprintf("write failed: %v", err)
-	}
-
-	// 12. Return unified diff.
-	return file.ComputeDiff(realPath, fileContent, working), ""
+	// 9–12. Dry-run, external-mod check, atomic write, return diff.
+	return ef.commit(working, dryRun)
 }
