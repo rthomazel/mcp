@@ -19,6 +19,20 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.4.0](https://github.com/rthomazel/jail-mcp/pull/20) feat: file_replace and file_replace_all tools
+
+### feat
+
+- [`1c31132`](https://github.com/rthomazel/jail-mcp/commit/1c31132) **(handlers)** `file_replace` — find and replace unique substrings in a file; accepts a batch of find/replace pairs; fail-fast pre-pass validates all items against original content before any write; rich diagnostics for zero and multi-match cases including partial first-line hints, char positions, and line context; `line_number` narrows ambiguous matches; overlap detection across items; returns unified diff.
+- [`1c31132`](https://github.com/rthomazel/jail-mcp/commit/1c31132) **(handlers)** `file_replace_all` — replace every occurrence of a substring; optional `start_line`/`end_line` scope with full-containment semantics; same diagnostic quality as `file_replace`; returns unified diff.
+- [`1c31132`](https://github.com/rthomazel/jail-mcp/commit/1c31132) **(config)** `JAIL_MCP_EDIT_MAX_LINES` and `JAIL_MCP_MAX_CANDIDATES` — configurable replace line-limit (default 50) and diagnostic candidate cap (default 5).
+
+### refactor
+
+- [`c0afc90`](https://github.com/rthomazel/jail-mcp/commit/c0afc90) **(internal/file)** shared file-editing helpers — `Match`, `FindMatches`, `CountLines`, `CountNewlines`, `FirstNonEmptyLine`, `Excerpt`, `ExcerptRange`, `ComputeDiff` (Myers diff via hexops/gotextdiff), `AtomicWrite`, `AcquireLock`/`ReleaseLock` (ref-counted per-file mutex).
+- [`c0afc90`](https://github.com/rthomazel/jail-mcp/commit/c0afc90) **(internal/xml)** `Builder`, `OpenTag`/`CloseTag`/`Tag` moved from `handlers/xml.go` to `internal/xml`; `ParseStringSlice` moved to `internal/params.go`. Handlers package now contains only handler files.
+- [`fb5df0d`](https://github.com/rthomazel/jail-mcp/commit/fb5df0d) **(handlers)** `file_edit.go` — `openFileForEdit`, `(*editedFile).commit`, `validateFindReplace`, `partialMatchDiagnostic`, `zeroMatchError`, `multiMatchError` extracted as shared helpers used by both handlers; eliminates ~130 lines of duplication.
+
 ## [0.3.5] feat: signed commits
 
 ### feat

@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -11,11 +12,15 @@ type Config struct {
 	BackgroundTimeout time.Duration
 	Home              string
 	MiseDir           string
+	EditMaxLines      int
+	MaxCandidates     int
 }
 
 var defaults = Config{
 	Timeout:           15 * time.Second,
 	BackgroundTimeout: 5 * time.Minute,
+	EditMaxLines:      50,
+	MaxCandidates:     5,
 }
 
 func LoadConfig() (*Config, error) {
@@ -38,6 +43,8 @@ func LoadConfig() (*Config, error) {
 		BackgroundTimeout: defaults.BackgroundTimeout,
 		Home:              home,
 		MiseDir:           miseDir,
+		EditMaxLines:      defaults.EditMaxLines,
+		MaxCandidates:     defaults.MaxCandidates,
 	}
 
 	if raw := os.Getenv("JAIL_MCP_TIMEOUT"); raw != "" {
@@ -54,6 +61,22 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("JAIL_MCP_BACKGROUND_TIMEOUT invalid: %w", err)
 		}
 		cfg.BackgroundTimeout = d
+	}
+
+	if raw := os.Getenv("JAIL_MCP_EDIT_MAX_LINES"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return nil, fmt.Errorf("JAIL_MCP_EDIT_MAX_LINES invalid: must be a positive integer")
+		}
+		cfg.EditMaxLines = n
+	}
+
+	if raw := os.Getenv("JAIL_MCP_MAX_CANDIDATES"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return nil, fmt.Errorf("JAIL_MCP_MAX_CANDIDATES invalid: must be a positive integer")
+		}
+		cfg.MaxCandidates = n
 	}
 
 	return cfg, nil

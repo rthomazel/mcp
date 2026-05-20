@@ -5,10 +5,13 @@ import (
 	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/rthomazel/jail-mcp/internal"
+	"github.com/rthomazel/jail-mcp/internal/xml"
 )
 
 func (h *Handler) HandleExecBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	commands, ok := parseStringSlice(req.Params.Arguments["commands"])
+	commands, ok := internal.ParseStringSlice(req.Params.Arguments["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil
 	}
@@ -19,9 +22,9 @@ func (h *Handler) HandleExecBackground(_ context.Context, req mcp.CallToolReques
 	}
 
 	multi := len(commands) > 1
-	var b xmlBuilder
+	var b xml.Builder
 
-	b.openTag("metadata")
+	b.OpenTag("metadata")
 
 	for i, cmd := range commands {
 		j := h.startJob(cmd, cwd)
@@ -33,7 +36,7 @@ func (h *Handler) HandleExecBackground(_ context.Context, req mcp.CallToolReques
 		}
 	}
 
-	b.closeTag("metadata", false)
+	b.CloseTag("metadata", false)
 
 	return mcp.NewToolResultText(b.String()), nil
 }
