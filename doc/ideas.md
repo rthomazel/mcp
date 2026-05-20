@@ -46,4 +46,30 @@ Then the model can use the other tools in any way that it wants. When the server
 We should probably have some type of exclusive string so that we can catch unset variables in commands and return an error and refuse to process the command.
 We could also have a tool to list the variables that are currently loaded in the server.
 A design question is, should this live in the jail or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the jail.
-The obvious upside is that it's so easy and simple. 
+The obvious upside is that it's so easy and simple.
+
+## integration test suite for file_replace and file_replace_all
+
+Unit tests cover the pure helpers in `internal/file` and `handlers`.
+The handler core (`handleFileReplace`, `handleFileReplaceAll`) is not yet integration-tested.
+
+Approach when this is picked up:
+
+- A `testhelper` (e.g. `handlers/testutil_test.go`) creates a temp file with known content,
+  calls the inner handler function directly, and asserts on the returned diff string and
+  final file content.
+- Cases to cover:
+  - Basic single and batch replace (file_replace)
+  - `line_number` narrowing — removes ambiguity
+  - Overlap detection across items
+  - Scoped replace (file_replace_all `start_line`/`end_line`)
+  - Dry-run: diff returned, file unchanged
+  - External-modification detection: modify file between open and commit, expect abort error
+  - Symlink resolution: path is a symlink to a regular file
+  - Binary file rejection
+  - Permissions preserved after atomic write
+- The external-modification test requires two goroutines: one holds the lock through the
+  SHA-256 check window, the other modifies the file. Consider exposing a test hook or
+  accepting that this case is tested at unit level via the checksum comparison logic alone.
+- Maintenance note: integration tests touch the real filesystem and are sensitive to
+  race conditions on CI. Use `t.TempDir()` for isolation and `t.Parallel()` carefully.
