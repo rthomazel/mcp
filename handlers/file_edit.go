@@ -12,8 +12,8 @@ import (
 )
 
 // editedFile holds the resolved state of a file opened for in-place editing.
-// The caller must defer file.ReleaseLock(ef.realPath, ef.lock) after a
-// successful openFileForEdit call.
+// The caller must defer file.ReleaseLock(theFile.realPath, theFile.lock) after
+// a successful openFileForEdit call.
 type editedFile struct {
 	realPath string
 	content  string
@@ -82,14 +82,33 @@ func (ef *editedFile) commit(working string, dryRun bool) (string, string) {
 	return file.ComputeDiff(ef.realPath, ef.content, working), ""
 }
 
+// validateFindReplace checks the five guards common to both file_replace and
+// file_replace_all: empty find, identical pair, null bytes, UTF-8 validity, and
+// replace line-limit. Returns an error string without label prefix, or "" if valid.
+func validateFindReplace(find, replace string, maxLines int) string {
+	switch {
+	case find == "":
+		return "find must not be empty."
+	case find == replace:
+		return "find and replace are identical \u2014 no change would be made."
+	case strings.Contains(find, "\x00") || strings.Contains(replace, "\x00"):
+		return "null bytes detected; binary files are not supported."
+	case !utf8.ValidString(find) || !utf8.ValidString(replace):
+		return "find and replace must be valid UTF-8."
+	case file.CountNewlines(replace) > maxLines:
+		return fmt.Sprintf("replace exceeds the %d-newline limit.", maxLines)
+	}
+	return ""
+}
+
 // partialMatchDiagnostic checks whether the first non-empty line of find
-// matches anywhere in fileContent. Returns a hint message when it does, "" otherwise.
-func partialMatchDiagnostic(find, fileContent string, maxCandidates int) string {
+// matches anywhere in content. Returns a hint message when it does, "" otherwise.
+func partialMatchDiagnostic(find, content string, maxCandidates int) string {
 	firstLine := file.FirstNonEmptyLine(find)
 	if firstLine == "" {
 		return ""
 	}
-	partial := file.FindMatches(fileContent, firstLine)
+	partial := file.FindMatches(content, firstLine)
 	if len(partial) == 0 {
 		return ""
 	}
@@ -101,7 +120,7 @@ func partialMatchDiagnostic(find, fileContent string, maxCandidates int) string 
 	snippets := make([]string, len(shown))
 	for i, m := range shown {
 		locs[i] = fmt.Sprintf("%d", m.StartLine)
-		snippets[i] = file.Excerpt(fileContent, m.StartLine, 1)
+		snippets[i] = file.Excerpt(content, m.StartLine, 1)
 	}
 	suffix := ""
 	if len(partial) > maxCandidates {

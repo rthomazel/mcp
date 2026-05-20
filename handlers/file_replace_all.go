@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/jail-mcp/internal/file"
@@ -53,20 +51,8 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	if !filepath.IsAbs(path) {
 		return "", "path must be absolute."
 	}
-	if find == "" {
-		return "", "find must not be empty."
-	}
-	if find == replace {
-		return "", "find and replace are identical — no change would be made."
-	}
-	if strings.Contains(find, "\x00") || strings.Contains(replace, "\x00") {
-		return "", "null bytes detected; binary files are not supported."
-	}
-	if !utf8.ValidString(find) || !utf8.ValidString(replace) {
-		return "", "find and replace must be valid UTF-8."
-	}
-	if file.CountNewlines(replace) > maxLines {
-		return "", fmt.Sprintf("replace exceeds the %d-newline limit.", maxLines)
+	if msg := validateFindReplace(find, replace, maxLines); msg != "" {
+		return "", msg
 	}
 	if startLine != 0 && startLine < 1 {
 		return "", "start_line must be ≥ 1."
@@ -79,23 +65,23 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	}
 
 	// 2–5. Resolve symlinks, stat, lock, read, validate binary.
-	editedFile, err := openFileForEdit(path)
+	theFile, err := openFileForEdit(path)
 	if err != "" {
 		return "", err
 	}
-	defer file.ReleaseLock(editedFile.realPath, editedFile.lock)
+	defer file.ReleaseLock(theFile.realPath, theFile.lock)
 
 	// 6. Validate scope against file length.
-	if startLine != 0 && startLine > editedFile.lines {
-		return "", fmt.Sprintf("start_line %d out of range (file has %d lines).", startLine, editedFile.lines)
+	if startLine != 0 && startLine > theFile.lines {
+		return "", fmt.Sprintf("start_line %d out of range (file has %d lines).", startLine, theFile.lines)
 	}
-	if endLine != 0 && endLine > editedFile.lines {
-		return "", fmt.Sprintf("end_line %d out of range (file has %d lines).", endLine, editedFile.lines)
+	if endLine != 0 && endLine > theFile.lines {
+		return "", fmt.Sprintf("end_line %d out of range (file has %d lines).", endLine, theFile.lines)
 	}
 
 	// 7. Find all matches within scope.
 	hasScope := startLine != 0 || endLine != 0
-	allMatches := file.FindMatches(editedFile.content, find)
+	allMatches := file.FindMatches(theFile.content, find)
 	candidates := make([]file.Match, 0, len(allMatches))
 	for _, m := range allMatches {
 		if startLine != 0 && m.StartLine < startLine {
@@ -114,24 +100,24 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 				sl = 1
 			}
 			if el == 0 {
-				el = editedFile.lines
+				el = theFile.lines
 			}
-			snip := file.ExcerptRange(editedFile.content, sl, el, 10)
+			snip := file.ExcerptRange(theFile.content, sl, el, 10)
 			return "", fmt.Sprintf("find not found between lines %d–%d.\n%s", sl, el, snip)
 		}
-		if hint := partialMatchDiagnostic(find, editedFile.content, maxCandidates); hint != "" {
+		if hint := partialMatchDiagnostic(find, theFile.content, maxCandidates); hint != "" {
 			return "", hint
 		}
 		return "", "find not found in file (check whitespace or CRLF endings)."
 	}
 
 	// 8. Apply in descending byte order.
-	working := editedFile.content
+	working := theFile.content
 	for i := len(candidates) - 1; i >= 0; i-- {
 		m := candidates[i]
 		working = working[:m.StartByte] + replace + working[m.EndByte:]
 	}
 
 	// 9–12. Dry-run, external-mod check, atomic write, return diff.
-	return editedFile.commit(working, dryRun)
+	return theFile.commit(working, dryRun)
 }

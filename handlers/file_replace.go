@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/jail-mcp/internal/file"
@@ -79,39 +77,27 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 	}
 	for i, r := range replacements {
 		label := fmt.Sprintf("Replacement %d", i+1)
-		if r.find == "" {
-			return "", fmt.Sprintf("%s: find must not be empty.", label)
-		}
-		if r.find == r.replace {
-			return "", fmt.Sprintf("%s: find and replace are identical — no change would be made.", label)
-		}
-		if strings.Contains(r.find, "\x00") || strings.Contains(r.replace, "\x00") {
-			return "", fmt.Sprintf("%s: null bytes detected; binary files are not supported.", label)
-		}
-		if !utf8.ValidString(r.find) || !utf8.ValidString(r.replace) {
-			return "", fmt.Sprintf("%s: find and replace must be valid UTF-8.", label)
+		if msg := validateFindReplace(r.find, r.replace, maxLines); msg != "" {
+			return "", fmt.Sprintf("%s: %s", label, msg)
 		}
 		if r.lineNumber != 0 && r.lineNumber < 1 {
 			return "", fmt.Sprintf("%s: line_number must be ≥ 1.", label)
 		}
-		if file.CountNewlines(r.replace) > maxLines {
-			return "", fmt.Sprintf("%s: replace exceeds the %d-newline limit.", label, maxLines)
-		}
 	}
 
 	// 2–5. Resolve symlinks, stat, lock, read, validate binary.
-	editedFile, err := openFileForEdit(path)
+	theFile, err := openFileForEdit(path)
 	if err != "" {
 		return "", err
 	}
-	defer file.ReleaseLock(editedFile.realPath, editedFile.lock)
+	defer file.ReleaseLock(theFile.realPath, theFile.lock)
 
 	// 6. Validate line_number ranges against actual file length.
 	for i, r := range replacements {
-		if r.lineNumber != 0 && r.lineNumber > editedFile.lines {
+		if r.lineNumber != 0 && r.lineNumber > theFile.lines {
 			return "", fmt.Sprintf(
 				"Replacement %d: line_number %d out of range (file has %d lines).",
-				i+1, r.lineNumber, editedFile.lines,
+				i+1, r.lineNumber, theFile.lines,
 			)
 		}
 	}
@@ -121,7 +107,7 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 	for i, r := range replacements {
 		label := fmt.Sprintf("Replacement %d of %d", i+1, len(replacements))
 
-		allMatches := file.FindMatches(editedFile.content, r.find)
+		allMatches := file.FindMatches(theFile.content, r.find)
 		var candidates []file.Match
 		if r.lineNumber != 0 {
 			for _, m := range allMatches {
@@ -135,11 +121,11 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 
 		switch len(candidates) {
 		case 0:
-			return "", zeroMatchError(label, r, editedFile.content, maxCandidates)
+			return "", zeroMatchError(label, r, theFile.content, maxCandidates)
 		case 1:
 			located = append(located, locatedReplacement{origIdx: i, r: r, m: candidates[0]})
 		default:
-			return "", multiMatchError(label, r, candidates, editedFile.content, maxCandidates)
+			return "", multiMatchError(label, r, candidates, theFile.content, maxCandidates)
 		}
 	}
 
@@ -158,12 +144,12 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 	}
 
 	// 9. Apply in descending byte order.
-	working := editedFile.content
+	working := theFile.content
 	for i := len(located) - 1; i >= 0; i-- {
 		l := located[i]
 		working = working[:l.m.StartByte] + l.r.replace + working[l.m.EndByte:]
 	}
 
 	// 10–13. Dry-run, external-mod check, atomic write, return diff.
-	return editedFile.commit(working, dryRun)
+	return theFile.commit(working, dryRun)
 }
