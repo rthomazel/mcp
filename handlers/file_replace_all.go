@@ -79,23 +79,23 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 	}
 
 	// 2–5. Resolve symlinks, stat, lock, read, validate binary.
-	ef, toolErr := openFileForEdit(path)
-	if toolErr != "" {
-		return "", toolErr
+	editedFile, err := openFileForEdit(path)
+	if err != "" {
+		return "", err
 	}
-	defer file.ReleaseLock(ef.realPath, ef.lock)
+	defer file.ReleaseLock(editedFile.realPath, editedFile.lock)
 
 	// 6. Validate scope against file length.
-	if startLine != 0 && startLine > ef.lines {
-		return "", fmt.Sprintf("start_line %d out of range (file has %d lines).", startLine, ef.lines)
+	if startLine != 0 && startLine > editedFile.lines {
+		return "", fmt.Sprintf("start_line %d out of range (file has %d lines).", startLine, editedFile.lines)
 	}
-	if endLine != 0 && endLine > ef.lines {
-		return "", fmt.Sprintf("end_line %d out of range (file has %d lines).", endLine, ef.lines)
+	if endLine != 0 && endLine > editedFile.lines {
+		return "", fmt.Sprintf("end_line %d out of range (file has %d lines).", endLine, editedFile.lines)
 	}
 
 	// 7. Find all matches within scope.
 	hasScope := startLine != 0 || endLine != 0
-	allMatches := file.FindMatches(ef.content, find)
+	allMatches := file.FindMatches(editedFile.content, find)
 	candidates := make([]file.Match, 0, len(allMatches))
 	for _, m := range allMatches {
 		if startLine != 0 && m.StartLine < startLine {
@@ -114,24 +114,24 @@ func (h *Handler) handleFileReplaceAll(path, find, replace string, startLine, en
 				sl = 1
 			}
 			if el == 0 {
-				el = ef.lines
+				el = editedFile.lines
 			}
-			snip := file.ExcerptRange(ef.content, sl, el, 10)
+			snip := file.ExcerptRange(editedFile.content, sl, el, 10)
 			return "", fmt.Sprintf("find not found between lines %d–%d.\n%s", sl, el, snip)
 		}
-		if hint := partialMatchDiagnostic(find, ef.content, maxCandidates); hint != "" {
+		if hint := partialMatchDiagnostic(find, editedFile.content, maxCandidates); hint != "" {
 			return "", hint
 		}
 		return "", "find not found in file (check whitespace or CRLF endings)."
 	}
 
 	// 8. Apply in descending byte order.
-	working := ef.content
+	working := editedFile.content
 	for i := len(candidates) - 1; i >= 0; i-- {
 		m := candidates[i]
 		working = working[:m.StartByte] + replace + working[m.EndByte:]
 	}
 
 	// 9–12. Dry-run, external-mod check, atomic write, return diff.
-	return ef.commit(working, dryRun)
+	return editedFile.commit(working, dryRun)
 }

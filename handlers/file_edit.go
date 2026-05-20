@@ -112,3 +112,75 @@ func partialMatchDiagnostic(find, fileContent string, maxCandidates int) string 
 		strings.Join(locs, ", "), suffix, strings.Join(snippets, ""),
 	)
 }
+
+// zeroMatchError builds the diagnostic for a find that matched zero times.
+func zeroMatchError(label string, r replacement, content string, maxCandidates int) string {
+	if r.lineNumber != 0 {
+		snip := file.Excerpt(content, r.lineNumber, 1)
+		return fmt.Sprintf("%s failed: find not found at line %d.\n%s", label, r.lineNumber, snip)
+	}
+	if hint := partialMatchDiagnostic(r.find, content, maxCandidates); hint != "" {
+		return fmt.Sprintf("%s failed: %s", label, hint)
+	}
+	return fmt.Sprintf("%s failed: find not found in file (check whitespace or CRLF endings).", label)
+}
+
+// multiMatchError builds the diagnostic for a find that matched more than once.
+func multiMatchError(label string, r replacement, candidates []file.Match, content string, maxCandidates int) string {
+	if r.lineNumber != 0 {
+		sameLine := true
+		for _, c := range candidates {
+			if c.StartLine != candidates[0].StartLine {
+				sameLine = false
+				break
+			}
+		}
+		if sameLine {
+			charPositions := make([]string, len(candidates))
+			for i, c := range candidates {
+				charPositions[i] = fmt.Sprintf("%d", c.StartChar)
+			}
+			snip := file.Excerpt(content, r.lineNumber, 1)
+			return fmt.Sprintf(
+				"%s failed: ambiguous at line %d: find matched %d times at characters [%s]. Replace the whole line.\n%s",
+				label, r.lineNumber, len(candidates), strings.Join(charPositions, ", "), snip,
+			)
+		}
+		shown := candidates
+		if len(shown) > maxCandidates {
+			shown = shown[:maxCandidates]
+		}
+		locs := make([]string, len(shown))
+		snippets := make([]string, len(shown))
+		for i, m := range shown {
+			locs[i] = fmt.Sprintf("%d", m.StartLine)
+			snippets[i] = file.Excerpt(content, m.StartLine, 1)
+		}
+		suffix := ""
+		if len(candidates) > maxCandidates {
+			suffix = fmt.Sprintf(" (showing first %d of %d)", maxCandidates, len(candidates))
+		}
+		return fmt.Sprintf(
+			"%s failed: line_number %d did not narrow to one match (at lines [%s]%s).\n%s",
+			label, r.lineNumber, strings.Join(locs, ", "), suffix, strings.Join(snippets, ""),
+		)
+	}
+	shown := candidates
+	if len(shown) > maxCandidates {
+		shown = shown[:maxCandidates]
+	}
+	locs := make([]string, len(shown))
+	snippets := make([]string, len(shown))
+	for i, m := range shown {
+		locs[i] = fmt.Sprintf("%d", m.StartLine)
+		snippets[i] = file.Excerpt(content, m.StartLine, 1)
+	}
+	suffix := ""
+	if len(candidates) > maxCandidates {
+		suffix = fmt.Sprintf(" (showing first %d of %d)", maxCandidates, len(candidates))
+	}
+	return fmt.Sprintf(
+		"%s failed: find matched %d locations (lines [%s]%s). Provide line_number or widen find.\n%s",
+		label, len(candidates), strings.Join(locs, ", "), suffix, strings.Join(snippets, ""),
+	)
+}
