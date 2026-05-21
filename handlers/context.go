@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rthomazel/jail-mcp/internal/pathsnapshot"
+	"github.com/rthomazel/bench-mcp/internal/pathsnapshot"
 	"github.com/samber/lo"
 )
 

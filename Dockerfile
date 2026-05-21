@@ -9,7 +9,7 @@ ARG VERSION
 RUN CGO_ENABLED=0 go build \
     # trim debug info and set version
     -ldflags="-s -w -X main.version=${VERSION:-local}" \
-    -o jail-mcp .
+    -o bench-mcp .
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM ubuntu:24.04
@@ -54,10 +54,10 @@ ENV PATH="/mise/shims:$PATH"
 
 RUN pip install mcpo mcp-proxy --break-system-packages
 
-COPY --from=builder /build/jail-mcp /usr/local/bin/jail-mcp
-COPY ./bin/jailmcphttp /usr/local/bin/jailmcphttp
-RUN chmod +x /usr/local/bin/jailmcphttp
+COPY --from=builder /build/bench-mcp /usr/local/bin/bench-mcp
+COPY ./bin/benchmcphttp /usr/local/bin/benchmcphttp
+RUN chmod +x /usr/local/bin/benchmcphttp
 
 EXPOSE 8001
 
-CMD ["jailmcphttp"]
+CMD ["benchmcphttp"]

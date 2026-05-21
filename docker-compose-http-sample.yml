@@ -1,29 +1,29 @@
 # this file has example values in the volumes section
 volumes:
-  jail-mcp-mise:
-  jail-mcp-root:
+  bench-mcp-mise:
+  bench-mcp-root:
 
 services:
-  jail-mcp:
-    container_name: jail-mcp-http
-    image: ghcr.io/rthomazel/jail-mcp:latest
+  bench-mcp:
+    container_name: bench-mcp-http
+    image: ghcr.io/rthomazel/bench-mcp:latest
     stdin_open: true
     tty: false
     ports:
       - "8001:8001"
     environment:
       # mcpo: OpenAI-compatible REST API (for Open WebUI and similar)
-      # JAIL_MCP_TRANSPORT: mcpo
+      # BENCH_MCP_TRANSPORT: mcpo
       # mcp-proxy: native MCP/SSE (for LibreChat, Claude Desktop, MCP-native clients)
-      JAIL_MCP_TRANSPORT: mcp-proxy
+      BENCH_MCP_TRANSPORT: mcp-proxy
       # timeout for exec sync commands
-      JAIL_MCP_TIMEOUT: 15s
+      BENCH_MCP_TIMEOUT: 15s
       # timeout for exec background
-      JAIL_MCP_BACKGROUND_TIMEOUT: 5m
+      BENCH_MCP_BACKGROUND_TIMEOUT: 5m
     volumes:
       # persistent state: mise installs and shims, Go cache, path snapshot
-      - jail-mcp-mise:/mise
-      - jail-mcp-root:/root
+      - bench-mcp-mise:/mise
+      - bench-mcp-root:/root
       # >>> add projects below here <<<
       # host machine path : container path
       - /Users/you/helloworld:/projects/helloworld

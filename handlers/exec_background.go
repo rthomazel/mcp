@@ -6,8 +6,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/rthomazel/jail-mcp/internal"
-	"github.com/rthomazel/jail-mcp/internal/xml"
+	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/bench-mcp/internal/xml"
 )
 
 func (h *Handler) HandleExecBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

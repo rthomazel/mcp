@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "$BENCH_MCP_HTTP" = "true" ] || [ "$BENCH_MCP_TRANSPORT" = "mcpo" ]; then
+    echo "INFO: starting bench-mcp with mcpo (OpenAI-compatible HTTP)" >&2
+    exec mcpo --port 8001 -- bench-mcp
+elif [ "$BENCH_MCP_TRANSPORT" = "mcp-proxy" ]; then
+    echo "INFO: starting bench-mcp with mcp-proxy (native MCP/SSE)" >&2
+    exec mcp-proxy --pass-environment --host 0.0.0.0 --port 8001 -- bench-mcp
+else
+    echo "INFO: starting bench-mcp in stdio mode" >&2
+    exec bench-mcp
+fi

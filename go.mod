@@ -1,4 +1,4 @@
-module github.com/rthomazel/jail-mcp
+module github.com/rthomazel/bench-mcp
 
 go 1.25.0
 

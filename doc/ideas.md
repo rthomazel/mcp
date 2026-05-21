@@ -7,7 +7,7 @@ Could run them with goroutines and be meaningfully faster.
 
 ## per-command timeout
 
-Timeout is global via `JAIL_MCP_TIMEOUT`.
+Timeout is global via `BENCH_MCP_TIMEOUT`.
 Letting `exec_sync` accept an optional `timeout` param would be useful for known slow commands.
 
 ## sqlite db with command stats
@@ -30,7 +30,7 @@ to respect depth — a wider refactor touching all handlers.
 
 ## path snapshot registration file
 
-Setup scripts could write a `.jail-mcp-extras` file in the project root —
+Setup scripts could write a `.bench-mcp-extras` file in the project root —
 one `name: /path/to/binary` pair per line. `context` reads all such files under
 known project roots and surfaces them alongside the `auto-detected in path:` block.
 Explicit opt-in, works for non-PATH installs, but requires setup scripts to be

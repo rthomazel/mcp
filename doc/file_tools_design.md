@@ -95,8 +95,8 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
 
 | Constraint | Value | Rationale |
 | --- | --- | --- |
-| Max newlines in `replace` | **50** (env: `JAIL_MCP_EDIT_MAX_LINES`) | Keeps individual replacements surgical |
-| Max candidates in error output | **5** (env: `JAIL_MCP_MAX_CANDIDATES`) | Keeps error messages readable |
+| Max newlines in `replace` | **50** (env: `BENCH_MCP_EDIT_MAX_LINES`) | Keeps individual replacements surgical |
+| Max candidates in error output | **5** (env: `BENCH_MCP_MAX_CANDIDATES`) | Keeps error messages readable |
 | `file_replace` match count | exactly 1 per item | Fails loudly on ambiguity |
 | `file_replace_all` match count | ≥ 1 | Zero matches is an error |
 | Chaining within a `file_replace` call | not supported | All `find` values are matched against the original file content before any replacement is applied. To target text produced by a prior replacement, issue a second call. |
@@ -131,7 +131,7 @@ All errors that identify match locations include 1 line of file context before a
 ### handle_file_replace
 
 ```python
-MAX_CANDIDATES = env("JAIL_MCP_MAX_CANDIDATES", default=5)  # max candidates shown in diagnostic output; shared by both handlers
+MAX_CANDIDATES = env("BENCH_MCP_MAX_CANDIDATES", default=5)  # max candidates shown in diagnostic output; shared by both handlers
 
 
 def handle_file_replace(path, replacements, dry_run=False):

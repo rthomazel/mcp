@@ -151,7 +151,7 @@ func ComputeDiff(path, before, after string) string {
 // mode, then renames. On any failure after temp creation the temp file is removed.
 func AtomicWrite(path, content string, mode os.FileMode) error {
 	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".jail-mcp-*")
+	tmp, err := os.CreateTemp(dir, ".bench-mcp-*")
 	if err != nil {
 		return fmt.Errorf("create temp: %w", err)
 	}

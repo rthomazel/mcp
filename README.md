@@ -1,12 +1,12 @@
-# safe-mcp
+# bench-mcp
 
-**Give your AI agent a real shell. Keep it in a box.**
+**Give your AI agent a real workbench.**
 
-[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Frthomazel%2Fsafe--mcp-blue?logo=docker)](https://ghcr.io/rthomazel/safe-mcp)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Frthomazel%2Fbench--mcp-blue?logo=docker)](https://ghcr.io/rthomazel/bench-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-lightgrey)](#)
 
-safe-mcp is an open-source MCP server that gives AI agents real shell access — isolated inside a Docker container. Your agent can read files, run commands, install dependencies, and work across multiple projects. Your host machine stays untouched.
+bench-mcp is an open-source MCP server that gives AI agents the fundamental tools to get real work done: a real shell, background job control, precise file editing, and environment discovery — all isolated inside a Docker container. Your host machine stays untouched.
 
 No custom sandboxing layer. No trust required. Just Docker doing what Docker does.
 
@@ -20,17 +20,19 @@ No custom sandboxing layer. No trust required. Just Docker doing what Docker doe
 | `exec_sync` | Run a foreground command and get stdout/stderr back immediately |
 | `exec_background` | Kick off a slow command without blocking |
 | `status` | Poll a background job for results |
-| `setup` | Install a project's language runtime and dependencies |
+| `setup` | Install a project\'s language runtime and dependencies |
+| `file_replace` | Find and replace unique substrings in a file. Returns a unified diff |
+| `file_replace_all` | Replace all occurrences of a substring in a file. Returns a unified diff |
 
 Agents can read and edit files, run tests, run linters, call CLIs, manage git — anything a developer can do in a terminal.
 
 ---
 
-## Why safe-mcp
+## Why bench-mcp
 
-**Agents need a real environment.** Giving an agent only file-read tools means it can't run tests, can't verify its own changes, can't install a dependency. safe-mcp gives agents a full shell so they can actually finish the job.
+**Agents need a real environment.** Giving an agent only file-read tools means it can\'t run tests, can\'t verify its own changes, can\'t install a dependency. bench-mcp gives agents a full shell so they can actually finish the job.
 
-**Container isolation is the right primitive.** Instead of a custom permission system, safe-mcp uses Docker volumes to define exactly what the agent can see and touch. Anything not mounted is invisible. Read-only mounts are supported. The container is ephemeral by default — nothing leaks between sessions.
+**Container isolation is the right primitive.** Instead of a custom permission system, bench-mcp uses Docker volumes to define exactly what the agent can see and touch. Anything not mounted is invisible. Read-only mounts are supported. The container is ephemeral by default — nothing leaks between sessions.
 
 **Works with the clients you already use.** stdio for Claude Desktop, HTTP/SSE for LibreChat, OpenAI-compatible HTTP for Open WebUI. One image, all transports.
 
@@ -41,7 +43,7 @@ Agents can read and edit files, run tests, run linters, call CLIs, manage git �
 ### 1. Pull the image
 
 ```bash
-docker pull ghcr.io/rthomazel/safe-mcp:latest
+docker pull ghcr.io/rthomazel/bench-mcp:latest
 # amd64 (most desktops/laptops) and arm64 (Apple Silicon, Raspberry Pi) builds available
 ```
 
@@ -58,7 +60,7 @@ Two sample files are included depending on your transport:
 Copy a sample, edit the volume paths to point at your projects:
 
 ```bash
-mkdir safeMCP && cd safeMCP
+mkdir benchMCP && cd benchMCP
 cp /path/to/docker-compose-sample.yml docker-compose.yml
 ${EDITOR:-vi} docker-compose.yml
 ```
@@ -76,11 +78,11 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 ```json
 {
   "mcpServers": {
-    "safe-mcp": {
+    "bench-mcp": {
       "command": "docker",
       "args": [
-        "compose", "-f", "/path/to/safeMCP/docker-compose.yml",
-        "run", "--rm", "-i", "safe-mcp"
+        "compose", "-f", "/path/to/benchMCP/docker-compose.yml",
+        "run", "--rm", "-i", "bench-mcp"
       ]
     }
   }
@@ -89,7 +91,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 Restart Claude Desktop.
 
-> **Tip:** If tools disappear after an image update, rename the server key (e.g. `safe-mcp` → `1_safe-mcp`). This is a known Claude Desktop bug — renaming forces re-registration.
+> **Tip:** If tools disappear after an image update, rename the server key (e.g. `bench-mcp` → `1_bench-mcp`). This is a known Claude Desktop bug — renaming forces re-registration.
 
 #### Open WebUI / HTTP clients
 
@@ -97,7 +99,7 @@ Restart Claude Desktop.
 docker compose -f docker-compose-http-sample.yml up -d
 ```
 
-Then add `http://localhost:8001` as an MCP server in your client. Set `SAFE_MCP_TRANSPORT` to `mcpo` for OpenAI-compatible REST or `mcp-proxy` for native MCP/SSE.
+Then add `http://localhost:8001` as an MCP server in your client. Set `BENCH_MCP_TRANSPORT` to `mcpo` for OpenAI-compatible REST or `mcp-proxy` for native MCP/SSE.
 
 ### 4. Install project dependencies
 
@@ -122,25 +124,16 @@ Two named volumes persist across sessions: `/mise` (language runtimes) and `/roo
 
 ### 5. Write an agent prompt
 
-The agent needs to know to call `context` at the start of a session. Here's a minimal system prompt:
+The agent needs to know to call `context` at the start of a session. Here\'s a minimal system prompt:
 
 ````markdown
-Call the safe-mcp `context` tool at the start of each session to orient yourself.
+Call the bench-mcp `context` tool at the start of each session to orient yourself.
 
 Use `exec_sync` for most file tasks (cat, find, grep). Use `exec_background` for slow commands and poll with `status`. You can do other work while waiting.
 
-Editing files: use Python via `exec_sync` with a quoted heredoc to avoid shell interpolation issues.
-
-```python
-python3 << 'PYEOF'
-with open('/projects/myproject/file.go', 'r') as f:
-    content = f.read()
-content = content.replace('old', 'new')
-with open('/projects/myproject/file.go', 'w') as f:
-    f.write(content)
-print('ok')
-PYEOF
-```
+Editing files:
+- Use `file_replace` for targeted edits — finds a unique substring and replaces it. Returns a unified diff.
+- Use `file_replace_all` to replace every occurrence of a substring (e.g. renaming a symbol).
 ````
 
 ---
@@ -154,22 +147,11 @@ The container is ephemeral. Between sessions:
 
 | Path | Volume | Notes |
 | --- | --- | --- |
-| `/mise` | `safe-mcp-mise` | Language runtimes installed by mise |
-| `/root` | `safe-mcp-root` | Home dir, `/root/bin` is on PATH |
+| `/mise` | `bench-mcp-mise` | Language runtimes installed by mise |
+| `/root` | `bench-mcp-root` | Home dir, `/root/bin` is on PATH |
 | `/projects/*` | your bind mounts | Your actual project files |
 
 ---
-
-## Logs
-
-Logs are written in plain text to stderr.
-
----
-
-## License
-
-Check run script.
-Comments `# -- ` above each `case` are used for help message.
 
 ## Optional: SSH key for git push from the container
 
@@ -178,7 +160,7 @@ If you want agents to be able to push to GitHub from inside the container, gener
 
 ```bash
 # generate a key on your host
-ssh-keygen -t ed25519 -f ~/.ssh/agents_id_ed25519 -N "" -C "jail-mcp container"
+ssh-keygen -t ed25519 -f ~/.ssh/agents_id_ed25519 -N "" -C "bench-mcp container"
 
 # print the public key — add it at github.com/settings/keys
 cat ~/.ssh/agents_id_ed25519.pub
@@ -194,9 +176,21 @@ Then mount the private key into the container by adding this line to your `docke
 On first use, open a shell into the container and add GitHub to known hosts:
 
 ```bash
-docker compose run --rm jail-mcp bash
+docker compose run --rm bench-mcp bash
 # then inside the container
 ssh-keyscan github.com >> ~/.ssh/known_hosts
 ```
 
 This only needs to run once — `/root` is a named volume so `known_hosts` persists across sessions.
+
+---
+
+## Logs
+
+Logs are written in plain text to stderr.
+
+---
+
+## License
+
+MIT

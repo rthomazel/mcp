@@ -10,9 +10,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rthomazel/jail-mcp/handlers"
-	"github.com/rthomazel/jail-mcp/internal"
-	"github.com/rthomazel/jail-mcp/internal/pathsnapshot"
+	"github.com/rthomazel/bench-mcp/handlers"
+	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/bench-mcp/internal/pathsnapshot"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -58,12 +58,12 @@ func run() error {
 
 	pathsnapshot.Diff(cfg.Home)
 
-	slog.Info("jail-mcp starting", "version", version, "timeout", cfg.Timeout, "background_timeout", cfg.BackgroundTimeout)
+	slog.Info("bench-mcp starting", "version", version, "timeout", cfg.Timeout, "background_timeout", cfg.BackgroundTimeout)
 
 	h := handlers.New(cfg, version)
 
 	s := server.NewMCPServer(
-		"jail-mcp",
+		"bench-mcp",
 		version,
 		server.WithToolCapabilities(false),
 	)

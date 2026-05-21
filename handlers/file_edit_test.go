@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rthomazel/jail-mcp/internal/file"
+	"github.com/rthomazel/bench-mcp/internal/file"
 )
 
 func TestValidateFindReplace(t *testing.T) {
