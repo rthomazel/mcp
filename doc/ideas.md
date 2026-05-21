@@ -47,3 +47,77 @@ We should probably have some type of exclusive string so that we can catch unset
 We could also have a tool to list the variables that are currently loaded in the server.
 A design question is, should this live in the jail or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the jail.
 The obvious upside is that it's so easy and simple. 
+The obvious upside is that it's so easy and simple.
+
+## integration test suite
+
+The project has no integration tests. Unit tests cover pure helpers; the full
+request path (MCP tool call → handler → disk/process → response) is untested.
+
+### scope
+
+Each MCP tool should have at least one integration test that exercises its handler
+end-to-end: parse params, execute the operation, assert on the returned text and
+any side effects (file contents, job state, etc.).
+
+### approach
+
+- Tests live in `handlers/` as `_test.go` files in `package handlers` (white-box,
+  so inner functions are accessible).
+- A small `testutil_test.go` provides shared helpers: temp file creation, temp dir
+  scaffolding, a fake `Config`, and a `Handler` factory.
+- All tests use `t.TempDir()` for filesystem isolation and clean up automatically.
+- Use `t.Parallel()` cautiously — file-lock tests must not share paths.
+
+### per-tool cases
+
+**exec_sync / exec_background / status**
+- Basic command execution, stdout/stderr captured correctly
+- Non-zero exit code returned without error
+- CWD respected
+- Background job transitions from pending to done; status reflects it
+- Timeout fires and is surfaced
+
+**context**
+- Returns expected metadata fields (os, arch, disk, path)
+
+**setup**
+- Detects manifest file and launches the right command (can mock by injecting a no-op rule)
+
+**file_replace**
+- Basic single-item replace, returns unified diff, file updated
+- Batch: multiple non-overlapping items applied in correct order
+- `line_number` narrows an ambiguous match
+- Overlap detection across items returns error, file unchanged
+- Zero matches returns error with diagnostic
+- Dry-run: diff returned, file not modified
+- External-modification detection: file changed between read and write, returns abort error
+- Symlink: path is a symlink to a regular file, write targets real file
+- Binary file: rejected before any write
+- Permissions preserved after atomic write
+
+**file_replace_all**
+- Replaces all occurrences, file updated, diff returned
+- `start_line`/`end_line` scope: matches outside range not replaced
+- Multi-line match crossing scope boundary not replaced
+- Zero matches within scope returns error with range excerpt
+- Dry-run, external-modification, symlink, binary — same as file_replace
+
+### tricky cases
+
+- **External-modification test**: requires modifying the file after `openFileForEdit`
+  acquires the lock but before `commit` re-reads. Simplest approach: expose a
+  `testHookAfterRead func()` on `editedFile` set only in tests, called just before
+  the SHA-256 recheck.
+- **Permissions**: create file at a non-default mode (e.g. 0o644 vs 0o600), assert
+  mode is preserved after the atomic rename.
+
+### maintenance notes
+
+- Integration tests touch the real filesystem and spawn real subprocesses — they
+  will be slower than unit tests. Keep them in a separate build tag (`//go:build integration`)
+  or accept the cost and run them in CI alongside unit tests.
+- Avoid sharing temp directories across parallel subtests; each subtest gets its own
+  `t.TempDir()`.
+- Flaky timeout tests can be avoided by using very short commands (e.g. `true`) and
+  asserting on zero exit rather than timing behaviour.

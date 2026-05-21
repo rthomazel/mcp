@@ -6,42 +6,45 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/rthomazel/jail-mcp/internal"
+	"github.com/rthomazel/jail-mcp/internal/xml"
 )
 
 func (h *Handler) HandleStatus(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ids, ok := parseStringSlice(req.Params.Arguments["job_ids"])
+	ids, ok := internal.ParseStringSlice(req.Params.Arguments["job_ids"])
 	if !ok || len(ids) == 0 {
 		return mcp.NewToolResultError("missing required parameter: job_ids"), nil
 	}
 
 	multi := len(ids) > 1
-	var b xmlBuilder
+	var b xml.Builder
 
 	for i, id := range ids {
 		if multi {
-			b.openTag("command", "index", strconv.Itoa(i))
+			b.OpenTag("command", "index", strconv.Itoa(i))
 		}
 
 		formatJobStatus(&b, h, id, multi)
 
 		if multi {
-			b.closeTag("command", true)
+			b.CloseTag("command", true)
 		}
 	}
 
 	return mcp.NewToolResultText(b.String()), nil
 }
 
-func formatJobStatus(b *xmlBuilder, h *Handler, id string, includeCommand bool) {
+func formatJobStatus(b *xml.Builder, h *Handler, id string, includeCommand bool) {
 	h.mu.RLock()
 	j, exists := h.jobs[id]
 	h.mu.RUnlock()
 
-	b.openTag("metadata")
+	b.OpenTag("metadata")
 	if !exists {
 		b.WriteString("job_id: " + id + "\n")
 		b.WriteString("error: job not found\n")
-		b.closeTag("metadata", false)
+		b.CloseTag("metadata", false)
 		return
 	}
 
@@ -65,7 +68,7 @@ func formatJobStatus(b *xmlBuilder, h *Handler, id string, includeCommand bool) 
 		b.WriteString("error: " + j.err + "\n")
 	}
 
-	b.closeTag("metadata", true)
-	b.tag("stdout", j.stdout.String(), true)
-	b.tag("stderr", j.stderr.String(), false)
+	b.CloseTag("metadata", true)
+	b.Tag("stdout", j.stdout.String(), true)
+	b.Tag("stderr", j.stderr.String(), false)
 }

@@ -1,10 +1,10 @@
-package handlers
+package xml
 
 import (
 	"testing"
 )
 
-func TestXMLBuilderOpenTag(t *testing.T) {
+func TestBuilderOpenTag(t *testing.T) {
 	useCases := []struct {
 		name  string
 		tag   string
@@ -32,8 +32,8 @@ func TestXMLBuilderOpenTag(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			var b xmlBuilder
-			b.openTag(u.tag, u.attrs...)
+			var b Builder
+			b.OpenTag(u.tag, u.attrs...)
 			if got := b.String(); got != u.want {
 				t.Errorf("got %q, want %q", got, u.want)
 			}
@@ -41,7 +41,7 @@ func TestXMLBuilderOpenTag(t *testing.T) {
 	}
 }
 
-func TestXMLBuilderCloseTag(t *testing.T) {
+func TestBuilderCloseTag(t *testing.T) {
 	useCases := []struct {
 		name    string
 		newline bool
@@ -61,8 +61,8 @@ func TestXMLBuilderCloseTag(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			var b xmlBuilder
-			b.closeTag("metadata", u.newline)
+			var b Builder
+			b.CloseTag("metadata", u.newline)
 			if got := b.String(); got != u.want {
 				t.Errorf("got %q, want %q", got, u.want)
 			}
@@ -70,7 +70,7 @@ func TestXMLBuilderCloseTag(t *testing.T) {
 	}
 }
 
-func TestXMLBuilderTag(t *testing.T) {
+func TestBuilderTag(t *testing.T) {
 	useCases := []struct {
 		name     string
 		tag      string
@@ -112,62 +112,10 @@ func TestXMLBuilderTag(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			var b xmlBuilder
-			b.tag(u.tag, u.contents, u.newline, u.attrs...)
+			var b Builder
+			b.Tag(u.tag, u.contents, u.newline, u.attrs...)
 			if got := b.String(); got != u.want {
 				t.Errorf("got %q, want %q", got, u.want)
-			}
-		})
-	}
-}
-
-func TestParseStringSlice(t *testing.T) {
-	useCases := []struct {
-		name  string
-		input any
-		want  []string
-		ok    bool
-	}{
-		{
-			name:  "valid slice",
-			input: []any{"foo", "bar", "baz"},
-			want:  []string{"foo", "bar", "baz"},
-			ok:    true,
-		},
-		{
-			name:  "empty slice",
-			input: []any{},
-			want:  []string{},
-			ok:    true,
-		},
-		{
-			name:  "not a slice",
-			input: "just a string",
-			ok:    false,
-		},
-		{
-			name:  "non-string element",
-			input: []any{"foo", 42},
-			ok:    false,
-		},
-	}
-
-	for _, u := range useCases {
-		t.Run(u.name, func(t *testing.T) {
-			got, ok := parseStringSlice(u.input)
-			if ok != u.ok {
-				t.Fatalf("ok = %v, want %v", ok, u.ok)
-			}
-			if !u.ok {
-				return
-			}
-			if len(got) != len(u.want) {
-				t.Fatalf("got %v, want %v", got, u.want)
-			}
-			for i := range got {
-				if got[i] != u.want[i] {
-					t.Errorf("got[%d] = %q, want %q", i, got[i], u.want[i])
-				}
 			}
 		})
 	}
