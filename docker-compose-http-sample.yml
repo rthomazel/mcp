@@ -16,9 +16,9 @@ services:
       # BENCH_MCP_TRANSPORT: mcpo
       # mcp-proxy: native MCP/SSE (for LibreChat, Claude Desktop, MCP-native clients)
       BENCH_MCP_TRANSPORT: mcp-proxy
-      # timeout for exec sync commands
+      # timeout for shell commands
       BENCH_MCP_TIMEOUT: 15s
-      # timeout for exec background
+      # timeout for shell background
       BENCH_MCP_BACKGROUND_TIMEOUT: 5m
     volumes:
       # persistent state: mise installs and shims, Go cache, path snapshot

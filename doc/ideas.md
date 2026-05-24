@@ -10,13 +10,13 @@ Could run them with goroutines and be meaningfully faster.
 ## per-command timeout
 
 Timeout is global via `BENCH_MCP_TIMEOUT`.
-Letting `exec_sync` accept an optional `timeout` param would be useful for known slow commands.
+Letting `shell` accept an optional `timeout` param would be useful for known slow commands.
 
 ## sqlite db with command stats
 
 Server would tokenize commands with weights, base command has higher weight, then flags.
 Normalize input.
-Expose historic command stats to allow planning when to use exec sync or background.
+Expose historic command stats to allow planning when to use shell or shell background.
 
 # what not to add
 
@@ -72,7 +72,7 @@ any side effects (file contents, job state, etc.).
 
 ### per-tool cases
 
-**exec_sync / exec_background / status**
+**shell / shell_background / status**
 
 - Basic command execution, stdout/stderr captured correctly
 - Non-zero exit code returned without error

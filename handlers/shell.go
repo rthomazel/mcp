@@ -24,7 +24,7 @@ type commandResult struct {
 	err      string
 }
 
-func (h *Handler) HandleExec(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	commands, ok := internal.ParseStringSlice(req.Params.Arguments["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil
@@ -46,10 +46,10 @@ func (h *Handler) HandleExec(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	}
 
 	multi := len(results) > 1
-	return mcp.NewToolResultText(formatExecResults(results, multi)), nil
+	return mcp.NewToolResultText(formatCommandResults(results, multi)), nil
 }
 
-func formatExecResults(results []*commandResult, multi bool) string {
+func formatCommandResults(results []*commandResult, multi bool) string {
 	var b xml.Builder
 
 	for i, r := range results {

@@ -10,7 +10,7 @@ import (
 	"github.com/rthomazel/bench-mcp/internal/xml"
 )
 
-func (h *Handler) HandleExecBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) HandleShellBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	commands, ok := internal.ParseStringSlice(req.Params.Arguments["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil

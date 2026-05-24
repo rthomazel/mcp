@@ -4,8 +4,8 @@ Config is loaded from environment variables only — no flags, no config files.
 
 | variable                       | default   | description                                                                                                                                             |
 | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BENCH_MCP_TIMEOUT`            | `15s`     | Timeout for `exec_sync` commands                                                                                                                        |
-| `BENCH_MCP_BACKGROUND_TIMEOUT` | `5m`      | Timeout for `exec_background` / `setup` jobs                                                                                                            |
+| `BENCH_MCP_TIMEOUT`            | `15s`     | Timeout for `shell` commands                                                                                                                            |
+| `BENCH_MCP_BACKGROUND_TIMEOUT` | `5m`      | Timeout for `shell_background` / `setup` jobs                                                                                                           |
 | `BENCH_MCP_TRANSPORT`          | _(unset)_ | HTTP wrapper: `mcpo` (OpenAI-compatible REST) or `mcp-proxy` (native MCP/SSE). `BENCH_MCP_HTTP=true` is equivalent to `mcpo` and remains supported.     |
 | `BENCH_MCP_HOME`               | `$HOME`   | Base directory for the path snapshot file and the persistent-install note. Override when running as a non-root user without access to the default home. |
 | `BENCH_MCP_MISE_DIR`           | `/mise`   | Directory where mise is mounted. Used to prepend the shims path to `$PATH` on startup and to mark the volume as persistent in context output.           |

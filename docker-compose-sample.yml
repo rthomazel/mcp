@@ -10,9 +10,9 @@ services:
     stdin_open: true
     tty: false
     environment:
-      # timeout for exec sync commands
+      # timeout for shell commands
       BENCH_MCP_TIMEOUT: 15s
-      # timeout for exec background
+      # timeout for shell background
       BENCH_MCP_BACKGROUND_TIMEOUT: 5m
     volumes:
       # persistent state: mise installs and shims, Go cache, path snapshot

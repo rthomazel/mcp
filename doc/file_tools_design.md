@@ -426,7 +426,7 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
 - **Symlink handling:** the path is resolved via `filepath.EvalSymlinks` before locking. The resolved target is then verified to be a regular file (`os.Stat` + `Mode().IsRegular()`). The lock key and write target are the real path. This ensures two calls through different symlinks to the same file serialize correctly, and that `rename` operates on the real file rather than replacing the symlink itself.
 - **No shell involvement:** the entire operation is in-process Go. No `exec`, no escaping.
 
-## Why not exec_sync?
+## Why not shell?
 
 The existing file-write workflow shells out Python/bash and redirects text into a file, creating two problems:
 

@@ -75,27 +75,27 @@ func run() error {
 	)
 
 	s.AddTool(
-		mcp.NewTool("exec_sync",
-			mcp.WithDescription("Execute one or more shell commands. Returns stdout, stderr, exit code, and duration per command. Times out after "+cfg.Timeout.String()+". Most agents should load this now and defer exec_background."),
+		mcp.NewTool("shell",
+			mcp.WithDescription("Execute one or more shell commands. Returns stdout, stderr, exit code, and duration per command. Times out after "+cfg.Timeout.String()+". Most agents should load this now and defer shell_background."),
 			mcp.WithArray("commands", mcp.Required(), mcp.Description("Shell commands to execute."), mcp.Items(map[string]any{"type": "string"})),
 			mcp.WithString("cwd", mcp.Description("Working directory. Defaults to /")),
 		),
-		h.HandleExec,
+		h.HandleShell,
 	)
 
 	s.AddTool(
-		mcp.NewTool("exec_background",
-			mcp.WithDescription("Execute one or more shell commands in the background. Returns a job_id per command immediately. Use exec_status to poll for results. Times out after "+cfg.BackgroundTimeout.String()+"."),
+		mcp.NewTool("shell_background",
+			mcp.WithDescription("Execute one or more shell commands in the background. Returns a job_id per command immediately. Use status to poll for results. Times out after "+cfg.BackgroundTimeout.String()+"."),
 			mcp.WithArray("commands", mcp.Required(), mcp.Description("Shell commands to execute."), mcp.Items(map[string]any{"type": "string"})),
 			mcp.WithString("cwd", mcp.Description("Working directory. Defaults to /")),
 		),
-		h.HandleExecBackground,
+		h.HandleShellBackground,
 	)
 
 	s.AddTool(
 		mcp.NewTool("status",
 			mcp.WithDescription("Poll the status of one or more background jobs. Returns done, stdout, stderr, exit_code (if done), and duration per job."),
-			mcp.WithArray("job_ids", mcp.Required(), mcp.Description("Job IDs returned by exec_background."), mcp.Items(map[string]any{"type": "string"})),
+			mcp.WithArray("job_ids", mcp.Required(), mcp.Description("Job IDs returned by shell_background."), mcp.Items(map[string]any{"type": "string"})),
 		),
 		h.HandleStatus,
 	)

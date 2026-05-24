@@ -17,8 +17,8 @@ No custom sandboxing layer. No trust required. Just Docker doing what Docker doe
 | Tool               | What it does                                                             |
 | ------------------ | ------------------------------------------------------------------------ |
 | `context`          | Discover the environment: OS, installed tools, mounted projects          |
-| `exec_sync`        | Run a foreground command and get stdout/stderr back immediately          |
-| `exec_background`  | Kick off a slow command without blocking                                 |
+| `shell`            | Run a foreground command and get stdout/stderr back immediately          |
+| `shell_background` | Kick off a slow command without blocking                                 |
 | `status`           | Poll a background job for results                                        |
 | `setup`            | Install a project\'s language runtime and dependencies                   |
 | `file_replace`     | Find and replace unique substrings in a file. Returns a unified diff     |
@@ -198,8 +198,8 @@ Here\'s a minimal system prompt:
 Call the bench-mcp `context` tool at the start of each session to orient yourself.
 Then run the 'setup' tool to install project dependencies.
 
-Use `exec_sync` for most file tasks (cat, find, grep).
-Use `exec_background` for slow commands and poll with `status`.
+Use `shell` for most file tasks (cat, find, grep).
+Use `shell_background` for slow commands and poll with `status`.
 You can do other work while waiting.
 
 Editing files:
