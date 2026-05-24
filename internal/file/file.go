@@ -77,7 +77,7 @@ func CountNewlines(s string) int {
 // FirstNonEmptyLine returns the first line of s containing non-whitespace,
 // stripped of its trailing newline. Returns "" if no such line exists.
 func FirstNonEmptyLine(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if strings.TrimSpace(line) != "" {
 			return line
 		}
@@ -100,14 +100,8 @@ func SplitLines(content string) []string {
 func Excerpt(content string, lineNum, radius int) string {
 	lines := SplitLines(content)
 	total := len(lines)
-	from := lineNum - 1 - radius
-	if from < 0 {
-		from = 0
-	}
-	to := lineNum + radius
-	if to > total {
-		to = total
-	}
+	from := max(lineNum - 1 - radius, 0)
+	to := min(lineNum + radius, total)
 	var b strings.Builder
 	for i := from; i < to; i++ {
 		fmt.Fprintf(&b, "%4d: %s\n", i+1, lines[i])
@@ -120,14 +114,8 @@ func Excerpt(content string, lineNum, radius int) string {
 func ExcerptRange(content string, startLine, endLine, maxLines int) string {
 	lines := SplitLines(content)
 	total := len(lines)
-	from := startLine - 1
-	if from < 0 {
-		from = 0
-	}
-	to := endLine
-	if to > total {
-		to = total
-	}
+	from := max(startLine - 1, 0)
+	to := min(endLine, total)
 	if to-from > maxLines {
 		to = from + maxLines
 	}
