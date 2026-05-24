@@ -14,9 +14,7 @@ Letting `shell` accept an optional `timeout` param would be useful for known slo
 
 ## sqlite db with command stats
 
-Server would tokenize commands with weights, base command has higher weight, then flags.
-Normalize input.
-Expose historic command stats to allow planning when to use shell or shell background.
+See [stats-design.md](stats-design.md) for the full design.
 
 # what not to add
 
