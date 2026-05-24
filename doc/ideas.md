@@ -47,6 +47,8 @@ We should probably have some type of exclusive string so that we can catch unset
 We could also have a tool to list the variables that are currently loaded in the server.
 A design question is, should this live in the bench or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the bench.
 The obvious upside is that it's so easy and simple.
+The obvious downside is that this is a paper thin security layer that doesn't really accomplish anything.
+If you're doing this to remove a token from the context, but you're giving the model a way to manipulate the token, it can still exfiltrate the token. 
 
 ## integration test suite
 
