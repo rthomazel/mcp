@@ -100,8 +100,8 @@ func SplitLines(content string) []string {
 func Excerpt(content string, lineNum, radius int) string {
 	lines := SplitLines(content)
 	total := len(lines)
-	from := max(lineNum - 1 - radius, 0)
-	to := min(lineNum + radius, total)
+	from := max(lineNum-1-radius, 0)
+	to := min(lineNum+radius, total)
 	var b strings.Builder
 	for i := from; i < to; i++ {
 		fmt.Fprintf(&b, "%4d: %s\n", i+1, lines[i])
@@ -114,7 +114,7 @@ func Excerpt(content string, lineNum, radius int) string {
 func ExcerptRange(content string, startLine, endLine, maxLines int) string {
 	lines := SplitLines(content)
 	total := len(lines)
-	from := max(startLine - 1, 0)
+	from := max(startLine-1, 0)
 	to := min(endLine, total)
 	if to-from > maxLines {
 		to = from + maxLines
