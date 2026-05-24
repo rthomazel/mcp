@@ -19,6 +19,23 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.5.0](https://github.com/rthomazel/bench-mcp/pull/18) refactor: rebrand to bench-mcp, rename shell tools
+
+### refactor
+
+- [`12a6992`](https://github.com/rthomazel/bench-mcp/commit/12a6992) **(project)** renamed jail-mcp → bench-mcp — module path, binary name, env vars (`JAIL_MCP_*` → `BENCH_MCP_*`), Docker image, named volumes, path snapshot file, and all internal strings updated throughout.
+- [`dbe0b4f`](https://github.com/rthomazel/bench-mcp/commit/dbe0b4f) **(handlers)** `exec_sync` → `shell`, `exec_background` → `shell_background` — tool names, handler method names (`HandleExec` → `HandleShell`, `HandleExecBackground` → `HandleShellBackground`), source files (`exec_sync.go` → `shell.go`, `exec_background.go` → `shell_background.go`), and all doc references updated. Fixes stale `exec_status` reference in `shell_background` tool description.
+- [`3fcea7d`](https://github.com/rthomazel/bench-mcp/commit/3fcea7d) **(go.mod)** Go 1.25 → 1.26.3 — `go.mod`, Dockerfile builder stage, and `.tool-versions` all updated.
+
+### docs
+
+- [`f93e7b0`](https://github.com/rthomazel/bench-mcp/commit/f93e7b0) **(README)** full overhaul — tagline updated to "Give your AI agent a real workbench"; `file_replace` and `file_replace_all` added to tools table; setup section rewritten to cover mise, dependencies, and custom scripts separately; agent prompt example updated to use `shell`/`shell_background` and `file_replace`; persistence section simplified; license corrected to BSD-3.
+
+### misc
+
+- [`2ec8ac9`](https://github.com/rthomazel/bench-mcp/commit/2ec8ac9) **(internal)** copy corrections — `doc.go` package comments corrected (`fileops` → `file`, `xmlutil` → `xml`); `partialMatchDiagnostic` error message improved to "check unusual characters and encoding"; `strings.SplitSeq` replaces `strings.Split` in `FirstNonEmptyLine` to avoid allocating the full slice; `max`/`min` builtins replace manual clamp patterns in `Excerpt`/`ExcerptRange`.
+- [`926fbf8`](https://github.com/rthomazel/bench-mcp/commit/926fbf8) **(internal/file)** gofumpt — spacing around arithmetic operators in `max`/`min` calls.
+
 ## [0.4.0](https://github.com/rthomazel/bench-mcp/pull/20) feat: file_replace and file_replace_all tools
 
 ### feat
