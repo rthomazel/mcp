@@ -69,7 +69,9 @@ run_permissions() {
 # shellcheck shell=bash
 # Installs a post-commit git hook that prints agent reminders after each commit.
 git_hook_post_commit() {
-  local hooks_dir="$SCRIPT_DIR/../.git/hooks"
+  local script_dir hooks_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  hooks_dir="$script_dir/../.git/hooks"
 
   if [[ ! -d "$hooks_dir" ]]; then
     echo "bin/setup: .git/hooks not found, skipping hook install" >&2
