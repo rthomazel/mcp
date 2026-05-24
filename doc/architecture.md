@@ -50,8 +50,8 @@ Containers are ephemeral — `docker compose run --rm` creates a new container e
 
 Only named volumes persist across sessions:
 
-| volume          | mountpoint | contents                                     |
-| --------------- | ---------- | -------------------------------------------- |
+| volume           | mountpoint | contents                                     |
+| ---------------- | ---------- | -------------------------------------------- |
 | `bench-mcp-mise` | `/mise`    | mise installs, shims                         |
 | `bench-mcp-root` | `/root`    | Go module cache, path snapshot, ad-hoc tools |
 

@@ -1,4 +1,3 @@
-// jail mcp server binary
 package main
 
 import (

@@ -14,14 +14,14 @@ No custom sandboxing layer. No trust required. Just Docker doing what Docker doe
 
 ## What your agent can do
 
-| Tool | What it does |
-| --- | --- |
-| `context` | Discover the environment: OS, installed tools, mounted projects |
-| `exec_sync` | Run a foreground command and get stdout/stderr back immediately |
-| `exec_background` | Kick off a slow command without blocking |
-| `status` | Poll a background job for results |
-| `setup` | Install a project\'s language runtime and dependencies |
-| `file_replace` | Find and replace unique substrings in a file. Returns a unified diff |
+| Tool               | What it does                                                             |
+| ------------------ | ------------------------------------------------------------------------ |
+| `context`          | Discover the environment: OS, installed tools, mounted projects          |
+| `exec_sync`        | Run a foreground command and get stdout/stderr back immediately          |
+| `exec_background`  | Kick off a slow command without blocking                                 |
+| `status`           | Poll a background job for results                                        |
+| `setup`            | Install a project\'s language runtime and dependencies                   |
+| `file_replace`     | Find and replace unique substrings in a file. Returns a unified diff     |
 | `file_replace_all` | Replace all occurrences of a substring in a file. Returns a unified diff |
 
 Agents can read and edit files, run tests, run linters, call CLIs, manage git — anything a developer can do in a terminal.
@@ -51,10 +51,10 @@ docker pull ghcr.io/rthomazel/bench-mcp:latest
 
 Two sample files are included depending on your transport:
 
-| File | Transport | Works with |
-| --- | --- | --- |
-| `docker-compose-sample.yml` | stdio | Claude Desktop, CLI clients |
-| `docker-compose-http-sample.yml` | HTTP/OpenAI | Open WebUI |
+| File                             | Transport    | Works with                    |
+| -------------------------------- | ------------ | ----------------------------- |
+| `docker-compose-sample.yml`      | stdio        | Claude Desktop, CLI clients   |
+| `docker-compose-http-sample.yml` | HTTP/OpenAI  | Open WebUI                    |
 | `docker-compose-http-sample.yml` | HTTP/MCP-SSE | LibreChat, any SSE MCP client |
 
 Copy a sample, edit the volume paths to point at your projects:
@@ -81,8 +81,13 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
     "bench-mcp": {
       "command": "docker",
       "args": [
-        "compose", "-f", "/path/to/benchMCP/docker-compose.yml",
-        "run", "--rm", "-i", "bench-mcp"
+        "compose",
+        "-f",
+        "/path/to/benchMCP/docker-compose.yml",
+        "run",
+        "--rm",
+        "-i",
+        "bench-mcp"
       ]
     }
   }
@@ -107,16 +112,16 @@ The container ships with `bash`, `python3`, and [mise](https://mise.jdx.dev) for
 
 If your project has a `.tool-versions` or `mise.toml`, mise installs the right runtime automatically. The `setup` tool then handles dependencies:
 
-| File | Command |
-| --- | --- |
-| `go.mod` | `go mod download` |
-| `yarn.lock` | `yarn install` |
-| `package.json` | `npm install` |
+| File               | Command                           |
+| ------------------ | --------------------------------- |
+| `go.mod`           | `go mod download`                 |
+| `yarn.lock`        | `yarn install`                    |
+| `package.json`     | `npm install`                     |
 | `requirements.txt` | `pip install -r requirements.txt` |
-| `pyproject.toml` | `pip install .` |
-| `Cargo.toml` | `cargo fetch` |
-| `Gemfile` | `bundle install` |
-| `mix.exs` | `mix deps.get` |
+| `pyproject.toml`   | `pip install .`                   |
+| `Cargo.toml`       | `cargo fetch`                     |
+| `Gemfile`          | `bundle install`                  |
+| `mix.exs`          | `mix deps.get`                    |
 
 For custom bootstrapping, drop a `bin/setup` (or `setup.sh`) in your project root — `setup` will find and run it.
 
@@ -126,15 +131,16 @@ Two named volumes persist across sessions: `/mise` (language runtimes) and `/roo
 
 The agent needs to know to call `context` at the start of a session. Here\'s a minimal system prompt:
 
-````markdown
+```markdown
 Call the bench-mcp `context` tool at the start of each session to orient yourself.
 
 Use `exec_sync` for most file tasks (cat, find, grep). Use `exec_background` for slow commands and poll with `status`. You can do other work while waiting.
 
 Editing files:
+
 - Use `file_replace` for targeted edits — finds a unique substring and replaces it. Returns a unified diff.
 - Use `file_replace_all` to replace every occurrence of a substring (e.g. renaming a symbol).
-````
+```
 
 ---
 
@@ -145,11 +151,11 @@ The container is ephemeral. Between sessions:
 - **Survives:** anything on a named or bind-mounted volume
 - **Lost:** anything installed to the container filesystem
 
-| Path | Volume | Notes |
-| --- | --- | --- |
-| `/mise` | `bench-mcp-mise` | Language runtimes installed by mise |
-| `/root` | `bench-mcp-root` | Home dir, `/root/bin` is on PATH |
-| `/projects/*` | your bind mounts | Your actual project files |
+| Path          | Volume           | Notes                               |
+| ------------- | ---------------- | ----------------------------------- |
+| `/mise`       | `bench-mcp-mise` | Language runtimes installed by mise |
+| `/root`       | `bench-mcp-root` | Home dir, `/root/bin` is on PATH    |
+| `/projects/*` | your bind mounts | Your actual project files           |
 
 ---
 

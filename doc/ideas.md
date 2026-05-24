@@ -1,5 +1,7 @@
 # ideas
 
+- [ ] Go dependency update cron job workflow copy from other projects.
+
 ## concurrent context
 
 `context` tool runs subprocesses serially.
@@ -40,13 +42,12 @@ authored with the convention.
 
 We could have a variable, a plaintext constant that the model can provide into the shell maybe or the github tool and it will get replaced by the mcp with the actual token.
 That way we keep the token out of the context, and don't overbuild this.
-Actually doing this in Jail, MCP would be so easy. There could be a new tool called load variable and then the model passes in a string. It can even pick whatever string it wants. It also passes the environment variable to read in the server to retrieve the value. The server could reply with messages variable is not set, variable is empty and those would be errors but if the variable is set and not empty it would reply with a success value and the checksum of the value.
+Actually doing this in bench MCP would be so easy. There could be a new tool called load variable and then the model passes in a string. It can even pick whatever string it wants. It also passes the environment variable to read in the server to retrieve the value. The server could reply with messages variable is not set, variable is empty and those would be errors but if the variable is set and not empty it would reply with a success value and the checksum of the value.
 Having the checksum gives the model the ability to use the value without knowing the value.
 Then the model can use the other tools in any way that it wants. When the server sees a string compatible with a variable, it replaces in the token before executing.
 We should probably have some type of exclusive string so that we can catch unset variables in commands and return an error and refuse to process the command.
 We could also have a tool to list the variables that are currently loaded in the server.
-A design question is, should this live in the jail or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the jail.
-The obvious upside is that it's so easy and simple. 
+A design question is, should this live in the bench or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the bench.
 The obvious upside is that it's so easy and simple.
 
 ## integration test suite
@@ -72,6 +73,7 @@ any side effects (file contents, job state, etc.).
 ### per-tool cases
 
 **exec_sync / exec_background / status**
+
 - Basic command execution, stdout/stderr captured correctly
 - Non-zero exit code returned without error
 - CWD respected
@@ -79,12 +81,15 @@ any side effects (file contents, job state, etc.).
 - Timeout fires and is surfaced
 
 **context**
+
 - Returns expected metadata fields (os, arch, disk, path)
 
 **setup**
+
 - Detects manifest file and launches the right command (can mock by injecting a no-op rule)
 
 **file_replace**
+
 - Basic single-item replace, returns unified diff, file updated
 - Batch: multiple non-overlapping items applied in correct order
 - `line_number` narrows an ambiguous match
@@ -97,6 +102,7 @@ any side effects (file contents, job state, etc.).
 - Permissions preserved after atomic write
 
 **file_replace_all**
+
 - Replaces all occurrences, file updated, diff returned
 - `start_line`/`end_line` scope: matches outside range not replaced
 - Multi-line match crossing scope boundary not replaced
