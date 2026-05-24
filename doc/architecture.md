@@ -7,8 +7,8 @@ main.go                       server wiring, tool registration, MCP server init,
 internal/config.go            Config struct, env var loading, defaults
 handlers/handler.go           Handler struct, job store, startJob, background job GC
 handlers/context.go           HandleContext, parseMounts, discoverMiseShims, formatPlainTextContext
-handlers/exec_sync.go         HandleExec, runCommand (shared by context), formatPlainText
-handlers/exec_background.go   HandleExecBackground
+handlers/shell.go         HandleExec, runCommand (shared by context), formatPlainText
+handlers/shell_background.go   HandleExecBackground
 handlers/status.go            HandleStatus
 handlers/setup.go             HandleSetup, orderedRules, setupScriptCandidates
 ```
@@ -19,9 +19,9 @@ All tools go through `mcp-go` → handler method → plain text response.
 
 Responses are formatted as human-readable plain text. Metadata fields are wrapped in `<metadata>` tags, one field per line. Command output is wrapped in `<stdout>` and `<stderr>` tags, raw and unindented.
 
-`exec_sync` and `context` run commands synchronously via `runCommand`, which wraps `bash -c` with a context timeout.
+`shell` and `context` run commands synchronously via `runCommand`, which wraps `bash -c` with a context timeout.
 
-`exec_background` calls `startJob`, which spawns a goroutine, assigns a random 4-digit ID, and returns immediately. The caller polls with `status`.
+`shell_background` calls `startJob`, which spawns a goroutine, assigns a random 4-digit ID, and returns immediately. The caller polls with `status`.
 
 `setup` detects the project's package manager by checking for known manifest files in order, builds a compound shell command (`&&`-joined), and launches it as a background job per path. If a `setup.sh` (or equivalent) is found it runs first.
 
@@ -50,14 +50,14 @@ Containers are ephemeral — `docker compose run --rm` creates a new container e
 
 Only named volumes persist across sessions:
 
-| volume          | mountpoint | contents                                     |
-| --------------- | ---------- | -------------------------------------------- |
-| `jail-mcp-mise` | `/mise`    | mise installs, shims                         |
-| `jail-mcp-root` | `/root`    | Go module cache, path snapshot, ad-hoc tools |
+| volume           | mountpoint | contents                                     |
+| ---------------- | ---------- | -------------------------------------------- |
+| `bench-mcp-mise` | `/mise`    | mise installs, shims                         |
+| `bench-mcp-root` | `/root`    | Go module cache, path snapshot, ad-hoc tools |
 
 Volumes are deleted only by `docker volume rm` or `docker compose down -v`.
 
 This means `setup` only needs to run once per project — language installs and downloaded modules persist.
-The path snapshot at `/root/.jail-mcp-path-snapshot` also persists, so `auto-detected in path:` correctly reflects tools installed in prior sessions rather than treating them as newly detected.
+The path snapshot at `/root/.bench-mcp-path-snapshot` also persists, so `auto-detected in path:` correctly reflects tools installed in prior sessions rather than treating them as newly detected.
 
 To install ad-hoc tools that survive across sessions, install to `$HOME/bin` (`/root/bin`) — the server creates this directory on startup and prepends it to `PATH`. Do not install to `/usr/local/bin` or other paths outside volumes; they will not survive the next session.

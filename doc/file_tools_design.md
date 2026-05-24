@@ -93,13 +93,13 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
 
 ## Limits
 
-| Constraint | Value | Rationale |
-| --- | --- | --- |
-| Max newlines in `replace` | **50** (env: `JAIL_MCP_EDIT_MAX_LINES`) | Keeps individual replacements surgical |
-| Max candidates in error output | **5** (env: `JAIL_MCP_MAX_CANDIDATES`) | Keeps error messages readable |
-| `file_replace` match count | exactly 1 per item | Fails loudly on ambiguity |
-| `file_replace_all` match count | ≥ 1 | Zero matches is an error |
-| Chaining within a `file_replace` call | not supported | All `find` values are matched against the original file content before any replacement is applied. To target text produced by a prior replacement, issue a second call. |
+| Constraint                            | Value                                    | Rationale                                                                                                                                                               |
+| ------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Max newlines in `replace`             | **50** (env: `BENCH_MCP_EDIT_MAX_LINES`) | Keeps individual replacements surgical                                                                                                                                  |
+| Max candidates in error output        | **5** (env: `BENCH_MCP_MAX_CANDIDATES`)  | Keeps error messages readable                                                                                                                                           |
+| `file_replace` match count            | exactly 1 per item                       | Fails loudly on ambiguity                                                                                                                                               |
+| `file_replace_all` match count        | ≥ 1                                      | Zero matches is an error                                                                                                                                                |
+| Chaining within a `file_replace` call | not supported                            | All `find` values are matched against the original file content before any replacement is applied. To target text produced by a prior replacement, issue a second call. |
 
 ## Error behavior
 
@@ -111,27 +111,27 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
 
 All errors that identify match locations include 1 line of file context before and after each match. Diagnostic output is capped at 5 matches; when more exist the error notes “showing first 5 of N.”
 
-| Matches | `line_number` | Error content |
-| --- | --- | --- |
-| 0 | omitted | Searches for first non-empty line of `find`; if found, reports line(s) with 1-line context; if not found, says so and points to whitespace/indentation or CRLF line endings |
-| 0 | provided | "`find` not found at line N" + shows line N with 1-line context |
-| >1 | omitted | Lists starting line of each match with 1-line context (capped at 5); suggests `line_number` or widening `find` |
-| >1 | provided, spread | Lists starting line of each candidate with 1-line context (capped at 5); notes `line_number` N did not narrow to one |
-| >1 | provided, same line | Char positions of each match + line content; suggests replacing the whole line |
+| Matches | `line_number`       | Error content                                                                                                                                                               |
+| ------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0       | omitted             | Searches for first non-empty line of `find`; if found, reports line(s) with 1-line context; if not found, says so and points to whitespace/indentation or CRLF line endings |
+| 0       | provided            | "`find` not found at line N" + shows line N with 1-line context                                                                                                             |
+| >1      | omitted             | Lists starting line of each match with 1-line context (capped at 5); suggests `line_number` or widening `find`                                                              |
+| >1      | provided, spread    | Lists starting line of each candidate with 1-line context (capped at 5); notes `line_number` N did not narrow to one                                                        |
+| >1      | provided, same line | Char positions of each match + line content; suggests replacing the whole line                                                                                              |
 
 ### file_replace_all error cases
 
-| Situation | Error content |
-| --- | --- |
-| 0 matches, no scope | "`find` not found in file" + first non-empty line diagnostic with 1-line context |
-| 0 matches, with scope | "`find` not found between lines X–Y" + up to 10 lines of that range |
+| Situation             | Error content                                                                    |
+| --------------------- | -------------------------------------------------------------------------------- |
+| 0 matches, no scope   | "`find` not found in file" + first non-empty line diagnostic with 1-line context |
+| 0 matches, with scope | "`find` not found between lines X–Y" + up to 10 lines of that range              |
 
 ## Execution flow
 
 ### handle_file_replace
 
 ```python
-MAX_CANDIDATES = env("JAIL_MCP_MAX_CANDIDATES", default=5)  # max candidates shown in diagnostic output; shared by both handlers
+MAX_CANDIDATES = env("BENCH_MCP_MAX_CANDIDATES", default=5)  # max candidates shown in diagnostic output; shared by both handlers
 
 
 def handle_file_replace(path, replacements, dry_run=False):
@@ -426,7 +426,7 @@ def handle_file_replace_all(path, find, replace, start_line=None, end_line=None,
 - **Symlink handling:** the path is resolved via `filepath.EvalSymlinks` before locking. The resolved target is then verified to be a regular file (`os.Stat` + `Mode().IsRegular()`). The lock key and write target are the real path. This ensures two calls through different symlinks to the same file serialize correctly, and that `rename` operates on the real file rather than replacing the symlink itself.
 - **No shell involvement:** the entire operation is in-process Go. No `exec`, no escaping.
 
-## Why not exec_sync?
+## Why not shell?
 
 The existing file-write workflow shells out Python/bash and redirects text into a file, creating two problems:
 
@@ -438,7 +438,7 @@ The existing file-write workflow shells out Python/bash and redirects text into 
 ## Out of scope
 
 **Workspace boundary**
-Path confinement to an allowed root (e.g. the jail volume) is enforced at the server level by existing middleware, not per-tool. These tools operate on any regular file the server process can reach after symlink resolution. Adding a per-tool allowlist would duplicate that logic.
+Path confinement to an allowed root (e.g. the bench volume) is enforced at the server level by existing middleware, not per-tool. These tools operate on any regular file the server process can reach after symlink resolution. Adding a per-tool allowlist would duplicate that logic.
 
 **Substring matching is byte-exact**
 Both tools match substrings byte-for-byte, including indentation and whitespace. Auto-formatter runs, import reordering, or generated comment additions can invalidate a `find` block that was valid moments before. This is the intended behavior for a precise surgical tool — indentation-aware matching, line-based patches, or AST-aware edits are different tools for a different purpose.

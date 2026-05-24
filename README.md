@@ -1,37 +1,53 @@
-# jail-mcp
+# bench-mcp
 
-MCP server providing shell access to clients, jailed in a container.
+**Give your AI agent a real workbench.**
 
-> **Running outside Docker is not supported.** By default the server runs as root in a container.
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Frthomazel%2Fbench--mcp-blue?logo=docker)](https://ghcr.io/rthomazel/bench-mcp)
+[![License: MIT](https://img.shields.io/badge/license-BSD3-green)](./LICENSE)
+[![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-lightgrey)](#)
 
-The following tools are exposed to agents
+bench-mcp is an open-source MCP server that gives AI agents the fundamental tools to get real work done: a real shell, background job control, precise file editing, and environment discovery — all isolated inside a Docker container.
+Your host machine stays untouched.
+No custom sandboxing layer. No trust required. Just Docker doing what Docker does.
 
-| tool            | use case                          |
-| --------------- | --------------------------------- |
-| context         | project and environment discovery |
-| exec sync       | run foreground commands           |
-| exec background | run background jobs               |
-| status          | poll job status                   |
-| setup           | install project dependencies      |
+---
 
-## Configuration
+## What your agent can do
 
-### Overview
+| Tool               | What it does                                                             |
+| ------------------ | ------------------------------------------------------------------------ |
+| `context`          | Discover the environment: OS, installed tools, mounted projects          |
+| `shell`            | Run a foreground command and get stdout/stderr back immediately          |
+| `shell_background` | Kick off a slow command without blocking                                 |
+| `status`           | Poll a background job for results                                        |
+| `setup`            | Install a project\'s language runtime and dependencies                   |
+| `file_replace`     | Find and replace unique substrings in a file. Returns a unified diff     |
+| `file_replace_all` | Replace all occurrences of a substring in a file. Returns a unified diff |
 
-- 1 pull image
-- 2 compose file with projects as volumes
-- 3 configure clients
-- 4 run setup to install project dependencies
-- 5 add an agent prompt
+Agents can read and edit files, run tests, run linters, call CLIs, manage git — anything a developer can do in a terminal.
 
-### **1. Pull image**
+---
+
+## Why bench-mcp
+
+**Agents need a real environment.** Giving an agent only file-read tools means it can\'t run tests, can\'t verify its own changes, can\'t install a dependency. bench-mcp gives agents a full shell so they can actually finish the job.
+
+**Container isolation is the right primitive.** Instead of a custom permission system, bench-mcp uses Docker volumes to define exactly what the agent can see and touch. Anything not mounted is invisible. Read-only mounts are supported. The container is ephemeral by default — nothing leaks between sessions.
+
+**Works with the clients you already use.** stdio for Claude Desktop, HTTP/SSE for LibreChat, OpenAI-compatible HTTP for Open WebUI. One image, all transports.
+
+---
+
+## Quickstart
+
+### 1. Pull the image
 
 ```bash
-docker pull ghcr.io/rthomazel/jail-mcp:latest
-# builds available: AMD64 (most personal computers) and ARM64 (apple devices, niche hardware)
+docker pull ghcr.io/rthomazel/bench-mcp:latest
+# amd64 (most desktops/laptops) and arm64 (Apple Silicon, Raspberry Pi) builds available
 ```
 
-### **2. Compose file**
+### 2. Write a compose file
 
 #### stdio
 
@@ -48,116 +64,105 @@ There are two possible formats
 
 Two sample compose files are provided depending on your transport needs
 
-| file                             | mode                   | use case                    |
-| -------------------------------- | ---------------------- | --------------------------- |
-| `docker-compose-sample.yml`      | stdio                  | Claude Desktop, CLI clients |
-| `docker-compose-http-sample.yml` | HTTP/OpenAI-compatible | Open WebUI                  |
-| `docker-compose-http-sample.yml` | HTTP/MCP-SSE           | LibreChat, HTTP MCP clients |
+#### Choosing one
 
-Copy the sample file, save and edit it.
+Two sample files are included depending on your transport.
+HTTP SSE is recommended.
+
+| File                             | Transport    | Works with                    |
+| -------------------------------- | ------------ | ----------------------------- |
+| `docker-compose-sample.yml`      | stdio        | Claude Desktop, CLI clients   |
+| `docker-compose-http-sample.yml` | HTTP/OpenAI  | Open WebUI                    |
+| `docker-compose-http-sample.yml` | HTTP/MCP-SSE | LibreChat, any SSE MCP client |
+
+Copy a sample, edit the volume paths to point at your projects:
 
 ```bash
-mkdir jailMCP
-cd jailMCP
-${EDITOR-vi} docker-compose.yml
-# paste contents
+mkdir benchMCP && cd benchMCP
+cp /path/to/docker-compose-sample.yml docker-compose.yml
+${EDITOR:-vi} docker-compose.yml
 ```
 
-Update the volume paths to point to your real work.
-The server discovers them dynamically, `/projects` is a suggestion.
-Only paths bind-mounted as volumes can be modified in your machine, the MCP server is isolated in a container.
-The container is ephemeral.
-Only named volumes (`/mise`, `/root`) persist.
-To install ad-hoc tools that survive across sessions, install to `$HOME/bin` (`/root/bin`), which is on the `jail-mcp-root` volume.
-There are only two environment variables that can be used to set command timeouts and both example files have default values. 
+Mount your projects under `/projects` (or anywhere — the agent discovers them dynamically via `context`).
 
-For tricks on how to mount paths read-only or hide sub-directories see [volume-mounting-tricks.md](./doc/volume-mounting-tricks.md)
+For advanced volume tricks (read-only mounts, hiding subdirectories) see [doc/volume-mounting-tricks.md](./doc/volume-mounting-tricks.md).
 
-### **3. Wire up clients**
+### 3. Wire up your client
 
-See instructions in your client application how to add an MCP tool.
+#### Claude Desktop
 
-### Example: Claude Desktop (stdio)
-
-Spawns a fresh container per session via `docker compose run`.
-`--rm` removes it after each session, only persistent paths survive.
-
-_MacOS:_
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-_Linux:_ Add to `~/.config/Claude/claude_desktop_config.json`
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `~/.config/Claude/claude_desktop_config.json` (Linux):
 
 ```json
 {
   "mcpServers": {
-    "jail-mcp": {
-      // Linux: just "docker"
-      "command": "/Applications/Docker.app/Contents/Resources/bin/docker",
+    "bench-mcp": {
+      "command": "docker",
       "args": [
         "compose",
         "-f",
-        // Linux: /home/you
-        "/Users/you/Desktop/jailMCP/docker-compose.yml",
+        "/path/to/benchMCP/docker-compose.yml",
         "run",
         "--rm",
         "-i",
-        "jail-mcp"
+        "bench-mcp"
       ]
     }
   }
 }
 ```
 
-Restart claude desktop.
+Restart Claude Desktop.
 
-### Example: Open WebUI / HTTP clients
+> **Tip:** If tools disappear after an image update, rename the server key (e.g. `bench-mcp` → `1_bench-mcp`). This is a known Claude Desktop bug — renaming forces re-registration.
 
-Runs a persistent container exposing an HTTP MCP endpoint on port 8001.
+#### Open WebUI / HTTP clients
 
 ```bash
 docker compose -f docker-compose-http-sample.yml up -d
 ```
 
-Then add `http://localhost:8001` as an MCP tool in your client.
+Then add `http://localhost:8001` as an MCP server in your client. Set `BENCH_MCP_TRANSPORT` to `mcpo` for OpenAI-compatible REST or `mcp-proxy` for native MCP/SSE.
 
-The HTTP transport is configured via `JAIL_MCP_TRANSPORT` in the container environment — `mcpo` for OpenAI-compatible REST (Open WebUI) or `mcp-proxy` for native MCP/SSE (LibreChat). See `docker-compose-http-sample.yml` for an example.
+### 4. Setup project in container
 
-#### Known Claude Desktop Bugs
+The container ships by design only with `bash`, `python3`, and [mise](https://mise.jdx.dev) for language version management.
+Remember that the bench is isolated from the host machine, so the binaries in the host system won't be available.
 
-When updating the MCP server to a new build, Claude desktop may show errors or fail to discover tools.
-This has been observed to happen when changing permission settings as well.
-This can be fixed by renaming the server in the configuration above (e.g. `jail-mcp` → `1_jail-mcp`), which forces the client to treat it as a new server and re-register the tools.
-Renaming the first letter seems to be important.
+#### Setup tool & mise
 
-### **4. Setup**
+The setup tool bootstraps the project, your prompt should ask the agent to run it before starting work.
+For programming languages and other tools create a mise file in the project root.
+It will become the source for versioning your tooling.
 
-Because the container is an isolated environment, the programming language and project dependencies have to be installed.
+```toml
+golang 1.26.3
+oxfmt latest
+gh latest
+```
 
-#### programming language installation
+Mise installs the right runtime automatically during the setup process.
+Check the [mise](https://mise.jdx.dev) documentation on how to get started.
 
-The container has only `bash` and `python3`, for basic scripting, programming languages are not included by design.
-[Mise](https://mise.jdx.dev) is installed for language version management.
-It's expected that the language will be versioned using a `.tool-versions` file or `mise.toml` for each project.
-Once this file is present the setup tool will call mise to install the language.
+#### Dependencies and libraries
 
-#### project dependencies
+The `setup` tool then installs dependencies:
 
-The setup tool also recognizes popular programming languages dependency files and installs them.
+| File               | Command                           |
+| ------------------ | --------------------------------- |
+| `go.mod`           | `go mod download`                 |
+| `yarn.lock`        | `yarn install`                    |
+| `package.json`     | `npm install`                     |
+| `requirements.txt` | `pip install -r requirements.txt` |
+| `pyproject.toml`   | `pip install .`                   |
+| `Cargo.toml`       | `cargo fetch`                     |
+| `Gemfile`          | `bundle install`                  |
+| `mix.exs`          | `mix deps.get`                    |
 
-| file               | setup command                        | reference                    |
-| ------------------ | ------------------------------------ | ---------------------------- |
-| ".tool-versions"   | "mise install"                       | programming languages & clis |
-| "go.mod"           | "go mod download && go install tool" | Go                           |
-| "yarn.lock"        | "yarn install"                       | JavaScript                   |
-| "package.json"     | "npm install"                        | JavaScript                   |
-| "requirements.txt" | "pip install -r requirements.txt"    | Python                       |
-| "pyproject.toml"   | "pip install ."                      | Python                       |
-| "Gemfile"          | "bundle install"                     | Ruby                         |
-| "Cargo.toml"       | "cargo fetch"                        | Rust                         |
-| "mix.exs"          | "mix deps.get"                       | Erlang/Elixir                |
+#### Customization
 
-For further project bootstraping, the setup tool will look for a `setup.sh` bash script and execute it.
-There are a few locations we expect to find this file besides the project root.
+If your project requires further setup, write your own script.
+Drop a bash `bin/setup` (or `setup.sh`) in your project root — `setup` will find and run it.
 
     # possible locations of the setup script
     "setup.sh",
@@ -167,53 +172,52 @@ There are a few locations we expect to find this file besides the project root.
     "scripts/setup",
     "scripts/setup.sh",
 
-### **5. Agent prompt**
+## Persistence model
 
-To discover projects, the agent needs to call the context tool.
-The system prompt should make this requirement clear and also explain how to how use exec sync and exec background.
-Have the agent run the setup tool in the project directory at the start of the session to install dependencies.
+Two named volumes persist across sessions: `/mise` (language runtimes) and `/root` (home directory, binaries in `/root/bin`).
+Install ad-hoc tools to `/root/bin` to keep them between runs.
+The container is ephemeral. Between sessions:
+
+- **Survives:** anything on a named or bind-mounted volume
+- **Lost:** anything installed to the container filesystem
+
+| Path          | Volume           | Notes                               |
+| ------------- | ---------------- | ----------------------------------- |
+| `/mise`       | `bench-mcp-mise` | Language runtimes installed by mise |
+| `/root`       | `bench-mcp-root` | Home dir, `/root/bin` is on PATH    |
+| `/projects/*` | your bind mounts | Your actual project files           |
+
+---
+
+### 5. Write an agent prompt
+
+You need to provide guidance on how to use the tools.
+Here\'s a minimal system prompt:
 
 ```markdown
-# sample prompt
+Call the bench-mcp `context` tool at the start of each session to orient yourself.
+Then run the 'setup' tool to install project dependencies.
 
-Call the jail MCP context tool at the start of each session to orient yourself.
-Use exec_sync for most file tasks (cat, find, grep, sed). This is the only way to interact with project files.
-Use exec_background for slow commands; poll with the status tool. You can do other work while waiting.
-If the project's language isn't installed, run the setup tool on the project path first.
+Use `shell` for most file tasks (cat, find, grep).
+Use `shell_background` for slow commands and poll with `status`.
+You can do other work while waiting.
 
-Editing files via jail:
+Editing files:
 
-- Use Python via exec_sync.
-- Always use a quoted heredoc (<< 'PYEOF') to prevent bash from interpreting backticks, $variables, or special characters inside the Python code.
-- Prefer two small targeted replaces over one large multi-line block match — large blocks are brittle.
-
-python3 << 'PYEOF'
-with open('/projects/server/path/to/file', 'r') as f:
-    content = f.read()
-content = content.replace('old', 'new')
-with open('/projects/server/path/to/file', 'w') as f:
-    f.write(content)
-print('ok')
-PYEOF
+- Use `file_replace` for targeted edits — finds a unique substring and replaces it. Returns a unified diff.
+- Use `file_replace_all` to replace every occurrence of a substring (e.g. renaming a symbol).
 ```
 
-## Logs
+---
 
-Logs are written in plain text to stderr.
-
-## Dev
-
-Check run script.
-Comments `# -- ` above each `case` are used for help message.
-
-## Optional: SSH key for git push from the container
+## 6. SSH key for git push from the container (optional)
 
 By default the container has no SSH key, so `git push` will fail against SSH remotes.
 If you want agents to be able to push to GitHub from inside the container, generate a dedicated key on your host and add it to your GitHub account.
 
 ```bash
 # generate a key on your host
-ssh-keygen -t ed25519 -f ~/.ssh/agents_id_ed25519 -N "" -C "jail-mcp container"
+ssh-keygen -t ed25519 -f ~/.ssh/agents_id_ed25519 -N "" -C "bench-mcp container"
 
 # print the public key — add it at github.com/settings/keys
 cat ~/.ssh/agents_id_ed25519.pub
@@ -229,9 +233,21 @@ Then mount the private key into the container by adding this line to your `docke
 On first use, open a shell into the container and add GitHub to known hosts:
 
 ```bash
-docker compose run --rm jail-mcp bash
+docker compose run --rm bench-mcp bash
 # then inside the container
 ssh-keyscan github.com >> ~/.ssh/known_hosts
 ```
 
 This only needs to run once — `/root` is a named volume so `known_hosts` persists across sessions.
+
+---
+
+## Logs
+
+Logs are written in plain text to stderr.
+
+---
+
+## License
+
+BSD 3-Clause License

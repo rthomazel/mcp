@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const snapshotFile = ".jail-mcp-path-snapshot"
+const snapshotFile = ".bench-mcp-path-snapshot"
 
 // Entry is a single executable discovered in PATH.
 type Entry struct {

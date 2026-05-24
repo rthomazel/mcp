@@ -29,12 +29,12 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("home directory: %w", err)
 	}
 
-	if raw := os.Getenv("JAIL_MCP_HOME"); raw != "" {
+	if raw := os.Getenv("BENCH_MCP_HOME"); raw != "" {
 		home = raw
 	}
 
 	miseDir := "/mise"
-	if raw := os.Getenv("JAIL_MCP_MISE_DIR"); raw != "" {
+	if raw := os.Getenv("BENCH_MCP_MISE_DIR"); raw != "" {
 		miseDir = raw
 	}
 
@@ -47,34 +47,34 @@ func LoadConfig() (*Config, error) {
 		MaxCandidates:     defaults.MaxCandidates,
 	}
 
-	if raw := os.Getenv("JAIL_MCP_TIMEOUT"); raw != "" {
+	if raw := os.Getenv("BENCH_MCP_TIMEOUT"); raw != "" {
 		d, err := time.ParseDuration(raw)
 		if err != nil {
-			return nil, fmt.Errorf("JAIL_MCP_TIMEOUT invalid: %w", err)
+			return nil, fmt.Errorf("BENCH_MCP_TIMEOUT invalid: %w", err)
 		}
 		cfg.Timeout = d
 	}
 
-	if raw := os.Getenv("JAIL_MCP_BACKGROUND_TIMEOUT"); raw != "" {
+	if raw := os.Getenv("BENCH_MCP_BACKGROUND_TIMEOUT"); raw != "" {
 		d, err := time.ParseDuration(raw)
 		if err != nil {
-			return nil, fmt.Errorf("JAIL_MCP_BACKGROUND_TIMEOUT invalid: %w", err)
+			return nil, fmt.Errorf("BENCH_MCP_BACKGROUND_TIMEOUT invalid: %w", err)
 		}
 		cfg.BackgroundTimeout = d
 	}
 
-	if raw := os.Getenv("JAIL_MCP_EDIT_MAX_LINES"); raw != "" {
+	if raw := os.Getenv("BENCH_MCP_EDIT_MAX_LINES"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 {
-			return nil, fmt.Errorf("JAIL_MCP_EDIT_MAX_LINES invalid: must be a positive integer")
+			return nil, fmt.Errorf("BENCH_MCP_EDIT_MAX_LINES invalid: must be a positive integer")
 		}
 		cfg.EditMaxLines = n
 	}
 
-	if raw := os.Getenv("JAIL_MCP_MAX_CANDIDATES"); raw != "" {
+	if raw := os.Getenv("BENCH_MCP_MAX_CANDIDATES"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 {
-			return nil, fmt.Errorf("JAIL_MCP_MAX_CANDIDATES invalid: must be a positive integer")
+			return nil, fmt.Errorf("BENCH_MCP_MAX_CANDIDATES invalid: must be a positive integer")
 		}
 		cfg.MaxCandidates = n
 	}

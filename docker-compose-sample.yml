@@ -1,23 +1,23 @@
 # this file has example values in the volumes section
 volumes:
-  jail-mcp-mise:
-  jail-mcp-root:
+  bench-mcp-mise:
+  bench-mcp-root:
 
 services:
-  jail-mcp:
-    container_name: jail-mcp-stdio
-    image: ghcr.io/rthomazel/jail-mcp:latest
+  bench-mcp:
+    container_name: bench-mcp-stdio
+    image: ghcr.io/rthomazel/bench-mcp:latest
     stdin_open: true
     tty: false
     environment:
-      # timeout for exec sync commands
-      JAIL_MCP_TIMEOUT: 15s
-      # timeout for exec background
-      JAIL_MCP_BACKGROUND_TIMEOUT: 5m
+      # timeout for shell commands
+      BENCH_MCP_TIMEOUT: 15s
+      # timeout for shell background
+      BENCH_MCP_BACKGROUND_TIMEOUT: 5m
     volumes:
       # persistent state: mise installs and shims, Go cache, path snapshot
-      - jail-mcp-mise:/mise
-      - jail-mcp-root:/root
+      - bench-mcp-mise:/mise
+      - bench-mcp-root:/root
       # >>> add projects below here <<<
       # host machine path : container path
       - /Users/you/helloworld:/projects/helloworld

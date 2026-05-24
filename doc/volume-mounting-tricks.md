@@ -28,7 +28,7 @@ volumes:
 ```yaml
 volumes:
   - /Users/you/myproject:/projects/myproject
-  - /tmp/jail-hidden:/projects/myproject/secrets
+  - /tmp/bench-hidden:/projects/myproject/secrets
 ```
 
-The empty dir must exist on the host (`mkdir -p /tmp/jail-hidden`). Mount order matters — the hide entry must come after the parent project mount, same rule as `:ro` overlays.
+The empty dir must exist on the host (`mkdir -p /tmp/bench-hidden`). Mount order matters — the hide entry must come after the parent project mount, same rule as `:ro` overlays.

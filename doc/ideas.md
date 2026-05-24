@@ -1,5 +1,7 @@
 # ideas
 
+- [ ] Go dependency update cron job workflow copy from other projects.
+
 ## concurrent context
 
 `context` tool runs subprocesses serially.
@@ -7,14 +9,14 @@ Could run them with goroutines and be meaningfully faster.
 
 ## per-command timeout
 
-Timeout is global via `JAIL_MCP_TIMEOUT`.
-Letting `exec_sync` accept an optional `timeout` param would be useful for known slow commands.
+Timeout is global via `BENCH_MCP_TIMEOUT`.
+Letting `shell` accept an optional `timeout` param would be useful for known slow commands.
 
 ## sqlite db with command stats
 
 Server would tokenize commands with weights, base command has higher weight, then flags.
 Normalize input.
-Expose historic command stats to allow planning when to use exec sync or background.
+Expose historic command stats to allow planning when to use shell or shell background.
 
 # what not to add
 
@@ -30,7 +32,7 @@ to respect depth — a wider refactor touching all handlers.
 
 ## path snapshot registration file
 
-Setup scripts could write a `.jail-mcp-extras` file in the project root —
+Setup scripts could write a `.bench-mcp-extras` file in the project root —
 one `name: /path/to/binary` pair per line. `context` reads all such files under
 known project roots and surfaces them alongside the `auto-detected in path:` block.
 Explicit opt-in, works for non-PATH installs, but requires setup scripts to be
@@ -40,12 +42,12 @@ authored with the convention.
 
 We could have a variable, a plaintext constant that the model can provide into the shell maybe or the github tool and it will get replaced by the mcp with the actual token.
 That way we keep the token out of the context, and don't overbuild this.
-Actually doing this in Jail, MCP would be so easy. There could be a new tool called load variable and then the model passes in a string. It can even pick whatever string it wants. It also passes the environment variable to read in the server to retrieve the value. The server could reply with messages variable is not set, variable is empty and those would be errors but if the variable is set and not empty it would reply with a success value and the checksum of the value.
+Actually doing this in bench MCP would be so easy. There could be a new tool called load variable and then the model passes in a string. It can even pick whatever string it wants. It also passes the environment variable to read in the server to retrieve the value. The server could reply with messages variable is not set, variable is empty and those would be errors but if the variable is set and not empty it would reply with a success value and the checksum of the value.
 Having the checksum gives the model the ability to use the value without knowing the value.
 Then the model can use the other tools in any way that it wants. When the server sees a string compatible with a variable, it replaces in the token before executing.
 We should probably have some type of exclusive string so that we can catch unset variables in commands and return an error and refuse to process the command.
 We could also have a tool to list the variables that are currently loaded in the server.
-A design question is, should this live in the jail or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the jail.
+A design question is, should this live in the bench or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the bench.
 The obvious upside is that it's so easy and simple.
 
 ## integration test suite
@@ -70,7 +72,8 @@ any side effects (file contents, job state, etc.).
 
 ### per-tool cases
 
-**exec_sync / exec_background / status**
+**shell / shell_background / status**
+
 - Basic command execution, stdout/stderr captured correctly
 - Non-zero exit code returned without error
 - CWD respected
@@ -78,12 +81,15 @@ any side effects (file contents, job state, etc.).
 - Timeout fires and is surfaced
 
 **context**
+
 - Returns expected metadata fields (os, arch, disk, path)
 
 **setup**
+
 - Detects manifest file and launches the right command (can mock by injecting a no-op rule)
 
 **file_replace**
+
 - Basic single-item replace, returns unified diff, file updated
 - Batch: multiple non-overlapping items applied in correct order
 - `line_number` narrows an ambiguous match
@@ -96,6 +102,7 @@ any side effects (file contents, job state, etc.).
 - Permissions preserved after atomic write
 
 **file_replace_all**
+
 - Replaces all occurrences, file updated, diff returned
 - `start_line`/`end_line` scope: matches outside range not replaced
 - Multi-line match crossing scope boundary not replaced

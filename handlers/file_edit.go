@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/rthomazel/jail-mcp/internal/file"
+	"github.com/rthomazel/bench-mcp/internal/file"
 )
 
 // editedFile holds the resolved state of a file opened for in-place editing.
@@ -62,7 +62,7 @@ func openFileForEdit(path string) (*editedFile, string) {
 	}, ""
 }
 
-// commit finalises an edit: on dry_run it returns the diff without writing;
+// commit finalizes an edit: on dry_run it returns the diff without writing;
 // otherwise it checks for external modifications, writes atomically, and
 // returns the unified diff.
 func (ef *editedFile) commit(working string, dryRun bool) (string, string) {
@@ -127,7 +127,7 @@ func partialMatchDiagnostic(find, content string, maxCandidates int) string {
 		suffix = fmt.Sprintf(" (showing first %d of %d)", maxCandidates, len(partial))
 	}
 	return fmt.Sprintf(
-		"first line of find matched at [%s]%s but full find did not match (check indentation or whitespace).\n%s",
+		"first line of find matched at [%s]%s but full find did not match (check unusual characters and encoding).\n%s",
 		strings.Join(locs, ", "), suffix, strings.Join(snippets, ""),
 	)
 }

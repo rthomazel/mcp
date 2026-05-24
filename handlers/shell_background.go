@@ -6,11 +6,11 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/rthomazel/jail-mcp/internal"
-	"github.com/rthomazel/jail-mcp/internal/xml"
+	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/bench-mcp/internal/xml"
 )
 
-func (h *Handler) HandleExecBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) HandleShellBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	commands, ok := internal.ParseStringSlice(req.Params.Arguments["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil

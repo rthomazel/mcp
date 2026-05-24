@@ -18,7 +18,7 @@ build_arch() {
 
   docker buildx build --platform "$1" \
     --build-arg VERSION="${version}_${commit}_$date" \
-    -t ghcr.io/rthomazel/jail-mcp:latest \
+    -t ghcr.io/rthomazel/bench-mcp:latest \
     --load .
 }
 
@@ -35,12 +35,9 @@ dev)
 test)
   go tool godotenv -f .env go test -race ./...
   ;;
-# -- run gofumpt formatter
+# -- run formatters
 format)
   go tool gofumpt -l -w .
-  ;;
-# -- run oxfmt on non-Go files: json, yaml, md
-format:others)
   oxfmt .
   ;;
 # -- build local binary to bin/server

@@ -1,4 +1,4 @@
-# jail-mcp — agent context
+# bench-mcp — agent context
 
 Read `doc/` .md files for architecture and project documentation before making changes — it's faster than reading source.
 

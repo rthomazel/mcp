@@ -13,7 +13,7 @@ The `context` tool lists available shims under `mise shims:` by reading `/mise/s
 
 1. Add the entry and version to the project's `.tool-versions`
 2. Call `setup` on the project path — mise will install it
-3. The shim appears in `/mise/shims/` and is immediately available to `exec_sync`
+3. The shim appears in `/mise/shims/` and is immediately available to `shell`
 
 ## how setup works
 
