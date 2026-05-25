@@ -1,8 +1,8 @@
 # stats design
 
 BenchMCP records statistics on every tool call into a local SQLite database.
-The data enables planning (when to use `shell` vs `shell_background`), project-level
-edit analysis, and review of command history — similar in spirit to a shell history file.
+The data enables planning (when to use `shell` vs `shell_background`), file-edit
+analysis, and review of command history — similar in spirit to a shell history file.
 
 See also: the sqlite db entry in [ideas.md](ideas.md), where this feature originated.
 
@@ -10,70 +10,141 @@ See also: the sqlite db entry in [ideas.md](ideas.md), where this feature origin
 
 The database lives at `$BENCH_MCP_HOME/bench-mcp-stats.db` (default: `/root/bench-mcp-stats.db`).
 `/root` is already a named persistent volume, so the file survives container restarts with no
-additional configuration.
+additional configuration. `BENCH_MCP_HOME` is documented in [config.md](config.md).
 
-A `*sql.DB` is opened once in `handlers.New()` and closed on process exit.
-The schema is bootstrapped on startup via `CREATE TABLE IF NOT EXISTS`.
-If the schema needs to change in a future version, a `schema_version` table and a minimal
-migration runner will be added at that time.
+The directory is created on startup if it does not exist. If the DB cannot be opened or the
+schema cannot be bootstrapped, stats are disabled for the session — the server continues
+normally and logs the error via `slog`.
 
 ## dependency
 
 `modernc.org/sqlite` — pure Go, no CGo, no gcc required in the container image.
 
+## lifecycle
+
+A `stats.Writer` is created in `handlers.New()` and stored on `Handler`. It wraps a
+`*sql.DB` and a single goroutine draining a write channel.
+
+`Handler` gains a `Close()` method that:
+
+1. Signals the writer channel to drain
+2. Waits for the goroutine to flush remaining records (with a short deadline)
+3. Closes the `*sql.DB`
+
+The MCP server calls `Handler.Close()` on shutdown.
+
+### SQLite connection settings
+
+Applied at open time:
+
+```sql
+PRAGMA journal_mode=WAL;     -- allows concurrent readers alongside the single writer
+PRAGMA busy_timeout=5000;    -- wait up to 5s before returning SQLITE_BUSY
+PRAGMA foreign_keys=ON;
+```
+
+Go `*sql.DB` settings:
+
+```go
+db.SetMaxOpenConns(1)    // single writer — eliminates connection-level lock contention
+db.SetMaxIdleConns(1)
+db.SetConnMaxLifetime(0)
+```
+
+### async writer queue
+
+All inserts go through a buffered channel (capacity 256). A single goroutine drains the
+channel and executes inserts. If the channel is full, the record is dropped and the drop
+is logged via `slog` — the tool response is never blocked.
+
+On `Handler.Close()`, the channel is closed and the goroutine drains all remaining records
+before returning.
+
 ## write strategy
 
-All DB writes are fire-and-forget: the recording call is dispatched on a goroutine so that a
-slow or locked DB never blocks a tool response. Errors are logged via `slog` and never returned
-to the caller.
+Every tool call produces one row. Recording happens on both success and failure paths.
 
 | tool | when recorded |
 | ---- | ------------- |
-| `shell` | after each `runCommand` returns — duration, exit code, and command all available |
-| `shell_background` / `setup` | inside the job goroutine, after `cmd.Run()` returns — single INSERT, no two-phase write |
-| `file_replace` / `file_replace_all` | at handler return |
-| `context` / `status` | at handler return — no command fields |
+| `shell` | after each `runCommand` returns — one row per command in the `commands` array |
+| `shell_background` / `setup` | inside the job goroutine after `cmd.Run()` returns |
+| `file_replace` / `file_replace_all` | at handler return, regardless of success |
+| `context` / `status` / `stats` | at handler return |
 
 ## schema
 
+Bootstrapped transactionally on startup. `schema_version` holds a single row; its absence
+indicates a corrupt or pre-v1 database.
+
 ```sql
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS schema_version (
-    version INTEGER NOT NULL
+    version     INTEGER NOT NULL,
+    created_at  TEXT    NOT NULL   -- 'YYYY-MM-DD HH:MM:SS' UTC
 );
+
+INSERT OR IGNORE INTO schema_version (version, created_at)
+    VALUES (1, datetime('now'));
 
 CREATE TABLE IF NOT EXISTS tool_calls (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-    tool                  TEXT    NOT NULL,           -- 'shell', 'shell_background', 'file_replace', etc.
-    called_at             TEXT    NOT NULL,            -- ISO-8601 UTC
-    duration_ms           INTEGER,                    -- NULL for tools where duration is not meaningful
+    id                  INTEGER  PRIMARY KEY AUTOINCREMENT,
+    tool                TEXT     NOT NULL,
+    called_at           TEXT     NOT NULL,   -- 'YYYY-MM-DD HH:MM:SS' UTC; compatible with datetime()
+    duration_ms         INTEGER  NOT NULL DEFAULT 0,
+    server_version      TEXT,               -- build version string from Handler.version
+    error_kind          TEXT,               -- NULL on success; 'timeout', 'start_failed',
+                                            -- 'arg_error', 'write_error', etc. on failure
 
     -- shell / shell_background / setup
-    base_cmd              TEXT,                       -- first token of the redacted command
-    cmd_hash              TEXT,                       -- SHA-256(redacted command), hex; always set when a command is present
-    cmd_encrypted         TEXT,                       -- AES-256-GCM(redacted command), base64; set only when BENCH_MCP_STATS_KEY is provided
-    exit_code             INTEGER,
-    timed_out             INTEGER NOT NULL DEFAULT 0,  -- 1 if the context deadline was exceeded
-    cwd                   TEXT,                       -- working directory passed by the caller, full path
+    base_cmd            TEXT,               -- first meaningful token; see base_cmd extraction
+    cmd_hash            TEXT,               -- SHA-256(post-pipeline command), hex
+    cmd_encrypted       TEXT,               -- 'v1:<b64 nonce>:<b64 ciphertext+tag>'; only when key set
+    normalizer_version  INTEGER,            -- version of normalization rules; bump when rules change
+    exit_code           INTEGER,
+    timed_out           INTEGER  NOT NULL DEFAULT 0  CHECK (timed_out IN (0,1)),
+    cwd                 TEXT,               -- full path as provided by caller
+    job_id              TEXT,               -- links shell_background/setup rows to their job ID
 
     -- file_replace / file_replace_all
-    file_path             TEXT,                       -- full path of the file being edited
-    replacement_count     INTEGER,                    -- number of replacement items passed
-    replacement_bytes     TEXT,                       -- JSON array of byte counts, one per item: [find_bytes, replace_bytes]
-    dry_run               INTEGER                     -- 1 if dry_run=true was passed
+    file_path           TEXT,               -- full path as provided
+    replacement_count   INTEGER,            -- number of items in the replacements array
+    replacement_bytes   TEXT,               -- JSON: [[find_bytes, replace_bytes], ...] one pair per item
+    dry_run             INTEGER             CHECK (dry_run IS NULL OR dry_run IN (0,1)),
+
+    -- setup
+    setup_paths         TEXT                -- JSON array of paths passed to setup
 );
+
+CREATE INDEX IF NOT EXISTS idx_tc_called_at      ON tool_calls (called_at);
+CREATE INDEX IF NOT EXISTS idx_tc_tool_date      ON tool_calls (tool, called_at);
+CREATE INDEX IF NOT EXISTS idx_tc_tool_hash_date ON tool_calls (tool, cmd_hash, called_at);
+CREATE INDEX IF NOT EXISTS idx_tc_file_path      ON tool_calls (tool, file_path);
+
+COMMIT;
 ```
 
-### notes
+### column notes
 
-- `base_cmd` and `cmd_hash` are always recorded when a command is present, regardless of
-  whether `BENCH_MCP_STATS_KEY` is set. The hash is one-way and reveals nothing about the
-  command; it enables frequency counting and deduplication with zero configuration.
-- `replacement_bytes` stores raw counts (e.g. `[[120, 85], [34, 0]]`) rather than a
-  pre-computed average, so queries can compute any aggregate (avg, sum, max) directly.
-- `file_path` and `cwd` are stored as provided — no project extraction or path stripping.
-  Strip path components in queries as needed.
-- No `cmd_plaintext` column. Storing a full command requires `BENCH_MCP_STATS_KEY`.
-  If the key is absent, only `base_cmd` and `cmd_hash` are stored.
+- `called_at` uses SQLite datetime text (`YYYY-MM-DD HH:MM:SS` UTC) so that
+  `called_at > datetime('now', '-30 days')` works without conversion.
+  In Go: `time.Now().UTC().Format("2006-01-02 15:04:05")`.
+- `duration_ms` is always set — `0` for tools where wall time is not meaningful.
+- `cmd_hash` is unsalted SHA-256 of the post-normalization string. Rows with different
+  `normalizer_version` values should not be grouped by `cmd_hash`. See privacy notes.
+- `normalizer_version` is an integer constant in the codebase, bumped when normalization
+  rules change, so that stale hashes can be identified in queries.
+- `error_kind` is NULL on success. The value set is `timeout` when context deadline is
+  exceeded, `start_failed` when the process could not launch, `arg_error` for missing or
+  invalid handler arguments, and `write_error` for file operation failures.
+- `replacement_bytes` stores raw per-item byte counts so queries can compute any aggregate.
+  Format: `[[find_bytes, replace_bytes], ...]` — one pair per item in order. For
+  `file_replace_all` the single pair represents the find pattern and replacement string.
+- `job_id` links `shell_background` and `setup` rows to the ID returned to the caller,
+  enabling correlation with `status` output.
+- `server_version` is populated from `Handler.version` — helps interpret stats across
+  server upgrades.
+- `setup_paths` stores the full path list passed to `setup` as a JSON array.
 
 ## configuration
 
@@ -81,153 +152,235 @@ Two new env vars, both optional:
 
 | variable | default | description |
 | -------- | ------- | ----------- |
-| `BENCH_MCP_STATS_KEY` | _(unset)_ | Enables full command storage. Must be a base64-encoded 32-byte AES-256 key. When set, the redacted command is encrypted with AES-256-GCM and stored in `cmd_encrypted`. When unset, only `base_cmd` and `cmd_hash` are stored. |
-| `BENCH_MCP_STATS_REDACT_PATTERNS` | _(unset)_ | Pipe-separated Go regex strings added as an extra redaction tier. Each match is replaced with `REDACTED`. Example: `acme-corp\|mrn-[0-9]+` |
+| `BENCH_MCP_STATS_KEY` | _(unset)_ | Enables full command storage. Base64-encoded 32-byte AES-256 key. When set, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When unset, only `base_cmd` and `cmd_hash` are stored. |
+| `BENCH_MCP_STATS_REDACT_PATTERNS` | _(unset)_ | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `REDACTED`. Patterns that fail to compile are skipped and logged at startup. |
+
+`BENCH_MCP_HOME` controls the DB directory and is documented in [config.md](config.md).
+
+### key generation
+
+```bash
+openssl rand -base64 32
+```
+
+Set the output as `BENCH_MCP_STATS_KEY` in the `environment:` section of `docker-compose.yml`.
+
+### encrypted storage envelope
+
+When `BENCH_MCP_STATS_KEY` is set, each command is encrypted with AES-256-GCM and stored
+in `cmd_encrypted` as:
+
+```
+v1:<base64(12-byte random nonce)>:<base64(ciphertext + 16-byte GCM tag)>
+```
+
+A fresh 12-byte nonce is generated per row via `crypto/rand`. The `v1:` prefix enables
+future key rotation or algorithm changes without a schema migration.
+
+The encrypted payload is always the post-pipeline, post-redaction string — never the raw
+command. The `stats` tool decrypts on read and displays the redacted command in output.
 
 ## command processing pipeline
 
-Applied in order before any DB write. Each pass is destructive — the raw command is never persisted.
+Applied in order before any DB write. Each pass is destructive — the raw command string is
+never persisted.
 
 ```
 raw command string
         │
         ▼
-[1. TOOL NORMALIZATION]      per-tool, strips structurally useless fields
+[1. TOOL NORMALIZATION]          per-tool, strips structurally useless fields
         │
         ▼
-[2. REDACTION]               pattern-based, security and privacy focused
+[2. REDACTION]                   pattern-based, security and privacy
         │
         ▼
-[3. LONG TOKEN NORMALIZATION] catch-all for remaining noise
+[3. STRUCTURAL NORMALIZATION]    shell and interpreter constructs
         │
-        ├──► base_cmd         first token of the result
-        ├──► cmd_hash         SHA-256(result), hex
-        └──► cmd_encrypted    AES-256-GCM(result) if BENCH_MCP_STATS_KEY is set
+        ▼
+[4. LONG TOKEN NORMALIZATION]    catch-all for remaining noise
+        │
+        ├──► base_cmd             shell-aware extraction (see below)
+        ├──► cmd_hash             SHA-256(result), hex
+        └──► cmd_encrypted        AES-256-GCM(result) if key is set
 ```
+
+All byte counts in normalization tokens use the byte length of the original matched text.
+Format: `[LABEL NB]` where N is an integer and B is the literal character `B`.
 
 ### pass 1 — tool normalization
 
 Strips fields that carry no stats value before pattern matching runs.
 
-| tool | what is kept | what is replaced |
-| ---- | ------------ | ---------------- |
-| `file_replace` | `path`, `dry_run`, item count | `find` and `replace` text → counted in `replacement_bytes`, not passed to further passes |
-| `file_replace_all` | `path`, `start_line`, `end_line`, `dry_run` | `find` and `replace` text → same |
-| `shell` / `shell_background` | full command string → passed to pass 2 | — |
-| `setup` | path list only | — |
-| `context` / `status` | no command fields | — |
+| tool | kept | stripped |
+| ---- | ---- | -------- |
+| `file_replace` | `path`, `dry_run`, item count | `find` and `replace` text — byte counts written to `replacement_bytes` |
+| `file_replace_all` | `path`, `start_line`, `end_line`, `dry_run` | `find` and `replace` text — same |
+| `shell` / `shell_background` | full command string → passes 2–4 | — |
+| `setup` | path list → stored in `setup_paths` | — |
+| `context` / `status` / `stats` | no command fields | — |
+
+File and setup paths are stored as-is. Passes 2–4 and `base_cmd` extraction do not
+apply to these tools.
 
 ### pass 2 — redaction
 
-Applied only to shell command strings. All substitutions are destructive.
-Byte counts in replacement tokens use raw byte length of the original matched text.
+Applied to shell command strings only. All substitutions are destructive. Tiers are
+applied in order; earlier matches take precedence.
 
 **tier 1 — known secret patterns**
 
-| pattern | example | stored as |
-| ------- | ------- | --------- |
+| pattern | example | result |
+| ------- | ------- | ------ |
 | env var assignment with sensitive name | `TOKEN=abc123 cmd` | `TOKEN=REDACTED cmd` |
 | `--flag=value` with sensitive flag name | `--password=hunter2` | `--password=REDACTED` |
-| quoted value after sensitive `=` | `KEY='abc'` | `KEY=REDACTED` |
+| quoted value after sensitive `=` | `KEY='abc'` or `KEY="abc"` | `KEY=REDACTED` |
 | URL credentials | `https://user:pass@host` | `https://REDACTED@host` |
-| Bearer / token auth header value | `Bearer eyJhbGci...` | `Bearer REDACTED` |
+| Bearer / token auth header | `Bearer eyJhbGci...` | `Bearer REDACTED` |
 | JWT (three base64url dot-separated segments) | `eyJ.eyJ.sig` | `[JWT]` |
 | PEM block | `-----BEGIN PRIVATE KEY-----...` | `[PEM BLOCK]` |
 
-Sensitive name keyword list (case-insensitive): `TOKEN`, `KEY`, `SECRET`, `PASSWORD`, `PASSWD`,
-`PWD`, `PASS`, `AUTH`, `CRED`, `CREDENTIAL`, `API_KEY`, `PRIVATE`, `CERT`, `SIGNING`.
+Sensitive name list, matched at whole env-var or flag-name boundaries (case-insensitive
+word boundary match to avoid false positives like `--passthrough` or `COMPASS_URL`):
+`TOKEN`, `KEY`, `SECRET`, `PASSWORD`, `PASSWD`, `PWD`, `PASS`, `AUTH`, `CRED`,
+`CREDENTIAL`, `API_KEY`, `PRIVATE`, `CERT`, `SIGNING`.
 
 **tier 2 — high-entropy patterns**
 
-| pattern | threshold | stored as |
-| ------- | --------- | --------- |
+| pattern | threshold | result |
+| ------- | --------- | ------ |
 | hex string | ≥ 32 contiguous hex chars | `[HEX 64B]` |
 | base64 string | ≥ 24 chars, valid base64 alphabet | `[BASE64 44B]` |
-| UUID | standard 8-4-4-4-12 format, always | `[UUID]` |
+| UUID | standard 8-4-4-4-12 format | `[UUID]` |
 
-Byte counts in hex and base64 tokens reflect the byte length of the matched string.
-The 32-char hex threshold preserves short git SHAs (≤ 12 chars) while catching full
+The 32-char hex threshold preserves short git SHAs (≤ 12 chars) while catching
 SHA-256 outputs, HMAC values, and raw keys.
 
 **tier 3 — PII**
 
-| pattern | stored as |
-| ------- | --------- |
+| pattern | result |
+| ------- | ------ |
 | email address | `[EMAIL]` |
-| public IP address | `[IP]` |
+| public IP address (non-RFC-1918, non-loopback) | `[IP]` |
 
-**tier 4 — user patterns (BENCH_MCP_STATS_REDACT_PATTERNS)**
+RFC-1918 ranges (`10.x.x.x`, `172.16–31.x.x`, `192.168.x.x`) and loopback are retained
+as they are useful operational context (e.g. Docker service addresses).
 
-Applied after tiers 1–3. Each pipe-separated regex is compiled at startup;
-if any pattern fails to compile the server logs an error and skips that pattern.
-Matches are replaced with `REDACTED`.
+**tier 4 — user patterns**
 
-### pass 3 — long token normalization
+Each newline-separated pattern from `BENCH_MCP_STATS_REDACT_PATTERNS` is compiled at
+startup and applied in order. Each match becomes `REDACTED`. Failed compilations are
+logged and skipped.
 
-Applied after redaction. Catches noise that pattern matching did not handle.
-All byte counts use the byte length of the original matched text.
+Example `docker-compose.yml` entry:
 
-**catch-all: long tokens**
+```yaml
+BENCH_MCP_STATS_REDACT_PATTERNS: |
+  acme-corp
+  mrn-[0-9]+
+  patient-[a-f0-9]{8}
+```
 
-Any whitespace-delimited token longer than 80 bytes becomes `[LONG STRING 323B]`.
-This handles deep paths, escaped strings, inline data, and anything else that
-survived earlier passes but adds no stats value.
+### pass 3 — structural normalization
 
-**shell structural constructs**
+Shell and interpreter constructs are replaced before the long-token rule so their
+content does not trigger spurious long-token matches.
 
-| construct | stored as |
-| --------- | --------- |
+**shell constructs**
+
+| construct | result |
+| --------- | ------ |
 | `$(...)` command substitution | `[SUBSHELL]` |
-| `` `...` `` backtick | `[SUBSHELL]` |
-| `<< 'EOF' ... EOF` heredoc (any delimiter) | `[HEREDOC 1247B]` |
+| `` `...` `` backtick substitution | `[SUBSHELL]` |
+| `<< 'DELIM' ... DELIM` heredoc (any delimiter) | `[HEREDOC 1247B]` |
+| `<<- DELIM ... DELIM` heredoc | `[HEREDOC 1247B]` |
 | `<<< "..."` here-string | `[HERESTRING 42B]` |
 | `<(...)` process substitution | `[PROCESS_SUB]` |
 
-**inline scripts (interpreter `-c` / `-e` flag)**
+**inline scripts**
 
-Any interpreter invocation where `-c` or `-e` is followed by a quoted string:
+Interpreter invocations where `-c` or `-e` is followed by a quoted argument:
 
-| example | stored as |
-| ------- | --------- |
+| example | result |
+| ------- | ------ |
 | `python3 -c '...'` | `python3 -c [INLINE_SCRIPT 89B]` |
 | `python -c "..."` | `python -c [INLINE_SCRIPT 89B]` |
 | `perl -e '...'` | `perl -e [INLINE_SCRIPT 45B]` |
 | `ruby -e '...'` | `ruby -e [INLINE_SCRIPT 45B]` |
 | `node -e '...'` | `node -e [INLINE_SCRIPT 45B]` |
-| `awk '{ print $1 }'` | `awk [INLINE_SCRIPT 14B]` |
+| `awk '{...}'` | `awk [INLINE_SCRIPT 14B]` |
 
-**Python multiline string (inside `-c` arg)**
+**Python multiline strings** (inside a `-c` argument):
 
-| pattern | stored as |
-| ------- | --------- |
+| pattern | result |
+| ------- | ------ |
 | `"""..."""` triple-quoted block | `[PYTHON_BLOCK 342B]` |
 
-### example
+These patterns are best-effort. Complex quoting, escaping, and nesting may not be
+handled correctly. Anything that survives is handled by pass 4.
+
+### pass 4 — long token normalization
+
+Applied last. Any whitespace-delimited token longer than 80 bytes becomes
+`[LONG STRING NB]` where N is the byte count of the original token. This handles deep
+paths, escaped strings, inline data, and anything else that passed earlier stages.
+
+### base_cmd extraction
+
+Applied to the post-pipeline string. Rules in order:
+
+1. Split on the first unquoted `&&`, `||`, `|`, or `;`. Use only the first segment.
+2. Strip leading env-var assignments (including already-redacted `WORD=REDACTED` forms).
+3. Strip leading wrapper commands: `sudo`, `env`, `time`, `command`, `exec`, `nice`, `ionice`.
+4. First remaining token is `base_cmd`.
+5. If no token remains, `base_cmd` is NULL.
+
+Examples:
+
+| post-pipeline command | base_cmd |
+| --------------------- | -------- |
+| `TOKEN=REDACTED git status` | `git` |
+| `sudo -u root bash -c [INLINE_SCRIPT 42B]` | `bash` |
+| `cd /projects/foo && go test ./...` | `go` |
+| `env GOPATH=/root go build` | `go` |
+| `TOKEN=REDACTED` | NULL |
+
+### pipeline example
 
 Input:
 ```bash
 TOKEN=secret git -C /projects/bench-mcp log --pretty=format:'%H %s' --author=user@example.com -n 20
 ```
 
-After pipeline:
+After pass 2 (tier 1: `TOKEN=secret` → `TOKEN=REDACTED`; tier 3: email → `[EMAIL]`):
 ```
-TOKEN=REDACTED git -C /projects/bench-mcp log --pretty=format:[INLINE_SCRIPT 6B] --author=[EMAIL] -n 20
+TOKEN=REDACTED git -C /projects/bench-mcp log --pretty=format:'%H %s' --author=[EMAIL] -n 20
 ```
+
+After passes 3–4 (no structural constructs match; no tokens exceed 80 bytes): unchanged.
 
 `base_cmd = git`
 `cmd_hash = SHA-256("TOKEN=REDACTED git -C /projects/bench-mcp log ...")`
 
-Two runs with different token values produce the same hash. ✓
+Two runs with different `TOKEN` values produce the same hash. ✓
 
 ## `stats` tool
 
-A new MCP tool. One optional parameter:
+One optional parameter:
 
 | parameter | type | default | description |
 | --------- | ---- | ------- | ----------- |
 | `days` | int | `30` | Rolling window in days. `0` means all time. |
 
-Output is plain text, consistent with other tools. Example:
+### p95 calculation
+
+SQLite has no built-in percentile function. The `stats` handler loads all matching
+`duration_ms` values into a Go slice, sorts it, and reads the value at index
+`floor(len × 0.95)`. Groups with fewer than 20 samples omit the p95 field.
+
+### output format
+
+Plain text, consistent with other tools. Example:
 
 ```
 tool usage (last 30 days):
@@ -236,51 +389,72 @@ tool usage (last 30 days):
   file_replace        27 calls   avg 0.3s
   setup               12 calls
   context              8 calls
+  stats                3 calls
 
-top commands by frequency:
+top commands by frequency (grouped by cmd_hash, labeled by base_cmd):
   git   [a3f9c2]   89 calls   avg 2.1s   p95 12.3s   ← consider shell_background
   go    [b17d44]   31 calls   avg 5.4s   p95 47.1s   ← consider shell_background
   npm   [c90e11]   12 calls   avg 22.0s  p95 91.0s   ← consider shell_background
   cat   [f4a812]   18 calls   avg 0.1s
   grep  [221bc9]   15 calls   avg 0.2s
 
-note: hash prefix shown — set BENCH_MCP_STATS_KEY to store and display full commands
+note: commands stored as hash only — set BENCH_MCP_STATS_KEY to store and display full commands
 ```
 
-The `note:` line is omitted when `BENCH_MCP_STATS_KEY` is set; full redacted commands
-are shown instead of hash prefixes.
+The `note:` line is omitted when `BENCH_MCP_STATS_KEY` is set; the decrypted redacted
+command is shown instead of the hash prefix. The displayed command is always post-redaction —
+never the raw input.
+
+Hash prefixes shown are the first 6 hex characters of `cmd_hash`. Rows are grouped by
+`cmd_hash` so that commands with identical post-normalization forms aggregate together.
+`base_cmd` labels the group in output.
 
 ### shell_background hint
 
-The `← consider shell_background` hint is appended when a command's p95 duration
-exceeds `BENCH_MCP_TIMEOUT × 0.5`. This ties the hint directly to the configured
-timeout — no extra env var needed.
+`← consider shell_background` is shown when a group's p95 duration exceeds
+`BENCH_MCP_TIMEOUT × 0.5`. Suppressed when the sample size is below 20.
+
+## privacy notes
+
+- `cmd_hash` is unsalted SHA-256. Given a suspected command, anyone with DB access can
+  confirm whether it was run by hashing and querying. Acceptable for a single-operator
+  local tool, but worth noting when sharing the DB file.
+- All content shown or decrypted by `stats` is post-redaction. Raw commands are never
+  reconstructed or displayed.
+- `cwd` and `file_path` are stored as provided by the caller and may reveal project
+  structure. No normalization is applied — strip path components in queries as needed.
+
+## retention
+
+The database is unbounded in v1. SQLite files in `/root` will grow with usage.
+The `days` parameter on `stats` limits query scope, not storage. A pruning command
+or row-count cap may be added in a future version.
 
 ## example queries
 
 ```sql
--- which project paths had the most file edits
+-- files edited most often
 SELECT file_path, COUNT(*) AS edits
 FROM tool_calls
 WHERE tool IN ('file_replace', 'file_replace_all')
 GROUP BY file_path
 ORDER BY edits DESC;
 
--- average and total replacement size per file
+-- replacement size distribution per file
 SELECT
     file_path,
-    AVG(replacement_count) AS avg_items,
-    SUM(replacement_count) AS total_items
+    SUM(replacement_count)  AS total_items,
+    AVG(replacement_count)  AS avg_items
 FROM tool_calls
 WHERE tool = 'file_replace'
 GROUP BY file_path;
 
--- commands slow enough to warrant shell_background
+-- commands by runtime — candidates for shell_background
 SELECT
     base_cmd,
-    COUNT(*) AS calls,
-    CAST(AVG(duration_ms) AS INTEGER) AS avg_ms,
-    MAX(duration_ms) AS max_ms
+    COUNT(*)                        AS calls,
+    CAST(AVG(duration_ms) AS INT)   AS avg_ms,
+    MAX(duration_ms)                AS max_ms
 FROM tool_calls
 WHERE tool = 'shell'
   AND called_at > datetime('now', '-30 days')
@@ -293,4 +467,24 @@ FROM tool_calls
 WHERE timed_out = 1
 ORDER BY called_at DESC
 LIMIT 20;
+
+-- error breakdown
+SELECT error_kind, COUNT(*) AS n
+FROM tool_calls
+WHERE error_kind IS NOT NULL
+GROUP BY error_kind
+ORDER BY n DESC;
+
+-- background jobs correlated to their job IDs
+SELECT job_id, base_cmd, duration_ms, exit_code, called_at
+FROM tool_calls
+WHERE tool = 'shell_background'
+ORDER BY called_at DESC
+LIMIT 20;
+
+-- rows with stale normalizer version (exclude from cmd_hash grouping)
+SELECT COUNT(*) AS stale_rows, normalizer_version
+FROM tool_calls
+WHERE normalizer_version < (SELECT MAX(normalizer_version) FROM tool_calls)
+GROUP BY normalizer_version;
 ```
