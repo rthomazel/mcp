@@ -27,8 +27,8 @@ A `stats.Writer` is created in `handlers.New()` and stored on `Handler`. It wrap
 
 `Handler` gains a `Close()` method that:
 
-1. Signals the writer channel to drain
-2. Waits for the goroutine to flush remaining records (with a short deadline)
+1. Closes the write channel, signalling the goroutine to stop accepting new records
+2. Waits for the goroutine to drain all buffered records and exit (no deadline — full drain is guaranteed)
 3. Closes the `*sql.DB`
 
 The MCP server calls `Handler.Close()` on shutdown.
@@ -57,8 +57,9 @@ All inserts go through a buffered channel (capacity 256). A single goroutine dra
 channel and executes inserts. If the channel is full, the record is dropped and the drop
 is logged via `slog` — the tool response is never blocked.
 
-On `Handler.Close()`, the channel is closed and the goroutine drains all remaining records
-before returning.
+On `Handler.Close()`, the channel is closed (new sends will panic — callers must not record
+after `Close()`). The goroutine finishes processing all buffered records then exits. `Close()`
+blocks until the goroutine returns, guaranteeing no writes are in flight when `*sql.DB` closes.
 
 ## write strategy
 
@@ -80,12 +81,14 @@ indicates a corrupt or pre-v1 database.
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS schema_version (
+    id          INTEGER PRIMARY KEY CHECK (id = 1),  -- enforces single-row invariant
     version     INTEGER NOT NULL,
     created_at  TEXT    NOT NULL   -- 'YYYY-MM-DD HH:MM:SS' UTC
 );
 
-INSERT OR IGNORE INTO schema_version (version, created_at)
-    VALUES (1, datetime('now'));
+-- id=1 constraint ensures at most one row; INSERT OR IGNORE is a no-op on subsequent startups
+INSERT OR IGNORE INTO schema_version (id, version, created_at)
+    VALUES (1, 1, datetime('now'));
 
 CREATE TABLE IF NOT EXISTS tool_calls (
     id                  INTEGER  PRIMARY KEY AUTOINCREMENT,
@@ -134,9 +137,11 @@ COMMIT;
   `normalizer_version` values should not be grouped by `cmd_hash`. See privacy notes.
 - `normalizer_version` is an integer constant in the codebase, bumped when normalization
   rules change, so that stale hashes can be identified in queries.
-- `error_kind` is NULL on success. The value set is `timeout` when context deadline is
-  exceeded, `start_failed` when the process could not launch, `arg_error` for missing or
-  invalid handler arguments, and `write_error` for file operation failures.
+- `error_kind` is NULL when a tool call completes normally — including shell commands that
+  exit nonzero. A nonzero exit is a successful execution from the handler's perspective;
+  it is captured in `exit_code`. `error_kind` is set only for handler-level failures:
+  `timeout` (context deadline exceeded), `start_failed` (process could not launch),
+  `arg_error` (missing or invalid handler arguments), `write_error` (file operation failure).
 - `replacement_bytes` stores raw per-item byte counts so queries can compute any aggregate.
   Format: `[[find_bytes, replace_bytes], ...]` — one pair per item in order. For
   `file_replace_all` the single pair represents the find pattern and replacement string.
@@ -327,13 +332,21 @@ paths, escaped strings, inline data, and anything else that passed earlier stage
 
 ### base_cmd extraction
 
-Applied to the post-pipeline string. Rules in order:
+Applied to the post-pipeline string. The algorithm is iterative — steps 2–4 repeat
+until no further progress is made:
 
-1. Split on the first unquoted `&&`, `||`, `|`, or `;`. Use only the first segment.
-2. Strip leading env-var assignments (including already-redacted `WORD=REDACTED` forms).
-3. Strip leading wrapper commands: `sudo`, `env`, `time`, `command`, `exec`, `nice`, `ionice`.
-4. First remaining token is `base_cmd`.
-5. If no token remains, `base_cmd` is NULL.
+1. **Split on pipeline boundary.** Locate the first unquoted `&&`, `||`, `|`, or `;`.
+   Use only the segment after the last leading `cd ...` navigation and before the
+   first operator that begins the "real" command. Specifically: if the first segment
+   begins with `cd`, discard it and take the next segment instead.
+2. **Strip leading env-var assignments.** Remove leading `WORD=value` and
+   `WORD=REDACTED` tokens. Repeat until the first token is not an assignment.
+3. **Strip leading wrapper tokens.** If the first token is a known wrapper
+   (`sudo`, `env`, `time`, `command`, `exec`, `nice`, `ionice`), consume it
+   along with any option flags it takes (`sudo -u USER`, `sudo -n`, `nice -n N`,
+   etc.). Repeat step 2 after each wrapper consumed.
+4. **Converge.** If neither step 2 nor step 3 made progress, stop.
+5. **First remaining token is `base_cmd`.** If none remains, `base_cmd` is NULL.
 
 Examples:
 
@@ -344,6 +357,11 @@ Examples:
 | `cd /projects/foo && go test ./...` | `go` |
 | `env GOPATH=/root go build` | `go` |
 | `TOKEN=REDACTED` | NULL |
+
+Note on `sudo -u root bash`: step 3 consumes `sudo -u root` (the `-u USER` option pair),
+leaving `bash` as the first token. Note on `env GOPATH=/root go build`: step 3 consumes
+`env`, then step 2 strips `GOPATH=/root`, leaving `go`. Note on `cd ... && go test`: step 1
+discards the `cd` segment, taking `go test ./...` from the next segment.
 
 ### pipeline example
 
@@ -375,8 +393,9 @@ One optional parameter:
 ### p95 calculation
 
 SQLite has no built-in percentile function. The `stats` handler loads all matching
-`duration_ms` values into a Go slice, sorts it, and reads the value at index
-`floor(len × 0.95)`. Groups with fewer than 20 samples omit the p95 field.
+`duration_ms` values into a Go slice, sorts it, and uses the nearest-rank formula:
+`index = ceil(0.95 × n) - 1` (zero-based). For 100 samples this yields index 94,
+the 95th value. Groups with fewer than 20 samples omit the p95 field.
 
 ### output format
 
@@ -406,8 +425,10 @@ command is shown instead of the hash prefix. The displayed command is always pos
 never the raw input.
 
 Hash prefixes shown are the first 6 hex characters of `cmd_hash`. Rows are grouped by
-`cmd_hash` so that commands with identical post-normalization forms aggregate together.
-`base_cmd` labels the group in output.
+`(normalizer_version, cmd_hash)` — only rows sharing both values are aggregated, preventing
+stale hashes from inflating counts. `base_cmd` labels the group in output. The stats tool
+only groups rows matching the current `normalizer_version` by default; older rows are
+counted in totals but excluded from the top-commands breakdown.
 
 ### shell_background hint
 
@@ -450,6 +471,7 @@ WHERE tool = 'file_replace'
 GROUP BY file_path;
 
 -- commands by runtime — candidates for shell_background
+-- restrict to current normalizer version to avoid stale-hash cross-contamination
 SELECT
     base_cmd,
     COUNT(*)                        AS calls,
@@ -458,7 +480,8 @@ SELECT
 FROM tool_calls
 WHERE tool = 'shell'
   AND called_at > datetime('now', '-30 days')
-GROUP BY cmd_hash
+  AND normalizer_version = (SELECT MAX(normalizer_version) FROM tool_calls)
+GROUP BY normalizer_version, cmd_hash
 ORDER BY max_ms DESC;
 
 -- timed-out commands
