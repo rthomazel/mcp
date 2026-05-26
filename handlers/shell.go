@@ -12,8 +12,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/bench-mcp/internal/stats"
 	"github.com/rthomazel/bench-mcp/internal/xml"
-	"github.com/rthomazel/bench-mcp/stats"
 )
 
 type commandResult struct {

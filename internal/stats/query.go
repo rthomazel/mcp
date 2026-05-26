@@ -97,6 +97,7 @@ func queryToolCounts(conn *sql.DB, filter string) ([]ToolStat, error) {
 }
 
 func queryTopCommands(conn *sql.DB, filter string, bgHintThreshold time.Duration, encKey []byte) ([]CmdStat, error) {
+	const statsTopLines = internal.StatsTopLines
 	currentNV := internal.NormalizerVersion
 	query := fmt.Sprintf(`
 		SELECT base_cmd, cmd_hash, normalizer_version, duration_ms, cmd_encrypted
@@ -152,12 +153,11 @@ func queryTopCommands(conn *sql.DB, filter string, bgHintThreshold time.Duration
 		return len(groups[order[i]].durations) > len(groups[order[j]].durations)
 	})
 
-	const maxTopCommands = 20
 	thresholdMS := bgHintThreshold.Milliseconds()
 
 	cmdStats := make([]CmdStat, 0, len(order))
 	for _, hash := range order {
-		if len(cmdStats) >= maxTopCommands {
+		if len(cmdStats) >= statsTopLines {
 			break
 		}
 		g := groups[hash]
@@ -221,10 +221,9 @@ func fetchDurations(conn *sql.DB, filter, condition, arg string) ([]int64, error
 }
 
 // p95 returns the 95th percentile using the nearest-rank formula.
-// Returns nil when the sample size is below 20.
+// Returns nil when the sample size is below StatsP95MinSamples.
 func p95(durations []int64) *int64 {
-	const minSamples = 20
-	if len(durations) < minSamples {
+	if len(durations) < internal.StatsP95MinSamples {
 		return nil
 	}
 	sorted := make([]int64, len(durations))

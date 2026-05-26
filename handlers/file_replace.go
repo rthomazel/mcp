@@ -9,7 +9,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/bench-mcp/internal/file"
-	"github.com/rthomazel/bench-mcp/stats"
+	"github.com/rthomazel/bench-mcp/internal/stats"
 )
 
 // replacement is a single find/replace pair from a file_replace call.

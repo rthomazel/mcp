@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	_ "modernc.org/sqlite" // register "sqlite" driver
 
 	"github.com/rthomazel/bench-mcp/db"
@@ -222,19 +223,8 @@ func (w *Writer) insert(tc ToolCall) {
 	}
 }
 
-func nullString(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
-func nullInt(n int) any {
-	if n == 0 {
-		return nil
-	}
-	return n
-}
+func nullString(s string) any { return lo.Ternary[any](s == "", nil, s) }
+func nullInt(n int) any       { return lo.Ternary[any](n == 0, nil, n) }
 
 // QueryStats queries the stats DB for a summary over the given rolling window.
 // days=0 returns all time. bgHintThreshold is half the shell timeout for the hint.

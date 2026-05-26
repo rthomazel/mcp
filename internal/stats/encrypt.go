@@ -9,17 +9,14 @@ import (
 	"io"
 	"os"
 	"strings"
-)
 
-// secretPath is the Docker Secret mount path for the AES-256 encryption key.
-// The _v1 suffix enables key rotation: a v2 key can be introduced as
-// bench_mcp_stats_encryption_key_v2 without changing existing rows.
-const secretPath = "/run/secrets/bench_mcp_stats_encryption_key_v1"
+	"github.com/rthomazel/bench-mcp/internal"
+)
 
 // LoadKey reads the encryption key from the Docker Secret file.
 // Returns nil, nil if the file does not exist or is empty — stats run without encryption.
 func LoadKey() ([]byte, error) {
-	raw, err := os.ReadFile(secretPath)
+	raw, err := os.ReadFile(internal.StatsEncryptionKeyPath)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}

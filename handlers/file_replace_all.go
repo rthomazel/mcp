@@ -8,7 +8,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/bench-mcp/internal/file"
-	"github.com/rthomazel/bench-mcp/stats"
+	"github.com/rthomazel/bench-mcp/internal/stats"
 )
 
 // HandleFileReplaceAll replaces every occurrence of find in a file, optionally

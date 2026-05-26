@@ -13,7 +13,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/bench-mcp/internal/pathsnapshot"
-	"github.com/rthomazel/bench-mcp/stats"
+	"github.com/rthomazel/bench-mcp/internal/stats"
 	"github.com/samber/lo"
 )
 

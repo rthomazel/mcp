@@ -105,3 +105,12 @@ func LoadConfig() (*Config, error) {
 // NormalizerVersion is incremented whenever the command normalization rules
 // change. Rows with different versions should not be grouped by cmd_hash.
 const NormalizerVersion = 1
+
+// StatsEncryptionKeyPath is the Docker Secret mount path for the stats AES-256 key.
+const StatsEncryptionKeyPath = "/run/secrets/bench_mcp_stats_encryption_key_v1"
+
+// StatsP95MinSamples is the minimum number of samples required before p95 is computed.
+const StatsP95MinSamples = 20
+
+// StatsTopLines is the maximum number of commands shown in the stats top-commands table.
+const StatsTopLines = 20
