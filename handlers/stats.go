@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/bench-mcp/stats"
@@ -39,27 +40,24 @@ func formatStatsReport(report *stats.StatsReport) string {
 
 	fmt.Fprintf(&b, "tool usage (%s):\n", report.Window)
 
-	// Column widths for alignment.
-	maxTool := 4
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	for _, ts := range report.ToolCounts {
-		if len(ts.Tool) > maxTool {
-			maxTool = len(ts.Tool)
-		}
-	}
-
-	for _, ts := range report.ToolCounts {
-		line := fmt.Sprintf("  %-*s  %d calls", maxTool, ts.Tool, ts.Count)
+		tfw(tw, "  %s\t%d calls", ts.Tool, ts.Count)
 		if ts.Count > 0 {
-			line += fmt.Sprintf("   avg %s", msToString(ts.AvgMS))
+			tfw(tw, "\tavg %s", msToString(ts.AvgMS))
+		} else {
+			tfw(tw, "\t")
 		}
 		if ts.P95MS != nil {
-			line += fmt.Sprintf("   p95 %s", msToString(float64(*ts.P95MS)))
+			tfw(tw, "\tp95 %s", msToString(float64(*ts.P95MS)))
 		}
-		b.WriteString(line + "\n")
+		tfl(tw)
 	}
+	_ = tw.Flush()
 
 	if len(report.TopCommands) > 0 {
 		b.WriteString("\ntop commands by frequency:\n")
+		tw2 := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 		for _, cmd := range report.TopCommands {
 			var label string
 			if cmd.Command != "" {
@@ -71,24 +69,34 @@ func formatStatsReport(report *stats.StatsReport) string {
 				}
 				label = fmt.Sprintf("%s [%s]", baseLabel, cmd.HashPrefix)
 			}
-			line := fmt.Sprintf("  %s   %d calls   avg %s",
-				label, cmd.Count, msToString(cmd.AvgMS))
+			tfw(tw2, "  %s\t%d calls\tavg %s", label, cmd.Count, msToString(cmd.AvgMS))
 			if cmd.P95MS != nil {
-				line += fmt.Sprintf("   p95 %s", msToString(float64(*cmd.P95MS)))
+				tfw(tw2, "\tp95 %s", msToString(float64(*cmd.P95MS)))
+			} else {
+				tfw(tw2, "\t")
 			}
 			if cmd.HintBG {
-				line += "   \u2190 consider shell_background"
+				tfw(tw2, "\t\u2190 consider shell_background")
 			}
-			b.WriteString(line + "\n")
+			tfl(tw2)
 		}
+		_ = tw2.Flush()
 	}
 
 	if !report.HasKey {
-		b.WriteString("\nnote: commands stored as hash only \u2014 configure the bench_mcp_stats_encryption_key Docker Secret to store and display full commands\n")
+		b.WriteString("\nnote: commands stored as hash only \u2014 configure the bench_mcp_stats_encryption_key_v1 Docker Secret to store and display full commands\n")
 	}
 
 	return b.String()
 }
+
+// tfw wraps fmt.Fprintf discarding the return values, for use with tabwriter
+// where write errors are deferred to Flush.
+func tfw(w *tabwriter.Writer, format string, a ...any) {
+	_, _ = fmt.Fprintf(w, format, a...)
+}
+
+func tfl(w *tabwriter.Writer) { _, _ = fmt.Fprintln(w) }
 
 func msToString(ms float64) string {
 	if ms < 1000 {

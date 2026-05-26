@@ -146,7 +146,7 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("stats",
-			mcp.WithDescription("Returns tool-call statistics from the local SQLite history. Pass days=0 to query all time (default is last 30 days)."),
+			mcp.WithDescription("Returns tool-call statistics from the local history. Default is last 30 days, pass 0 to query all time."),
 			mcp.WithNumber("days", mcp.Description("Rolling window in days. 0 returns all time. Defaults to 30.")),
 		),
 		h.HandleStats,

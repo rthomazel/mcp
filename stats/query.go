@@ -71,7 +71,7 @@ func queryToolCounts(conn *sql.DB, filter string) ([]ToolStat, error) {
 	query := `
 		SELECT tool, COUNT(*) AS cnt, AVG(duration_ms) AS avg_ms
 		FROM tool_calls
-		WHERE 1=1 ` + filter + `
+		WHERE tool IS NOT NULL ` + filter + `
 		GROUP BY tool
 		ORDER BY cnt DESC`
 

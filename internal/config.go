@@ -84,7 +84,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	if raw := os.Getenv("BENCH_MCP_STATS_REDACT_PATTERNS"); raw != "" {
-		for _, line := range strings.Split(raw, "\n") {
+		for i, line := range strings.Split(raw, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
 				continue
@@ -92,7 +92,7 @@ func LoadConfig() (*Config, error) {
 			re, err := regexp.Compile(line)
 			if err != nil {
 				slog.Error("BENCH_MCP_STATS_REDACT_PATTERNS: invalid regex, skipping",
-					"pattern", line, "err", err)
+					"pattern", line, "line", i+1, "err", err)
 				continue
 			}
 			cfg.StatsRedactPatterns = append(cfg.StatsRedactPatterns, re)

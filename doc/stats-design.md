@@ -155,7 +155,7 @@ One new env var and one Docker Secret, both optional:
 
 | name | kind | description |
 | ---- | ---- | ----------- |
-| `bench_mcp_stats_encryption_key` | Docker Secret | Enables full command storage. Base64-encoded 32-byte AES-256 key, read from `/run/secrets/bench_mcp_stats_encryption_key`. When present, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When absent, only `base_cmd` and `cmd_hash` are stored. |
+| `bench_mcp_stats_encryption_key_v1` | Docker Secret | Enables full command storage. Base64-encoded 32-byte AES-256 key, read from `/run/secrets/bench_mcp_stats_encryption_key_v1`. When present, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When absent, only `base_cmd` and `cmd_hash` are stored. |
 | `BENCH_MCP_STATS_REDACT_PATTERNS` | env var | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `REDACTED`. Patterns that fail to compile are skipped and logged at startup. |
 
 `BENCH_MCP_HOME` controls the DB directory and is documented in [config.md](config.md).
@@ -165,24 +165,24 @@ One new env var and one Docker Secret, both optional:
 Generate a key and write it to a secrets file:
 
 ```bash
-openssl rand -base64 32 > secrets/bench_mcp_stats_encryption_key
-chmod 600 secrets/bench_mcp_stats_encryption_key
+openssl rand -base64 32 > secrets/bench_mcp_stats_encryption_key_v1
+chmod 600 secrets/bench_mcp_stats_encryption_key_v1
 ```
 
 Declare the secret and mount it in `docker-compose.yml`:
 
 ```yaml
 secrets:
-  bench_mcp_stats_encryption_key:
-    file: ./secrets/bench_mcp_stats_encryption_key
+  bench_mcp_stats_encryption_key_v1:
+    file: ./secrets/bench_mcp_stats_encryption_key_v1
 
 services:
   bench-mcp:
     secrets:
-      - bench_mcp_stats_encryption_key
+      - bench_mcp_stats_encryption_key_v1
 ```
 
-The server reads the key from `/run/secrets/bench_mcp_stats_encryption_key` at startup.
+The server reads the key from `/run/secrets/bench_mcp_stats_encryption_key_v1` at startup.
 If the file is absent or empty, full command storage is disabled and only `base_cmd` and
 `cmd_hash` are recorded.
 
@@ -207,12 +207,13 @@ Applied in order before any DB write. Each pass is destructive — the raw comma
 never persisted.
 
 ```
-raw command string
+call site (handler)
         │
-        ▼
-[1. TOOL NORMALIZATION]          per-tool, strips structurally useless fields
+        │  pass 1: tool normalization — handler extracts the command string
+        │  and records structured fields (file_path, replacement_bytes, etc.)
+        │  directly. Non-shell tools skip passes 2-4 entirely.
         │
-        ▼
+        ▼  shell command string
 [2. REDACTION]                   pattern-based, security and privacy
         │
         ▼
@@ -226,23 +227,26 @@ raw command string
         └──► cmd_encrypted        AES-256-GCM(result) if key is set
 ```
 
+Passes 2–4 are implemented in `stats.ProcessCommand` (`stats/destroy.go`). Pass 1
+is intentionally at the call site in each handler — there is no single
+normalization function for it, which keeps handler recording code explicit.
+
 All byte counts in normalization tokens use the byte length of the original matched text.
 Format: `[LABEL NB]` where N is an integer and B is the literal character `B`.
 
-### pass 1 — tool normalization
+### pass 1 — tool normalization (at call sites)
 
-Strips fields that carry no stats value before pattern matching runs.
+Each handler records structured fields directly and decides whether to pass a
+command string to `ProcessCommand`. There is no single function for this pass —
+it is explicit in each handler.
 
-| tool | kept | stripped |
-| ---- | ---- | -------- |
-| `file_replace` | `path`, `dry_run`, item count | `find` and `replace` text — byte counts written to `replacement_bytes` |
-| `file_replace_all` | `path`, `start_line`, `end_line`, `dry_run` | `find` and `replace` text — same |
-| `shell` / `shell_background` | full command string → passes 2–4 | — |
-| `setup` | path list → stored in `setup_paths` | — |
-| `context` / `status` / `stats` | no command fields | — |
-
-File and setup paths are stored as-is. Passes 2–4 and `base_cmd` extraction do not
-apply to these tools.
+| tool | what is recorded directly | command passed to ProcessCommand |
+| ---- | ------------------------- | -------------------------------- |
+| `file_replace` | `file_path`, `replacement_count`, `replacement_bytes`, `dry_run` | none — passes 2–4 skipped |
+| `file_replace_all` | same + `start_line`, `end_line` | none |
+| `shell` / `shell_background` | `cwd`, `exit_code`, `timed_out` | full command string |
+| `setup` | `setup_paths`, `cwd` | full command string |
+| `context` / `status` / `stats` | duration only | none |
 
 ### pass 2 — redaction
 
@@ -433,7 +437,7 @@ top commands by frequency (grouped by cmd_hash, labeled by base_cmd):
   cat   [f4a812]   18 calls   avg 0.1s
   grep  [221bc9]   15 calls   avg 0.2s
 
-note: commands stored as hash only — configure the bench_mcp_stats_encryption_key Docker Secret to store and display full commands
+note: commands stored as hash only — configure the bench_mcp_stats_encryption_key_v1 Docker Secret to store and display full commands
 ```
 
 The `note:` line is omitted when the Docker Secret is configured; the decrypted redacted
