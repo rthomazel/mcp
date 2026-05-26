@@ -4,8 +4,6 @@ BenchMCP records statistics on every tool call into a local SQLite database.
 The data enables planning (when to use `shell` vs `shell_background`), file-edit
 analysis, and review of command history — similar in spirit to a shell history file.
 
-See also: the sqlite db entry in [ideas.md](ideas.md), where this feature originated.
-
 ## persistence
 
 The database lives at `$BENCH_MCP_HOME/bench-mcp-stats.db` (default: `/root/bench-mcp-stats.db`).
@@ -28,7 +26,7 @@ A `stats.Writer` is created in `handlers.New()` and stored on `Handler`. It wrap
 `Handler` gains a `Close()` method that:
 
 1. Closes the write channel, signalling the goroutine to stop accepting new records
-2. Waits for the goroutine to drain all buffered records and exit (no deadline — full drain is guaranteed)
+2. Waits up to 1 minute for the goroutine to drain all buffered records and exit; any records remaining after the deadline are dropped and counted in the log
 3. Closes the `*sql.DB`
 
 The MCP server calls `Handler.Close()` on shutdown.
@@ -74,62 +72,58 @@ Every tool call produces one row. Recording happens on both success and failure 
 
 ## schema
 
-Bootstrapped transactionally on startup. `schema_version` holds a single row; its absence
-indicates a corrupt or pre-v1 database.
+The schema is managed with `golang-migrate/migrate/v4`, following the same pattern as the
+feature-flag project. Migration files live in `db/migrations/` and are embedded in the binary.
+A `stats.Writer.Migrate()` method runs pending migrations at startup before any inserts.
+`schema_migrations` tracking is handled by golang-migrate — no custom version table is needed.
+
+Initial migration (`db/migrations/1_initial_schema.up.sql`):
 
 ```sql
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS schema_version (
-    id          INTEGER PRIMARY KEY CHECK (id = 1),  -- enforces single-row invariant
-    version     INTEGER NOT NULL,
-    created_at  TEXT    NOT NULL   -- 'YYYY-MM-DD HH:MM:SS' UTC
-);
-
--- id=1 constraint ensures at most one row; INSERT OR IGNORE is a no-op on subsequent startups
-INSERT OR IGNORE INTO schema_version (id, version, created_at)
-    VALUES (1, 1, datetime('now'));
-
-CREATE TABLE IF NOT EXISTS tool_calls (
-    id                  INTEGER  PRIMARY KEY AUTOINCREMENT,
-    tool                TEXT     NOT NULL,
-    called_at           TEXT     NOT NULL,   -- 'YYYY-MM-DD HH:MM:SS' UTC; compatible with datetime()
-    duration_ms         INTEGER  NOT NULL DEFAULT 0,
-    server_version      TEXT,               -- build version string from Handler.version
-    error_kind          TEXT,               -- NULL on success; 'timeout', 'start_failed',
-                                            -- 'arg_error', 'write_error', etc. on failure
+CREATE TABLE tool_calls (
+    id                    TEXT     PRIMARY KEY,          -- UUID v4
+    tool                  TEXT     NOT NULL,
+    called_at             DATETIME NOT NULL,             -- 'YYYY-MM-DD HH:MM:SS' UTC
+    duration_ms           INTEGER  NOT NULL DEFAULT 0,
+    server_version        TEXT,                         -- build version from Handler.version
+    error_kind            TEXT,                         -- NULL on success; 'timeout',
+                                                        -- 'start_failed', 'arg_error', 'write_error'
 
     -- shell / shell_background / setup
-    base_cmd            TEXT,               -- first meaningful token; see base_cmd extraction
-    cmd_hash            TEXT,               -- SHA-256(post-pipeline command), hex
-    cmd_encrypted       TEXT,               -- 'v1:<b64 nonce>:<b64 ciphertext+tag>'; only when key set
-    normalizer_version  INTEGER,            -- version of normalization rules; bump when rules change
-    exit_code           INTEGER,
-    timed_out           INTEGER  NOT NULL DEFAULT 0  CHECK (timed_out IN (0,1)),
-    cwd                 TEXT,               -- full path as provided by caller
-    job_id              TEXT,               -- links shell_background/setup rows to their job ID
+    base_cmd              TEXT,                         -- first meaningful token; see base_cmd extraction
+    cmd_hash              TEXT,                         -- SHA-256(post-pipeline command), hex
+    cmd_encrypted         TEXT,                         -- 'v1:<b64 nonce>:<b64 ciphertext+tag>'
+    normalizer_version    INTEGER,                      -- bump when normalization rules change
+    exit_code             INTEGER,
+    timed_out             INTEGER  NOT NULL DEFAULT 0   CHECK (timed_out IN (0,1)),
+    cwd                   TEXT,                         -- full path as provided by caller
+    job_id                TEXT,                         -- links shell_background/setup to job ID
+    redacted_byte_counts  TEXT,                         -- JSON: [N, ...] original byte size per redacted token
 
     -- file_replace / file_replace_all
-    file_path           TEXT,               -- full path as provided
-    replacement_count   INTEGER,            -- number of items in the replacements array
-    replacement_bytes   TEXT,               -- JSON: [[find_bytes, replace_bytes], ...] one pair per item
-    dry_run             INTEGER             CHECK (dry_run IS NULL OR dry_run IN (0,1)),
+    file_path             TEXT,                         -- full path as provided
+    replacement_count     INTEGER,                      -- number of items in the replacements array
+    replacement_bytes     TEXT,                         -- JSON: [[find_bytes, replace_bytes], ...]
+    dry_run               INTEGER                       CHECK (dry_run IS NULL OR dry_run IN (0,1)),
 
     -- setup
-    setup_paths         TEXT                -- JSON array of paths passed to setup
+    setup_paths           TEXT                          -- JSON array of paths passed to setup
 );
 
-CREATE INDEX IF NOT EXISTS idx_tc_called_at      ON tool_calls (called_at);
-CREATE INDEX IF NOT EXISTS idx_tc_tool_date      ON tool_calls (tool, called_at);
-CREATE INDEX IF NOT EXISTS idx_tc_tool_hash_date ON tool_calls (tool, cmd_hash, called_at);
-CREATE INDEX IF NOT EXISTS idx_tc_file_path      ON tool_calls (tool, file_path);
+CREATE INDEX idx_tc_called_at      ON tool_calls (called_at);
+CREATE INDEX idx_tc_tool_date      ON tool_calls (tool, called_at);
+CREATE INDEX idx_tc_tool_hash_date ON tool_calls (tool, cmd_hash, called_at);
+CREATE INDEX idx_tc_file_path      ON tool_calls (tool, file_path);
 
 COMMIT;
 ```
 
 ### column notes
 
-- `called_at` uses SQLite datetime text (`YYYY-MM-DD HH:MM:SS` UTC) so that
+- `id` is a UUID v4 generated in Go (`google/uuid` or `crypto/rand` + RFC 4122 formatting).
+- `called_at` uses SQLite `DATETIME` text (`YYYY-MM-DD HH:MM:SS` UTC) so that
   `called_at > datetime('now', '-30 days')` works without conversion.
   In Go: `time.Now().UTC().Format("2006-01-02 15:04:05")`.
 - `duration_ms` is always set — `0` for tools where wall time is not meaningful.
@@ -142,6 +136,10 @@ COMMIT;
   it is captured in `exit_code`. `error_kind` is set only for handler-level failures:
   `timeout` (context deadline exceeded), `start_failed` (process could not launch),
   `arg_error` (missing or invalid handler arguments), `write_error` (file operation failure).
+- `redacted_byte_counts` is a JSON array of the original byte sizes of every string replaced
+  during passes 2 and 3, in order of substitution. Example: a command where `TOKEN=secret` (6B),
+  an email (17B), and a heredoc (1247B) were replaced yields `[6, 17, 1247]`. Collected during
+  the pipeline; stored as `NULL` for tools with no command string.
 - `replacement_bytes` stores raw per-item byte counts so queries can compute any aggregate.
   Format: `[[find_bytes, replace_bytes], ...]` — one pair per item in order. For
   `file_replace_all` the single pair represents the find pattern and replacement string.
@@ -153,26 +151,44 @@ COMMIT;
 
 ## configuration
 
-Two new env vars, both optional:
+One new env var and one Docker Secret, both optional:
 
-| variable | default | description |
-| -------- | ------- | ----------- |
-| `BENCH_MCP_STATS_KEY` | _(unset)_ | Enables full command storage. Base64-encoded 32-byte AES-256 key. When set, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When unset, only `base_cmd` and `cmd_hash` are stored. |
-| `BENCH_MCP_STATS_REDACT_PATTERNS` | _(unset)_ | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `REDACTED`. Patterns that fail to compile are skipped and logged at startup. |
+| name | kind | description |
+| ---- | ---- | ----------- |
+| `bench_mcp_stats_encryption_key` | Docker Secret | Enables full command storage. Base64-encoded 32-byte AES-256 key, read from `/run/secrets/bench_mcp_stats_encryption_key`. When present, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When absent, only `base_cmd` and `cmd_hash` are stored. |
+| `BENCH_MCP_STATS_REDACT_PATTERNS` | env var | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `REDACTED`. Patterns that fail to compile are skipped and logged at startup. |
 
 `BENCH_MCP_HOME` controls the DB directory and is documented in [config.md](config.md).
 
-### key generation
+### key setup with Docker Secrets
+
+Generate a key and write it to a secrets file:
 
 ```bash
-openssl rand -base64 32
+openssl rand -base64 32 > secrets/bench_mcp_stats_encryption_key
+chmod 600 secrets/bench_mcp_stats_encryption_key
 ```
 
-Set the output as `BENCH_MCP_STATS_KEY` in the `environment:` section of `docker-compose.yml`.
+Declare the secret and mount it in `docker-compose.yml`:
+
+```yaml
+secrets:
+  bench_mcp_stats_encryption_key:
+    file: ./secrets/bench_mcp_stats_encryption_key
+
+services:
+  bench-mcp:
+    secrets:
+      - bench_mcp_stats_encryption_key
+```
+
+The server reads the key from `/run/secrets/bench_mcp_stats_encryption_key` at startup.
+If the file is absent or empty, full command storage is disabled and only `base_cmd` and
+`cmd_hash` are recorded.
 
 ### encrypted storage envelope
 
-When `BENCH_MCP_STATS_KEY` is set, each command is encrypted with AES-256-GCM and stored
+When the Docker Secret is present, each command is encrypted with AES-256-GCM and stored
 in `cmd_encrypted` as:
 
 ```
@@ -388,7 +404,7 @@ One optional parameter:
 
 | parameter | type | default | description |
 | --------- | ---- | ------- | ----------- |
-| `days` | int | `30` | Rolling window in days. `0` means all time. |
+| `days` | int | `30` | Rolling window in days. `0` returns all time — document this in the tool description so agents know querying without a time constraint is an option. |
 
 ### p95 calculation
 
@@ -417,10 +433,10 @@ top commands by frequency (grouped by cmd_hash, labeled by base_cmd):
   cat   [f4a812]   18 calls   avg 0.1s
   grep  [221bc9]   15 calls   avg 0.2s
 
-note: commands stored as hash only — set BENCH_MCP_STATS_KEY to store and display full commands
+note: commands stored as hash only — configure the bench_mcp_stats_encryption_key Docker Secret to store and display full commands
 ```
 
-The `note:` line is omitted when `BENCH_MCP_STATS_KEY` is set; the decrypted redacted
+The `note:` line is omitted when the Docker Secret is configured; the decrypted redacted
 command is shown instead of the hash prefix. The displayed command is always post-redaction —
 never the raw input.
 
@@ -442,6 +458,8 @@ counted in totals but excluded from the top-commands breakdown.
   local tool, but worth noting when sharing the DB file.
 - All content shown or decrypted by `stats` is post-redaction. Raw commands are never
   reconstructed or displayed.
+- The encryption key is stored as a Docker Secret (file on disk), not in the environment.
+  The DB file and the secrets file should not be co-located in the same backup or commit.
 - `cwd` and `file_path` are stored as provided by the caller and may reveal project
   structure. No normalization is applied — strip path components in queries as needed.
 

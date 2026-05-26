@@ -7,14 +7,23 @@
 `context` tool runs subprocesses serially.
 Could run them with goroutines and be meaningfully faster.
 
+## stats table storage optimization
+
+The `tool_calls` table in the stats DB grows unboundedly. For long-running deployments,
+options worth exploring:
+
+- Row-count cap or age-based pruning (e.g. delete rows older than 90 days)
+- Separate DB files per time period (e.g. per month) with a union view — allows dropping old
+  files without vacuuming the main DB
+- Moving to a purpose-built time-series store if query patterns outgrow SQLite
+
+For now the DB is unbounded; the `days` parameter on the `stats` tool limits query scope
+but not storage. See `doc/stats-design.md` § retention.
+
 ## per-command timeout
 
 Timeout is global via `BENCH_MCP_TIMEOUT`.
 Letting `shell` accept an optional `timeout` param would be useful for known slow commands.
-
-## sqlite db with command stats
-
-See [stats-design.md](stats-design.md) for the full design.
 
 # what not to add
 
