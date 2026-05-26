@@ -79,7 +79,7 @@ func queryToolCounts(conn *sql.DB, filter string) ([]ToolStat, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query tool counts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Collect all duration_ms per tool for p95 computation.
 	type toolRow struct {
@@ -132,7 +132,7 @@ func queryTopCommands(conn *sql.DB, filter string, bgHintThreshold time.Duration
 	if err != nil {
 		return nil, fmt.Errorf("query top commands: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type group struct {
 		baseCmd   string
@@ -229,7 +229,7 @@ func fetchDurations(conn *sql.DB, filter, condition, arg string) ([]int64, error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var durations []int64
 	for rows.Next() {
 		var d int64

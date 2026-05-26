@@ -37,7 +37,7 @@ func (h *Handler) HandleStats(_ context.Context, req mcp.CallToolRequest) (*mcp.
 func formatStatsReport(report *stats.StatsReport) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("tool usage (%s):\n", report.Window))
+	fmt.Fprintf(&b, "tool usage (%s):\n", report.Window)
 
 	// Column widths for alignment.
 	maxTool := 4
