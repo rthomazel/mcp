@@ -78,7 +78,7 @@ func (h *Handler) HandleSetup(_ context.Context, req mcp.CallToolRequest) (*mcp.
 		if command == "" {
 			b.WriteString("  error: no supported rule found; project may use an unsupported language or package manager\n")
 		} else {
-			j := h.startJob(command, mountPath)
+			j := h.startJob(command, mountPath, jobOpts{tool: "setup", setupPaths: paths})
 			b.WriteString("  job_id: " + j.id + "\n")
 			if setupScript != "" {
 				b.WriteString("  setup_script: " + setupScript + "\n")

@@ -60,6 +60,7 @@ func run() error {
 	slog.Info("bench-mcp starting", "version", version, "timeout", cfg.Timeout, "background_timeout", cfg.BackgroundTimeout)
 
 	h := handlers.New(cfg, version)
+	defer h.Close()
 
 	s := server.NewMCPServer(
 		"bench-mcp",
@@ -141,6 +142,14 @@ func run() error {
 			mcp.WithBoolean("dry_run", mcp.Description("Optional. If true, validate and compute the diff without writing to disk.")),
 		),
 		h.HandleFileReplace,
+	)
+
+	s.AddTool(
+		mcp.NewTool("stats",
+			mcp.WithDescription("Returns tool-call statistics from the local SQLite history. Pass days=0 to query all time (default is last 30 days)."),
+			mcp.WithNumber("days", mcp.Description("Rolling window in days. 0 returns all time. Defaults to 30.")),
+		),
+		h.HandleStats,
 	)
 
 	slog.Info("serving on stdio")

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/bench-mcp/internal/file"
+	"github.com/rthomazel/bench-mcp/stats"
 )
 
 // replacement is a single find/replace pair from a file_replace call.
@@ -49,7 +51,28 @@ func (h *Handler) HandleFileReplace(_ context.Context, req mcp.CallToolRequest) 
 		replacements = append(replacements, r)
 	}
 
+	start := time.Now()
 	result, toolErr := h.handleFileReplace(path, replacements, dryRun)
+
+	repBytes := make([][2]int, len(replacements))
+	for i, r := range replacements {
+		repBytes[i] = [2]int{len(r.find), len(r.replace)}
+	}
+	errorKind := ""
+	if toolErr != "" {
+		errorKind = "write_error"
+	}
+	h.record(stats.ToolCall{
+		Tool:             "file_replace",
+		StartedAt:        start,
+		Duration:         time.Since(start),
+		ErrorKind:        errorKind,
+		FilePath:         path,
+		ReplacementCount: len(replacements),
+		ReplacementBytes: repBytes,
+		DryRun:           &dryRun,
+	})
+
 	if toolErr != "" {
 		return mcp.NewToolResultError(toolErr), nil
 	}

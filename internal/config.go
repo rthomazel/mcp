@@ -2,18 +2,22 @@ package internal
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	Timeout           time.Duration
-	BackgroundTimeout time.Duration
-	Home              string
-	MiseDir           string
-	EditMaxLines      int
-	MaxCandidates     int
+	Timeout             time.Duration
+	BackgroundTimeout   time.Duration
+	Home                string
+	MiseDir             string
+	EditMaxLines        int
+	MaxCandidates       int
+	StatsRedactPatterns []*regexp.Regexp
 }
 
 var defaults = Config{
@@ -77,6 +81,22 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("BENCH_MCP_MAX_CANDIDATES invalid: must be a positive integer")
 		}
 		cfg.MaxCandidates = n
+	}
+
+	if raw := os.Getenv("BENCH_MCP_STATS_REDACT_PATTERNS"); raw != "" {
+		for _, line := range strings.Split(raw, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			re, err := regexp.Compile(line)
+			if err != nil {
+				slog.Error("BENCH_MCP_STATS_REDACT_PATTERNS: invalid regex, skipping",
+					"pattern", line, "err", err)
+				continue
+			}
+			cfg.StatsRedactPatterns = append(cfg.StatsRedactPatterns, re)
+		}
 	}
 
 	return cfg, nil
