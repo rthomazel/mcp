@@ -476,6 +476,40 @@ The database is unbounded in v1. SQLite files in `/root` will grow with usage.
 The `days` parameter on `stats` limits query scope, not storage. A pruning command
 or row-count cap may be added in a future version.
 
+## testing
+
+Tests run with `./run test`. The stats feature adds tests in three files:
+
+| file | scope |
+| ---- | ----- |
+| `internal/stats/destroy_test.go` | `ProcessCommand` pipeline — redaction rules, base_cmd extraction, hash invariants |
+| `internal/stats/writer_test.go` | `QueryStats` integration — inserts and queries against a real temp-file SQLite database |
+| `internal/migrate_test.go` | `MigrateDB` schema bootstrap and idempotency |
+
+### design choices
+
+- Encryption is not tested directly. AES-256-GCM is a stdlib primitive; the envelope is simple enough that the value is low.
+- Writer integration tests call `w.insert()` synchronously, bypassing the async channel, so tests are deterministic with no sleeps.
+- Tests open a real SQLite file in `t.TempDir()` rather than `:memory:` to exercise the same driver and pragma path as production.
+
+### query coverage
+
+`TestQueryStats_*` covers:
+
+| test | what it verifies |
+| ---- | --------------- |
+| `Empty` | empty DB returns an empty report with no error |
+| `WindowLabel` | `window` string reflects the `days` parameter |
+| `ToolCounts` | correct per-tool count and average duration |
+| `P95` | nil when < `StatsP95MinSamples` samples; correct nearest-rank value when ≥ threshold |
+| `DateFilter` | `days=1` excludes rows inserted 31 days ago; `days=0` includes them |
+| `TopCommandsSortedByCount` | most-called commands appear first |
+| `HashGrouping` | two commands identical post-redaction count as one group with the right average |
+| `BGHint` | `HintBG=true` when p95 exceeds the bgHintThreshold; false when under |
+| `NormalizerVersionFiltering` | stale `normalizer_version` rows excluded from top commands but counted in tool totals |
+| `TopLinesCap` | result capped at `StatsTopLines` even with more distinct commands |
+| `FileReplaceNotInTopCommands` | `file_replace` rows appear in tool counts but not top commands |
+
 ## example queries
 
 ```sql
