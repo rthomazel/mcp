@@ -72,8 +72,8 @@ Every tool call produces one row. Recording happens on both success and failure 
 
 ## schema
 
-The schema is managed with `golang-migrate/migrate/v4`, following the same pattern as the
-feature-flag project. Migration files live in `db/migrations/` and are embedded in the binary.
+The schema is managed with `golang-migrate/migrate/v4`. Migration files live in `db/migrations/`
+and are embedded in the binary.
 A `stats.Writer.Migrate()` method runs pending migrations at startup before any inserts.
 `schema_migrations` tracking is handled by golang-migrate — no custom version table is needed.
 
