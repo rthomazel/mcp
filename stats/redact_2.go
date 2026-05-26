@@ -195,7 +195,7 @@ func redactPublicIPs(cmd string, counts *[]int) string {
 			return match
 		}
 		*counts = append(*counts, len(match))
-		return "[IP]"
+		return "[PUBLIC IP]"
 	})
 }
 

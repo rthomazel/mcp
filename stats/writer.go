@@ -13,6 +13,7 @@ import (
 	_ "modernc.org/sqlite" // register "sqlite" driver
 
 	"github.com/rthomazel/bench-mcp/db"
+	"github.com/rthomazel/bench-mcp/internal"
 )
 
 const writeQueueCap = 256
@@ -141,7 +142,7 @@ func (w *Writer) insert(tc ToolCall) {
 			}
 		}
 
-		nv := NormalizerVersion
+		nv := internal.NormalizerVersion
 		normalizerVer = &nv
 
 		if len(processed.RedactedByteCounts) > 0 {

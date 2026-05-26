@@ -4,12 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"regexp"
+	"slices"
 	"strings"
 )
-
-// NormalizerVersion is incremented whenever normalization rules change.
-// Rows with different versions should not be grouped by cmd_hash.
-const NormalizerVersion = 1
 
 // ProcessedCommand is the result of running a shell command through the pipeline.
 type ProcessedCommand struct {
@@ -39,19 +36,7 @@ func ProcessCommand(cmd string, userPatterns []*regexp.Regexp) ProcessedCommand 
 	}
 }
 
-// --- base_cmd extraction ---
-
-var wrappers = map[string]bool{
-	"sudo": true, "env": true, "time": true,
-	"command": true, "exec": true, "nice": true, "ionice": true,
-}
-
-// wrapperArgs holds flags that consume the next token for each wrapper.
-var wrapperArgs = map[string]map[string]bool{
-	"sudo":   {"-u": true, "-g": true, "-C": true, "-r": true, "-t": true, "-T": true, "-p": true},
-	"nice":   {"-n": true},
-	"ionice": {"-c": true, "-n": true, "-p": true},
-}
+var wrappers = []string{"sudo", "env", "time", "command", "exec", "nice", "ionice"}
 
 // reAnyEnvAssign matches tokens that look like env var assignments (WORD=anything).
 var reAnyEnvAssign = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
@@ -80,7 +65,7 @@ func extractBaseCmd(cmd string) string {
 		}
 
 		// Strip leading wrapper and its flags.
-		if wrappers[tokens[0]] {
+		if slices.Contains(wrappers, tokens[0]) {
 			tokens = consumeWrapper(tokens)
 			progress = true
 		}
@@ -117,18 +102,19 @@ func firstRealSegment(cmd string) string {
 func splitOnOperators(cmd string) []string {
 	var segments []string
 	var current strings.Builder
-	inQuote := rune(0)
+	var inQuote *rune
 	for i := 0; i < len(cmd); i++ {
 		ch := rune(cmd[i])
 		switch {
-		case inQuote != 0:
+		case inQuote != nil:
 			current.WriteByte(cmd[i])
-			if ch == inQuote {
-				inQuote = 0
+			if ch == *inQuote {
+				inQuote = nil
 			}
 		case ch == '\'' || ch == '"':
 			current.WriteByte(cmd[i])
-			inQuote = ch
+			q := ch
+			inQuote = &q
 		case i+1 < len(cmd) && ((cmd[i] == '&' && cmd[i+1] == '&') || (cmd[i] == '|' && cmd[i+1] == '|')):
 			segments = append(segments, current.String())
 			current.Reset()
@@ -150,20 +136,9 @@ func consumeWrapper(tokens []string) []string {
 	if len(tokens) == 0 {
 		return tokens
 	}
-	wrapper := tokens[0]
-	tokens = tokens[1:]
-	args := wrapperArgs[wrapper]
-	for len(tokens) > 0 {
-		tok := tokens[0]
-		if !strings.HasPrefix(tok, "-") {
-			break
-		}
-		// Flag-only (no next-token arg)
-		if args[tok] && len(tokens) > 1 {
-			tokens = tokens[2:] // consume flag + its argument
-		} else {
-			tokens = tokens[1:] // consume flag only
-		}
+	tokens = tokens[1:] // drop the wrapper itself
+	for len(tokens) > 0 && strings.HasPrefix(tokens[0], "-") {
+		tokens = tokens[1:]
 	}
 	return tokens
 }

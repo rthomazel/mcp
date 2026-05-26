@@ -42,16 +42,16 @@ func formatStatsReport(report *stats.StatsReport) string {
 
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	for _, ts := range report.ToolCounts {
-		tfw(tw, "  %s\t%d calls", ts.Tool, ts.Count)
+		_, _ = fmt.Fprintf(tw, "  %s\t%d calls", ts.Tool, ts.Count)
 		if ts.Count > 0 {
-			tfw(tw, "\tavg %s", msToString(ts.AvgMS))
+			_, _ = fmt.Fprintf(tw, "\tavg %s", msToString(ts.AvgMS))
 		} else {
-			tfw(tw, "\t")
+			_, _ = fmt.Fprintf(tw, "\t")
 		}
 		if ts.P95MS != nil {
-			tfw(tw, "\tp95 %s", msToString(float64(*ts.P95MS)))
+			_, _ = fmt.Fprintf(tw, "\tp95 %s", msToString(float64(*ts.P95MS)))
 		}
-		tfl(tw)
+		_, _ = fmt.Fprintln(tw)
 	}
 	_ = tw.Flush()
 
@@ -69,34 +69,26 @@ func formatStatsReport(report *stats.StatsReport) string {
 				}
 				label = fmt.Sprintf("%s [%s]", baseLabel, cmd.HashPrefix)
 			}
-			tfw(tw2, "  %s\t%d calls\tavg %s", label, cmd.Count, msToString(cmd.AvgMS))
+			_, _ = fmt.Fprintf(tw2, "  %s\t%d calls\tavg %s", label, cmd.Count, msToString(cmd.AvgMS))
 			if cmd.P95MS != nil {
-				tfw(tw2, "\tp95 %s", msToString(float64(*cmd.P95MS)))
+				_, _ = fmt.Fprintf(tw2, "\tp95 %s", msToString(float64(*cmd.P95MS)))
 			} else {
-				tfw(tw2, "\t")
+				_, _ = fmt.Fprintf(tw2, "\t")
 			}
 			if cmd.HintBG {
-				tfw(tw2, "\t\u2190 consider shell_background")
+				_, _ = fmt.Fprintf(tw2, "\t← consider shell_background")
 			}
-			tfl(tw2)
+			_, _ = fmt.Fprintln(tw2)
 		}
 		_ = tw2.Flush()
 	}
 
 	if !report.HasKey {
-		b.WriteString("\nnote: commands stored as hash only \u2014 configure the bench_mcp_stats_encryption_key_v1 Docker Secret to store and display full commands\n")
+		b.WriteString("\nnote: commands stored as hash only — configure the bench_mcp_stats_encryption_key_v1 Docker Secret to store and display full commands\n")
 	}
 
 	return b.String()
 }
-
-// tfw wraps fmt.Fprintf discarding the return values, for use with tabwriter
-// where write errors are deferred to Flush.
-func tfw(w *tabwriter.Writer, format string, a ...any) {
-	_, _ = fmt.Fprintf(w, format, a...)
-}
-
-func tfl(w *tabwriter.Writer) { _, _ = fmt.Fprintln(w) }
 
 func msToString(ms float64) string {
 	if ms < 1000 {

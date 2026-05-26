@@ -101,3 +101,7 @@ func LoadConfig() (*Config, error) {
 
 	return cfg, nil
 }
+
+// NormalizerVersion is incremented whenever the command normalization rules
+// change. Rows with different versions should not be grouped by cmd_hash.
+const NormalizerVersion = 1

@@ -286,7 +286,7 @@ SHA-256 outputs, HMAC values, and raw keys.
 | pattern | result |
 | ------- | ------ |
 | email address | `[EMAIL]` |
-| public IP address (non-RFC-1918, non-loopback) | `[IP]` |
+| public IP address (non-RFC-1918, non-loopback) | `[PUBLIC IP]` |
 
 RFC-1918 ranges (`10.x.x.x`, `172.16–31.x.x`, `192.168.x.x`) and loopback are retained
 as they are useful operational context (e.g. Docker service addresses).

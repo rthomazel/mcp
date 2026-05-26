@@ -7,6 +7,8 @@ import (
 	"math"
 	"sort"
 	"time"
+
+	"github.com/rthomazel/bench-mcp/internal"
 )
 
 // StatsReport is the result of QueryStats.
@@ -118,7 +120,7 @@ func queryToolCounts(conn *sql.DB, filter string) ([]ToolStat, error) {
 }
 
 func queryTopCommands(conn *sql.DB, filter string, bgHintThreshold time.Duration, encKey []byte) ([]CmdStat, error) {
-	currentNV := NormalizerVersion
+	currentNV := internal.NormalizerVersion
 	query := fmt.Sprintf(`
 		SELECT base_cmd, cmd_hash, normalizer_version, duration_ms, cmd_encrypted
 		FROM tool_calls
