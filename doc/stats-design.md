@@ -294,7 +294,8 @@ as they are useful operational context (e.g. Docker service addresses).
 **tier 4 — user patterns**
 
 Each newline-separated pattern from `BENCH_MCP_STATS_REDACT_PATTERNS` is compiled at
-startup and applied in order. Each match becomes `REDACTED`. Failed compilations are
+startup and applied in order. Each match becomes `[USER REDACTED]`, distinguishing
+user-defined redactions from built-in pipeline redactions. Failed compilations are
 logged and skipped.
 
 Example `docker-compose.yml` entry:
