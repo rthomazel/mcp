@@ -220,6 +220,6 @@ func isPrivateIPv4(a, b, _, _ int) bool {
 func redactCustom(cmd string, pattern *regexp.Regexp, counts *[]int) string {
 	return pattern.ReplaceAllStringFunc(cmd, func(match string) string {
 		*counts = append(*counts, len(match))
-		return "REDACTED"
+		return "[USER REDACTED]"
 	})
 }
