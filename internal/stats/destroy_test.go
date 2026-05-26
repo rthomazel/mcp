@@ -147,6 +147,37 @@ func TestProcessCommand_Redaction(t *testing.T) {
 	}
 }
 
+// TestProcessCommand_URLCredsCascade pins the two-pass cascade:
+// redactURLCreds produces "REDACTED@host" which is itself a valid email
+// address, so redactEmails consumes it in the next pass.
+// The intermediate form must not survive into the final normalized output.
+func TestProcessCommand_URLCredsCascade(t *testing.T) {
+	const input = "git clone https://user:s3cr3t@github.com/repo"
+	got := ProcessCommand(input, nil)
+
+	absent := []string{
+		"s3cr3t",                  // original secret
+		"user",                    // original username
+		"REDACTED@github.com",     // intermediate form — must be consumed by email pass
+	}
+	for _, s := range absent {
+		if strings.Contains(got.Normalized, s) {
+			t.Errorf("Normalized %q still contains %q", got.Normalized, s)
+		}
+	}
+
+	present := []string{
+		"https://", // scheme preserved
+		"[EMAIL]",  // cascade end-state
+		"/repo",   // path preserved
+	}
+	for _, s := range present {
+		if !strings.Contains(got.Normalized, s) {
+			t.Errorf("Normalized %q missing %q", got.Normalized, s)
+		}
+	}
+}
+
 func TestProcessCommand_UserPattern(t *testing.T) {
 	re := regexp.MustCompile(`acme-[a-z]+`)
 	got := ProcessCommand("echo acme-secret", []*regexp.Regexp{re})
