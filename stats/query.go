@@ -38,29 +38,6 @@ type CmdStat struct {
 	HintBG     bool   // p95 > bgHintThreshold
 }
 
-// QueryStats queries the stats DB for a summary over the given rolling window.
-// days=0 returns all time. bgHintThreshold is half the shell timeout for the hint.
-func (w *Writer) QueryStats(days int, bgHintThreshold time.Duration) (*StatsReport, error) {
-	filter, window := buildDateFilter(days)
-
-	toolCounts, err := queryToolCounts(w.db, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	topCmds, err := queryTopCommands(w.db, filter, bgHintThreshold, w.cfg.EncryptionKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return &StatsReport{
-		Window:      window,
-		ToolCounts:  toolCounts,
-		TopCommands: topCmds,
-		HasKey:      len(w.cfg.EncryptionKey) > 0,
-	}, nil
-}
-
 func buildDateFilter(days int) (filter, window string) {
 	if days <= 0 {
 		return "", "all time"

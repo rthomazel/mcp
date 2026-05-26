@@ -63,12 +63,12 @@ blocks until the goroutine returns, guaranteeing no writes are in flight when `*
 
 Every tool call produces one row. Recording happens on both success and failure paths.
 
-| tool | when recorded |
-| ---- | ------------- |
-| `shell` | after each `runCommand` returns — one row per command in the `commands` array |
-| `shell_background` / `setup` | inside the job goroutine after `cmd.Run()` returns |
-| `file_replace` / `file_replace_all` | at handler return, regardless of success |
-| `context` / `status` / `stats` | at handler return |
+| tool                                | when recorded                                                                 |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
+| `shell`                             | after each `runCommand` returns — one row per command in the `commands` array |
+| `shell_background` / `setup`        | inside the job goroutine after `cmd.Run()` returns                            |
+| `file_replace` / `file_replace_all` | at handler return, regardless of success                                      |
+| `context` / `status` / `stats`      | at handler return                                                             |
 
 ## schema
 
@@ -153,10 +153,10 @@ COMMIT;
 
 One new env var and one Docker Secret, both optional:
 
-| name | kind | description |
-| ---- | ---- | ----------- |
+| name                                | kind          | description                                                                                                                                                                                                                                                                        |
+| ----------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bench_mcp_stats_encryption_key_v1` | Docker Secret | Enables full command storage. Base64-encoded 32-byte AES-256 key, read from `/run/secrets/bench_mcp_stats_encryption_key_v1`. When present, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When absent, only `base_cmd` and `cmd_hash` are stored. |
-| `BENCH_MCP_STATS_REDACT_PATTERNS` | env var | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `REDACTED`. Patterns that fail to compile are skipped and logged at startup. |
+| `BENCH_MCP_STATS_REDACT_PATTERNS`   | env var       | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `REDACTED`. Patterns that fail to compile are skipped and logged at startup.                                                                                                |
 
 `BENCH_MCP_HOME` controls the DB directory and is documented in [config.md](config.md).
 
@@ -240,13 +240,13 @@ Each handler records structured fields directly and decides whether to pass a
 command string to `ProcessCommand`. There is no single function for this pass —
 it is explicit in each handler.
 
-| tool | what is recorded directly | command passed to ProcessCommand |
-| ---- | ------------------------- | -------------------------------- |
-| `file_replace` | `file_path`, `replacement_count`, `replacement_bytes`, `dry_run` | none — passes 2–4 skipped |
-| `file_replace_all` | same + `start_line`, `end_line` | none |
-| `shell` / `shell_background` | `cwd`, `exit_code`, `timed_out` | full command string |
-| `setup` | `setup_paths`, `cwd` | full command string |
-| `context` / `status` / `stats` | duration only | none |
+| tool                           | what is recorded directly                                        | command passed to ProcessCommand |
+| ------------------------------ | ---------------------------------------------------------------- | -------------------------------- |
+| `file_replace`                 | `file_path`, `replacement_count`, `replacement_bytes`, `dry_run` | none — passes 2–4 skipped        |
+| `file_replace_all`             | same + `start_line`, `end_line`                                  | none                             |
+| `shell` / `shell_background`   | `cwd`, `exit_code`, `timed_out`                                  | full command string              |
+| `setup`                        | `setup_paths`, `cwd`                                             | full command string              |
+| `context` / `status` / `stats` | duration only                                                    | none                             |
 
 ### pass 2 — redaction
 
@@ -255,15 +255,15 @@ applied in order; earlier matches take precedence.
 
 **tier 1 — known secret patterns**
 
-| pattern | example | result |
-| ------- | ------- | ------ |
-| env var assignment with sensitive name | `TOKEN=abc123 cmd` | `TOKEN=REDACTED cmd` |
-| `--flag=value` with sensitive flag name | `--password=hunter2` | `--password=REDACTED` |
-| quoted value after sensitive `=` | `KEY='abc'` or `KEY="abc"` | `KEY=REDACTED` |
-| URL credentials | `https://user:pass@host` | `https://REDACTED@host` |
-| Bearer / token auth header | `Bearer eyJhbGci...` | `Bearer REDACTED` |
-| JWT (three base64url dot-separated segments) | `eyJ.eyJ.sig` | `[JWT]` |
-| PEM block | `-----BEGIN PRIVATE KEY-----...` | `[PEM BLOCK]` |
+| pattern                                      | example                          | result                  |
+| -------------------------------------------- | -------------------------------- | ----------------------- |
+| env var assignment with sensitive name       | `TOKEN=abc123 cmd`               | `TOKEN=REDACTED cmd`    |
+| `--flag=value` with sensitive flag name      | `--password=hunter2`             | `--password=REDACTED`   |
+| quoted value after sensitive `=`             | `KEY='abc'` or `KEY="abc"`       | `KEY=REDACTED`          |
+| URL credentials                              | `https://user:pass@host`         | `https://REDACTED@host` |
+| Bearer / token auth header                   | `Bearer eyJhbGci...`             | `Bearer REDACTED`       |
+| JWT (three base64url dot-separated segments) | `eyJ.eyJ.sig`                    | `[JWT]`                 |
+| PEM block                                    | `-----BEGIN PRIVATE KEY-----...` | `[PEM BLOCK]`           |
 
 Sensitive name list, matched at whole env-var or flag-name boundaries (case-insensitive
 word boundary match to avoid false positives like `--passthrough` or `COMPASS_URL`):
@@ -272,20 +272,20 @@ word boundary match to avoid false positives like `--passthrough` or `COMPASS_UR
 
 **tier 2 — high-entropy patterns**
 
-| pattern | threshold | result |
-| ------- | --------- | ------ |
-| hex string | ≥ 32 contiguous hex chars | `[HEX 64B]` |
+| pattern       | threshold                         | result         |
+| ------------- | --------------------------------- | -------------- |
+| hex string    | ≥ 32 contiguous hex chars         | `[HEX 64B]`    |
 | base64 string | ≥ 24 chars, valid base64 alphabet | `[BASE64 44B]` |
-| UUID | standard 8-4-4-4-12 format | `[UUID]` |
+| UUID          | standard 8-4-4-4-12 format        | `[UUID]`       |
 
 The 32-char hex threshold preserves short git SHAs (≤ 12 chars) while catching
 SHA-256 outputs, HMAC values, and raw keys.
 
 **tier 3 — PII**
 
-| pattern | result |
-| ------- | ------ |
-| email address | `[EMAIL]` |
+| pattern                                        | result        |
+| ---------------------------------------------- | ------------- |
+| email address                                  | `[EMAIL]`     |
 | public IP address (non-RFC-1918, non-loopback) | `[PUBLIC IP]` |
 
 RFC-1918 ranges (`10.x.x.x`, `172.16–31.x.x`, `192.168.x.x`) and loopback are retained
@@ -313,32 +313,32 @@ content does not trigger spurious long-token matches.
 
 **shell constructs**
 
-| construct | result |
-| --------- | ------ |
-| `$(...)` command substitution | `[SUBSHELL]` |
-| `` `...` `` backtick substitution | `[SUBSHELL]` |
-| `<< 'DELIM' ... DELIM` heredoc (any delimiter) | `[HEREDOC 1247B]` |
-| `<<- DELIM ... DELIM` heredoc | `[HEREDOC 1247B]` |
-| `<<< "..."` here-string | `[HERESTRING 42B]` |
-| `<(...)` process substitution | `[PROCESS_SUB]` |
+| construct                                      | result             |
+| ---------------------------------------------- | ------------------ |
+| `$(...)` command substitution                  | `[SUBSHELL]`       |
+| `` `...` `` backtick substitution              | `[SUBSHELL]`       |
+| `<< 'DELIM' ... DELIM` heredoc (any delimiter) | `[HEREDOC 1247B]`  |
+| `<<- DELIM ... DELIM` heredoc                  | `[HEREDOC 1247B]`  |
+| `<<< "..."` here-string                        | `[HERESTRING 42B]` |
+| `<(...)` process substitution                  | `[PROCESS_SUB]`    |
 
 **inline scripts**
 
 Interpreter invocations where `-c` or `-e` is followed by a quoted argument:
 
-| example | result |
-| ------- | ------ |
+| example            | result                           |
+| ------------------ | -------------------------------- |
 | `python3 -c '...'` | `python3 -c [INLINE_SCRIPT 89B]` |
-| `python -c "..."` | `python -c [INLINE_SCRIPT 89B]` |
-| `perl -e '...'` | `perl -e [INLINE_SCRIPT 45B]` |
-| `ruby -e '...'` | `ruby -e [INLINE_SCRIPT 45B]` |
-| `node -e '...'` | `node -e [INLINE_SCRIPT 45B]` |
-| `awk '{...}'` | `awk [INLINE_SCRIPT 14B]` |
+| `python -c "..."`  | `python -c [INLINE_SCRIPT 89B]`  |
+| `perl -e '...'`    | `perl -e [INLINE_SCRIPT 45B]`    |
+| `ruby -e '...'`    | `ruby -e [INLINE_SCRIPT 45B]`    |
+| `node -e '...'`    | `node -e [INLINE_SCRIPT 45B]`    |
+| `awk '{...}'`      | `awk [INLINE_SCRIPT 14B]`        |
 
 **Python multiline strings** (inside a `-c` argument):
 
-| pattern | result |
-| ------- | ------ |
+| pattern                         | result                |
+| ------------------------------- | --------------------- |
 | `"""..."""` triple-quoted block | `[PYTHON_BLOCK 342B]` |
 
 These patterns are best-effort. Complex quoting, escaping, and nesting may not be
@@ -370,13 +370,13 @@ until no further progress is made:
 
 Examples:
 
-| post-pipeline command | base_cmd |
-| --------------------- | -------- |
-| `TOKEN=REDACTED git status` | `git` |
-| `sudo -u root bash -c [INLINE_SCRIPT 42B]` | `bash` |
-| `cd /projects/foo && go test ./...` | `go` |
-| `env GOPATH=/root go build` | `go` |
-| `TOKEN=REDACTED` | NULL |
+| post-pipeline command                      | base_cmd |
+| ------------------------------------------ | -------- |
+| `TOKEN=REDACTED git status`                | `git`    |
+| `sudo -u root bash -c [INLINE_SCRIPT 42B]` | `bash`   |
+| `cd /projects/foo && go test ./...`        | `go`     |
+| `env GOPATH=/root go build`                | `go`     |
+| `TOKEN=REDACTED`                           | NULL     |
 
 Note on `sudo -u root bash`: step 3 consumes `sudo -u root` (the `-u USER` option pair),
 leaving `bash` as the first token. Note on `env GOPATH=/root go build`: step 3 consumes
@@ -386,11 +386,13 @@ discards the `cd` segment, taking `go test ./...` from the next segment.
 ### pipeline example
 
 Input:
+
 ```bash
 TOKEN=secret git -C /projects/bench-mcp log --pretty=format:'%H %s' --author=user@example.com -n 20
 ```
 
 After pass 2 (tier 1: `TOKEN=secret` → `TOKEN=REDACTED`; tier 3: email → `[EMAIL]`):
+
 ```
 TOKEN=REDACTED git -C /projects/bench-mcp log --pretty=format:'%H %s' --author=[EMAIL] -n 20
 ```
@@ -406,9 +408,9 @@ Two runs with different `TOKEN` values produce the same hash. ✓
 
 One optional parameter:
 
-| parameter | type | default | description |
-| --------- | ---- | ------- | ----------- |
-| `days` | int | `30` | Rolling window in days. `0` returns all time — document this in the tool description so agents know querying without a time constraint is an option. |
+| parameter | type | default | description                                                                                                                                          |
+| --------- | ---- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `days`    | int  | `30`    | Rolling window in days. `0` returns all time — document this in the tool description so agents know querying without a time constraint is an option. |
 
 ### p95 calculation
 

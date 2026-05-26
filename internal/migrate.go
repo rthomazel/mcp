@@ -1,4 +1,4 @@
-package stats
+package internal
 
 import (
 	"database/sql"
@@ -11,7 +11,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-func migrateDB(db *sql.DB, migrations fs.FS) error {
+// MigrateDB runs all pending up migrations from the embedded migrations FS.
+func MigrateDB(db *sql.DB, migrations fs.FS) error {
 	src, err := iofs.New(migrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("create migration source: %w", err)

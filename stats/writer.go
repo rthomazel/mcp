@@ -72,7 +72,7 @@ func Open(dbPath string, cfg WriterConfig) (*Writer, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("set WAL: %w", err)
 	}
-	if err = migrateDB(conn, db.Migrations); err != nil {
+	if err = internal.MigrateDB(conn, db.Migrations); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("migrate stats db: %w", err)
 	}
@@ -234,4 +234,27 @@ func nullInt(n int) any {
 		return nil
 	}
 	return n
+}
+
+// QueryStats queries the stats DB for a summary over the given rolling window.
+// days=0 returns all time. bgHintThreshold is half the shell timeout for the hint.
+func (w *Writer) QueryStats(days int, bgHintThreshold time.Duration) (*StatsReport, error) {
+	filter, window := buildDateFilter(days)
+
+	toolCounts, err := queryToolCounts(w.db, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	topCmds, err := queryTopCommands(w.db, filter, bgHintThreshold, w.cfg.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StatsReport{
+		Window:      window,
+		ToolCounts:  toolCounts,
+		TopCommands: topCmds,
+		HasKey:      len(w.cfg.EncryptionKey) > 0,
+	}, nil
 }
