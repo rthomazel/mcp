@@ -27,7 +27,7 @@ func (h *Handler) HandleShellBackground(_ context.Context, req mcp.CallToolReque
 	b.OpenTag("metadata")
 
 	for i, cmd := range commands {
-		j := h.startJob(cmd, cwd)
+		j := h.startJob(cmd, cwd, jobOpts{tool: "shell_background"})
 		if multi {
 			fmt.Fprintf(&b.Builder, "command_%d: %s\n", i, cmd)
 			fmt.Fprintf(&b.Builder, "job_id_%d: %s\n", i, j.id)

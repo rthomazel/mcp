@@ -19,6 +19,29 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.6.0](https://github.com/rthomazel/bench-mcp/pull/21) feat: tool-call statistics
+
+### feat
+
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(stats)** `stats` tool — new MCP tool returning a formatted summary of tool-call history from a local SQLite database. Accepts an optional `days` parameter (default 30, `0` = all time). Output includes per-tool call counts, avg and p95 durations, and a top-commands table. Commands with p95 > `BENCH_MCP_TIMEOUT × 0.5` are flagged with `← consider shell_background`.
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(internal/stats)** command processing pipeline — raw shell commands are passed through four destructive passes before storage: redaction (env var assignments, flag values, URL credentials, Bearer tokens, JWTs, PEM blocks, UUIDs, long hex strings, emails, public IPs, user-defined patterns), structural normalization (heredocs, herestrings, inline scripts, Python blocks, subshells, process substitutions), long-token normalization (tokens > 80B), and base_cmd extraction. SHA-256 hash computed post-pipeline; same command with different secret values hashes identically.
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(internal/stats)** AES-256-GCM encrypted command storage — when the `bench_mcp_stats_encryption_key_v1` Docker Secret is present, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted` using a per-row random nonce. Envelope format: `v1:<b64nonce>:<b64ct+tag>`. Absent key = hash-only mode.
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(internal/stats)** user-defined redaction patterns — `BENCH_MCP_STATS_REDACT_PATTERNS` env var accepts newline-separated Go regexes. Matches emit `[USER REDACTED]`, distinct from built-in redactions.
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(internal/stats)** async write queue — all DB inserts are fire-and-forget via a buffered channel (cap 256) drained by a single goroutine. Dropped records are logged. `Handler.Close()` drains up to 1 minute on shutdown.
+
+### refactor
+
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(handlers)** `Handler.Close()` — new shutdown method flushes the stats write queue and closes the SQLite connection. Called via `defer` in `main`.
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(handlers)** stats recording on all tool calls — every handler records a `ToolCall` row: `shell`/`shell_background`/`setup` record command, exit code, cwd, job ID; `file_replace`/`file_replace_all` record path, replacement count, per-item byte counts; `context`/`status`/`stats` record duration only.
+
+### build
+
+- [`714cd85`](https://github.com/rthomazel/bench-mcp/commit/714cd85) **(go.mod)** new dependencies — `modernc.org/sqlite` (pure-Go SQLite, no CGo), `golang-migrate/migrate/v4` (schema migrations), `google/uuid` (row IDs).
+
+### docs
+
+- [`ad39308`](https://github.com/rthomazel/bench-mcp/commit/ad39308) **(doc)** `doc/stats-design.md` — full design document covering schema, pipeline passes, redaction rules, encryption, configuration, and example queries. `doc/ideas.md` gains a `stats table storage optimization` entry.
+
 ## [0.5.0](https://github.com/rthomazel/bench-mcp/pull/18) refactor: rebrand to bench-mcp, rename shell tools
 
 ### refactor

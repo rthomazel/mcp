@@ -9,9 +9,11 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/mcp/bench/internal/pathsnapshot"
+	"github.com/rthomazel/mcp/bench/internal/stats"
 	"github.com/samber/lo"
 )
 
@@ -40,6 +42,11 @@ type mount struct {
 }
 
 func (h *Handler) HandleContext(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	defer func() {
+		h.record(stats.ToolCall{Tool: "context", StartedAt: start, Duration: time.Since(start)})
+	}()
+
 	gather := func(cmd string) string {
 		r := runCommand(ctx, h.cfg, cmd, "/")
 		return strings.TrimSpace(r.Stdout)

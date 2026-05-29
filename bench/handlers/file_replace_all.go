@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/mcp/bench/internal/file"
+	"github.com/rthomazel/mcp/bench/internal/stats"
 )
 
 // HandleFileReplaceAll replaces every occurrence of find in a file, optionally
@@ -35,7 +37,24 @@ func (h *Handler) HandleFileReplaceAll(_ context.Context, req mcp.CallToolReques
 		endLine = int(f)
 	}
 
+	start := time.Now()
 	result, toolErr := h.handleFileReplaceAll(path, find, replace, startLine, endLine, dryRun)
+
+	errorKind := ""
+	if toolErr != "" {
+		errorKind = "write_error"
+	}
+	h.record(stats.ToolCall{
+		Tool:             "file_replace_all",
+		StartedAt:        start,
+		Duration:         time.Since(start),
+		ErrorKind:        errorKind,
+		FilePath:         path,
+		ReplacementCount: 1,
+		ReplacementBytes: [][2]int{{len(find), len(replace)}},
+		DryRun:           &dryRun,
+	})
+
 	if toolErr != "" {
 		return mcp.NewToolResultError(toolErr), nil
 	}
