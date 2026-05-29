@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/mcp/bench/internal"
 )
 
 type job struct {

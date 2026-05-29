@@ -9,9 +9,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rthomazel/bench-mcp/handlers"
-	"github.com/rthomazel/bench-mcp/internal"
-	"github.com/rthomazel/bench-mcp/internal/pathsnapshot"
+	"github.com/rthomazel/mcp/bench/handlers"
+	"github.com/rthomazel/mcp/bench/internal"
+	"github.com/rthomazel/mcp/bench/internal/pathsnapshot"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."

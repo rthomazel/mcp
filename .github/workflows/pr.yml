@@ -16,7 +16,7 @@ jobs:
         with:
           go-version: "1.26"
 
-      - run: ./run build
+      - run: ./run bench:build:go
 
   test:
     name: test
@@ -29,7 +29,7 @@ jobs:
           go-version: "1.26"
 
       - run: go install github.com/joho/godotenv/cmd/godotenv@v1.5.1
-      - run: cp .env-default .env && ./run test
+      - run: cp bench/.env-default bench/.env && ./run bench:test
 
   lint:
     name: lint
@@ -44,6 +44,7 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.10
+          working-directory: bench
 
   go-mod:
     name: go_mod_tidy
@@ -57,7 +58,7 @@ jobs:
 
       - uses: j0hnsmith/go-mod-check@v1.0.0
         with:
-          working-directory: .
+          working-directory: bench
 
   changelog:
     name: changelog
@@ -70,7 +71,7 @@ jobs:
 
       - name: check CHANGELOG.md is updated
         run: |
-          if git diff --name-only origin/main...HEAD | grep -q '^CHANGELOG.md$'; then
+          if git diff --name-only origin/main...HEAD | grep -q '^bench/CHANGELOG.md$'; then
             echo "CHANGELOG.md is updated."
           else
             echo "::warning::CHANGELOG.md was not updated in this PR."

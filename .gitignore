@@ -1,8 +1,2 @@
-.env
-bench-mcp
 _local/*
 prompt.md
-main
-bin/server
-docker-compose.yml
-docker-compose-http.yml
