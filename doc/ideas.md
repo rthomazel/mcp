@@ -7,16 +7,23 @@
 `context` tool runs subprocesses serially.
 Could run them with goroutines and be meaningfully faster.
 
+## stats table storage optimization
+
+The `tool_calls` table in the stats DB grows unboundedly. For long-running deployments,
+options worth exploring:
+
+- Row-count cap or age-based pruning (e.g. delete rows older than 90 days)
+- Separate DB files per time period (e.g. per month) with a union view — allows dropping old
+  files without vacuuming the main DB
+- Moving to a purpose-built time-series store if query patterns outgrow SQLite
+
+For now the DB is unbounded; the `days` parameter on the `stats` tool limits query scope
+but not storage. See `doc/stats-design.md` § retention.
+
 ## per-command timeout
 
 Timeout is global via `BENCH_MCP_TIMEOUT`.
 Letting `shell` accept an optional `timeout` param would be useful for known slow commands.
-
-## sqlite db with command stats
-
-Server would tokenize commands with weights, base command has higher weight, then flags.
-Normalize input.
-Expose historic command stats to allow planning when to use shell or shell background.
 
 # what not to add
 
@@ -49,6 +56,8 @@ We should probably have some type of exclusive string so that we can catch unset
 We could also have a tool to list the variables that are currently loaded in the server.
 A design question is, should this live in the bench or be a separate MCP tool? This design kind of couples the variable idea to another tool that executes commands. So I think this has to be done in the bench.
 The obvious upside is that it's so easy and simple.
+The obvious downside is that this is a paper thin security layer that doesn't really accomplish anything.
+If you're doing this to remove a token from the context, but you're giving the model a way to manipulate the token, it can still exfiltrate the token.
 
 ## integration test suite
 

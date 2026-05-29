@@ -12,16 +12,19 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/bench-mcp/internal/stats"
 	"github.com/rthomazel/bench-mcp/internal/xml"
 )
 
 type commandResult struct {
-	Command  string
-	Stdout   string
-	Stderr   string
-	ExitCode int
-	Duration string
-	err      string
+	Command    string
+	Stdout     string
+	Stderr     string
+	ExitCode   int
+	Duration   string
+	DurationMS int64
+	TimedOut   bool
+	err        string
 }
 
 func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -37,9 +40,30 @@ func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mc
 
 	results := make([]*commandResult, len(commands))
 	for i, cmd := range commands {
+		start := time.Now()
 		r := runCommand(ctx, h.cfg, cmd, cwd)
 		r.Command = cmd
 		results[i] = r
+
+		errorKind := ""
+		switch {
+		case r.TimedOut:
+			errorKind = "timeout"
+		case r.err != "":
+			errorKind = "start_failed"
+		}
+		exitCode := r.ExitCode
+		h.record(stats.ToolCall{
+			Tool:      "shell",
+			StartedAt: start,
+			Duration:  time.Duration(r.DurationMS) * time.Millisecond,
+			ErrorKind: errorKind,
+			Command:   cmd,
+			ExitCode:  &exitCode,
+			TimedOut:  r.TimedOut,
+			CWD:       cwd,
+		})
+
 		if r.err != "" {
 			return mcp.NewToolResultError(r.err), nil
 		}
@@ -93,6 +117,7 @@ func runCommand(ctx context.Context, cfg *internal.Config, command, cwd string) 
 	err := cmd.Run()
 	duration := time.Since(start)
 	exitCode := 0
+	timedOut := ctx.Err() != nil
 
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -100,9 +125,11 @@ func runCommand(ctx context.Context, cfg *internal.Config, command, cwd string) 
 		} else {
 			slog.Error("exec failed to start", "cmd", command, "err", err)
 			return &commandResult{
-				Duration: duration.Round(1_000_000).String(),
-				ExitCode: -1,
-				err:      fmt.Sprintf("could not start process: %v", err),
+				Duration:   duration.Round(1_000_000).String(),
+				DurationMS: duration.Milliseconds(),
+				TimedOut:   timedOut,
+				ExitCode:   -1,
+				err:        fmt.Sprintf("could not start process: %v", err),
 			}
 		}
 	}
@@ -110,9 +137,11 @@ func runCommand(ctx context.Context, cfg *internal.Config, command, cwd string) 
 	slog.Info("exec done", "cmd", command, "exit_code", exitCode, "duration", duration.Round(time.Millisecond))
 
 	return &commandResult{
-		Stdout:   strings.TrimRight(stdout.String(), "\n"),
-		Stderr:   strings.TrimRight(stderr.String(), "\n"),
-		ExitCode: exitCode,
-		Duration: duration.Round(1_000_000).String(),
+		Stdout:     strings.TrimRight(stdout.String(), "\n"),
+		Stderr:     strings.TrimRight(stderr.String(), "\n"),
+		ExitCode:   exitCode,
+		Duration:   duration.Round(1_000_000).String(),
+		DurationMS: duration.Milliseconds(),
+		TimedOut:   timedOut,
 	}
 }

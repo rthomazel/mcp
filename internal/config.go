@@ -2,18 +2,22 @@ package internal
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	Timeout           time.Duration
-	BackgroundTimeout time.Duration
-	Home              string
-	MiseDir           string
-	EditMaxLines      int
-	MaxCandidates     int
+	Timeout             time.Duration
+	BackgroundTimeout   time.Duration
+	Home                string
+	MiseDir             string
+	EditMaxLines        int
+	MaxCandidates       int
+	StatsRedactPatterns []*regexp.Regexp
 }
 
 var defaults = Config{
@@ -79,5 +83,34 @@ func LoadConfig() (*Config, error) {
 		cfg.MaxCandidates = n
 	}
 
+	if raw := os.Getenv("BENCH_MCP_STATS_REDACT_PATTERNS"); raw != "" {
+		for i, line := range strings.Split(raw, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			re, err := regexp.Compile(line)
+			if err != nil {
+				slog.Error("BENCH_MCP_STATS_REDACT_PATTERNS: invalid regex, skipping",
+					"pattern", line, "line", i+1, "err", err)
+				continue
+			}
+			cfg.StatsRedactPatterns = append(cfg.StatsRedactPatterns, re)
+		}
+	}
+
 	return cfg, nil
 }
+
+// NormalizerVersion is incremented whenever the command normalization rules
+// change. Rows with different versions should not be grouped by cmd_hash.
+const NormalizerVersion = 1
+
+// StatsEncryptionKeyPath is the Docker Secret mount path for the stats AES-256 key.
+const StatsEncryptionKeyPath = "/run/secrets/bench_mcp_stats_encryption_key_v1"
+
+// StatsP95MinSamples is the minimum number of samples required before p95 is computed.
+const StatsP95MinSamples = 20
+
+// StatsTopLines is the maximum number of commands shown in the stats top-commands table.
+const StatsTopLines = 20

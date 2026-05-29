@@ -8,10 +8,16 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/bench-mcp/internal/stats"
 	"github.com/rthomazel/bench-mcp/internal/xml"
 )
 
 func (h *Handler) HandleStatus(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	defer func() {
+		h.record(stats.ToolCall{Tool: "status", StartedAt: start, Duration: time.Since(start)})
+	}()
+
 	ids, ok := internal.ParseStringSlice(req.Params.Arguments["job_ids"])
 	if !ok || len(ids) == 0 {
 		return mcp.NewToolResultError("missing required parameter: job_ids"), nil
