@@ -67,7 +67,7 @@ func formatStatsReport(report *stats.StatsReport) string {
 				if baseLabel == "" {
 					baseLabel = "(unknown)"
 				}
-				label = fmt.Sprintf("%s [%s]", baseLabel, cmd.HashPrefix)
+				label = fmt.Sprintf("%s [HASHED %s]", baseLabel, cmd.HashPrefix)
 			}
 			_, _ = fmt.Fprintf(tw2, "  %s\t%d calls\tavg %s", label, cmd.Count, msToString(cmd.AvgMS))
 			if cmd.P95MS != nil {
