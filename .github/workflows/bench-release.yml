@@ -1,4 +1,4 @@
-name: release
+name: bench release
 run-name: ${{ github.ref_name }}
 
 on:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   release:
-    name: release
+    name: bench release
     runs-on: ubuntu-latest
     permissions:
       contents: read

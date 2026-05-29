@@ -11,60 +11,15 @@ trap 'echo fatal: $0:$LINENO >&2' ERR
 # AGENTS: run commands directly, you cannot execute this file. if making changes to this file, run chmod u+x on it.
 cmd="${1:-help}"
 
-bench_build_arch() {
-  version="$(git describe --tags --abbrev=0 --match 'bench/*')"
-  version="${version#bench/}"
-  commit="$(git rev-parse --short HEAD)"
-  date="$(date +%Y.%m.%d.%H:%M)"
-
-  docker buildx build --platform "$1" \
-    --build-arg VERSION="${version}_${commit}_$date" \
-    -t ghcr.io/rthomazel/bench-mcp:latest \
-    --load bench/
-}
-
 case "$cmd" in
-# -- run golangci-lint on bench
-bench:lint)
-  cd bench && go tool golangci-lint run ./...
-  ;;
-# -- start bench with godotenv
-bench:dev)
-  cd bench && go tool godotenv -f .env go run main.go
-  ;;
-# -- run bench tests
-bench:test)
-  cd bench && go tool godotenv -f .env go test -race ./...
-  ;;
-# -- run formatters on bench
-bench:format)
-  cd bench && go tool gofumpt -l -w .
-  oxfmt .
-  ;;
-# -- build bench local binary to bench/bin/server
-bench:build:go)
-  cd bench && go build -o bin/server main.go
-  ;;
-# -- build bench versioned docker image for amd64
-bench:build:amd64)
-  bench_build_arch "linux/amd64"
-  ;;
-# -- build bench versioned docker image for arm64
-bench:build:arm64)
-  bench_build_arch "linux/arm64"
-  ;;
-# -- bring bench services UP
-bench:up)
-  docker compose -f bench/docker-compose-http.yml up -d
-  ;;
-# -- bring bench services DOWN
-bench:down)
-  docker compose -f bench/docker-compose-http.yml down
+# -- delegate to bench/run
+bench:*)
+  exec bench/run "${cmd#bench:}"
   ;;
 help | *)
   echo "Usage: ./run <command>"
   echo ""
-  echo "Commands:"
-  awk '/^# -- /{desc=substr($0, index($0,"-- ")+3)} /\)$/ && desc{cmd=$0; gsub(/[[:space:]()|*]/, "", cmd); printf "  %-20s %s\n", cmd, desc; desc=""}' "$0"
+  echo "Bench commands (delegated to bench/run):"
+  bench/run help | tail -n +3
   ;;
 esac

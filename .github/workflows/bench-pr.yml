@@ -1,9 +1,12 @@
-name: pr
+name: bench pr
 run-name: ${{ github.head_ref }}@${{ github.sha }}
 
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'bench/**'
+      - '.github/workflows/bench-pr.yml'
 
 jobs:
   build:
