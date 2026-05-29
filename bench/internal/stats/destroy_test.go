@@ -65,9 +65,9 @@ func TestProcessCommand_Redaction(t *testing.T) {
 		{
 			// redactURLCreds fires first (replacing user:secret@), then
 			// redactEmails fires again on the REDACTED@ placeholder, leaving [EMAIL].
-			name:       "url credentials",
-			input:      "git clone https://user:s3cr3t@github.com/repo",
-			wantAbsent: []string{"s3cr3t", "user:s3cr3t"},
+			name:        "url credentials",
+			input:       "git clone https://user:s3cr3t@github.com/repo",
+			wantAbsent:  []string{"s3cr3t", "user:s3cr3t"},
 			wantPresent: []string{"[EMAIL]"},
 		},
 		{
@@ -156,9 +156,9 @@ func TestProcessCommand_URLCredsCascade(t *testing.T) {
 	got := ProcessCommand(input, nil)
 
 	absent := []string{
-		"s3cr3t",                  // original secret
-		"user",                    // original username
-		"REDACTED@github.com",     // intermediate form — must be consumed by email pass
+		"s3cr3t",              // original secret
+		"user",                // original username
+		"REDACTED@github.com", // intermediate form — must be consumed by email pass
 	}
 	for _, s := range absent {
 		if strings.Contains(got.Normalized, s) {
@@ -169,7 +169,7 @@ func TestProcessCommand_URLCredsCascade(t *testing.T) {
 	present := []string{
 		"https://", // scheme preserved
 		"[EMAIL]",  // cascade end-state
-		"/repo",   // path preserved
+		"/repo",    // path preserved
 	}
 	for _, s := range present {
 		if !strings.Contains(got.Normalized, s) {
