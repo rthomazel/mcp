@@ -30,16 +30,16 @@ Introspection results can include sensitive metadata: view definitions, function
 | `search_schema(term)` | Text search across table, column, and view names |
 | `er_diagram(schema?)` | Mermaid ERD built from FK relationships in `information_schema` |
 
-### group 2 — query execution
+### group 2 — query & mutation
 
 Gated by configuration flags. The real enforcement boundary is the database user's own grants — the server's keyword check is a first-line guard and a clear signal to the agent about intent, not a security guarantee.
 
 | tool | SQL class | accepts | flag |
 |---|---|---|---|
-| `query(sql)` | DQL — Data Query Language | `SELECT`, `SHOW`, `TABLE` | always on |
-| `execute(sql)` | DML — Data Manipulation Language | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` | `ALLOW_DML` |
-| `execute_schema(sql)` | DDL — Data Definition Language | `CREATE`, `ALTER`, `DROP` | `ALLOW_DDL` |
-| `execute_permissions(sql)` | DCL — Data Control Language | `GRANT`, `REVOKE` | `ALLOW_DCL` |
+| `query(sql)` | DQL — Data Query Language | `SELECT`, `SHOW`, `TABLE`, `WITH` | always on |
+| `mutate(sql)` | DML — Data Manipulation Language | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` | `ALLOW_DML` |
+| `mutate_schema(sql)` | DDL — Data Definition Language | `CREATE`, `ALTER`, `DROP` | `ALLOW_DDL` |
+| `mutate_permissions(sql)` | DCL — Data Control Language | `GRANT`, `REVOKE` | `ALLOW_DCL` |
 
 #### keyword validation
 
@@ -47,12 +47,15 @@ Before execution each tool:
 1. Strips SQL comments (`--` line comments and `/* */` block comments)
 2. Trims whitespace, normalizes to uppercase
 3. Rejects input containing multiple statements (`;` followed by non-whitespace)
-4. Checks the first token against that tool's allowlist
-5. Returns an error without touching the database if any check fails
+4. Rejects transaction-control keywords: `BEGIN`, `COMMIT`, `ROLLBACK`, `ROLLBACK TO`, `SAVEPOINT`, `RELEASE`, `START TRANSACTION`. These would break the server's own transaction wrapping. This check runs before the per-tool allowlist and applies to all execution tools including `mutate_batch` and `dry_run`.
+5. Checks the first token against that tool's allowlist
+6. Returns an error without touching the database if any check fails
 
-**v1 limitations**: queries beginning with `WITH` (CTEs) are rejected even if they are read-only `SELECT`s. The scanner does not fully handle dollar-quoted strings or complex quoted identifiers — edge cases with `;` or comment-like tokens inside string literals may be incorrectly rejected. These are known constraints, not security gaps.
+`WITH` (CTEs) is in `query`'s allowlist — it is safe because `query` runs inside `BEGIN READ ONLY`, so PostgreSQL itself rejects any data-modifying CTE before it executes. CTEs are not supported in mutation tools in v1.
 
-Schema filtering does **not** apply to execution tools. Unqualified names, views, functions, and CTEs make pre-execution schema enforcement unreliable. Use a restricted database user for that boundary.
+**v1 limitation**: the scanner does not fully handle dollar-quoted strings or complex quoted identifiers — edge cases with `;` or comment-like tokens inside string literals may be incorrectly rejected. Known constraint, not a security gap.
+
+Schema filtering does **not** apply to mutation tools. Unqualified names, views, functions, and CTEs make pre-execution schema enforcement unreliable. Use a restricted database user for that boundary.
 
 #### `query` transaction model
 
@@ -64,8 +67,8 @@ Enabled by `ALLOW_TRANSACTIONS`.
 
 | tool | description |
 |---|---|
-| `execute_batch(statements[])` | Runs multiple SQL statements in a single transaction. Commits on full success; rolls back and reports the failing statement on any error. Each statement is validated against the same keyword and class rules as the single-statement tools — `ALLOW_TRANSACTIONS` does not bypass DML/DDL/DCL flags. |
-| `dry_run(sql)` | Wraps the statement in a transaction, executes it, returns the result or affected row count, then **unconditionally rolls back**. Undoes transactional writes; does not undo sequence advances, `pg_notify` calls, or volatile function side effects. Rejects transaction-control keywords (`BEGIN`, `COMMIT`, `ROLLBACK`, `SAVEPOINT`). Requires the same class flag as the equivalent single-statement tool. |
+| `mutate_batch(statements[])` | Runs multiple SQL statements in a single transaction. Commits on full success; rolls back and reports the failing statement on any error. Each statement is validated against the same keyword and class rules as the single-statement tools — `ALLOW_TRANSACTIONS` does not bypass DML/DDL/DCL flags. |
+| `dry_run(sql)` | Wraps the statement in a transaction, executes it, returns the result or affected row count, then **unconditionally rolls back**. Undoes transactional writes; does not undo sequence advances, `pg_notify` calls, or volatile function side effects. Requires the same class flag as the equivalent single-statement tool. |
 
 Stateful `BEGIN`/`COMMIT` across separate MCP tool calls is not supported — the request/response model carries no session state between calls.
 
@@ -93,7 +96,7 @@ The caller passes only the **inner SQL** — not an `EXPLAIN` statement. The too
 // tool builds: EXPLAIN (ANALYZE, FORMAT TEXT) SELECT * FROM appointments WHERE id = 1
 ```
 
-This closes the bypass vector where a caller could pass `EXPLAIN ANALYZE DELETE ...` to the always-on `query` tool. `query`'s allowlist is `SELECT`, `SHOW`, `TABLE` only — `EXPLAIN` is not accepted there.
+This closes the bypass vector where a caller could pass `EXPLAIN ANALYZE DELETE ...` to the always-on `query` tool. `query`'s allowlist is `SELECT`, `SHOW`, `TABLE`, `WITH` — `EXPLAIN` is not accepted there.
 
 `explain_analyze` validates the inner statement's first token before wrapping it. If the inner statement is DML, `ALLOW_DML` is also required. `explain_analyze` always runs inside a transaction that is unconditionally rolled back — this prevents DML inner statements from committing while still producing the real execution plan.
 
@@ -107,10 +110,10 @@ All config is env-var only — no flags, no config files. Pattern matches `bench
 
 | variable | default | description |
 |---|---|---|
-| `POSTGRES_MCP_ALLOW_DML` | `false` | Enable `execute` (INSERT, UPDATE, DELETE, TRUNCATE) |
-| `POSTGRES_MCP_ALLOW_DDL` | `false` | Enable `execute_schema` (CREATE, ALTER, DROP) |
-| `POSTGRES_MCP_ALLOW_DCL` | `false` | Enable `execute_permissions` (GRANT, REVOKE) |
-| `POSTGRES_MCP_ALLOW_TRANSACTIONS` | `false` | Enable `execute_batch` and `dry_run` (class flags still apply per statement) |
+| `POSTGRES_MCP_ALLOW_DML` | `false` | Enable `mutate` (INSERT, UPDATE, DELETE, TRUNCATE) |
+| `POSTGRES_MCP_ALLOW_DDL` | `false` | Enable `mutate_schema` (CREATE, ALTER, DROP) |
+| `POSTGRES_MCP_ALLOW_DCL` | `false` | Enable `mutate_permissions` (GRANT, REVOKE) |
+| `POSTGRES_MCP_ALLOW_TRANSACTIONS` | `false` | Enable `mutate_batch` and `dry_run` (class flags still apply per statement) |
 | `POSTGRES_MCP_ALLOW_DIAGNOSTICS` | `false` | Enable explain, active_connections, active_locks |
 | `POSTGRES_MCP_ALLOW_EXPLAIN_ANALYZE` | `false` | Enable `explain_analyze` (executes the inner query) |
 
@@ -155,8 +158,8 @@ postgres/
   handlers/
     handler.go              Handler struct, shared pgxpool
     introspect.go           list_schemas, list_tables, describe_table, etc.
-    query.go                query, execute, execute_schema, execute_permissions
-    transaction.go          execute_batch, dry_run
+    query.go                query, mutate, mutate_schema, mutate_permissions
+    transaction.go          mutate_batch, dry_run
     diagnostics.go          explain, explain_analyze, active_connections, active_locks, ping
   doc/
     design.md               this file
@@ -171,7 +174,7 @@ postgres/
 
 All tools follow the same path:
 1. **Config check** — is this tool enabled? Return a descriptive error if not.
-2. **Keyword validation** — strip comments, reject multi-statement, check first token. (Execution tools only.)
+2. **Keyword validation** — strip comments, reject transaction-control keywords, reject multi-statement, check first token. (Mutation tools only; `query` runs steps 1–4 but skips per-tool allowlist since it runs in `BEGIN READ ONLY`.)
 3. **Execute** — via `pgxpool` with `context.WithTimeout`. Mutations and `query` run inside an explicit transaction with `SET LOCAL statement_timeout` inside it.
 4. **Format** — plain text, tab-separated. NULLs rendered as `NULL`. Rows capped at `MAX_ROWS` by stopping collection, not post-fetch truncation.
 
@@ -180,8 +183,8 @@ All tools follow the same path:
 | tool | transaction |
 |---|---|
 | `query` | `BEGIN READ ONLY` → `SET LOCAL statement_timeout` → execute → `ROLLBACK` |
-| `execute` / `execute_schema` / `execute_permissions` | `BEGIN` → `SET LOCAL statement_timeout` → execute → `COMMIT` (or `ROLLBACK` on error) |
-| `execute_batch` | `BEGIN` → `SET LOCAL statement_timeout` → each statement in order → `COMMIT` or `ROLLBACK` |
+| `mutate` / `mutate_schema` / `mutate_permissions` | `BEGIN` → `SET LOCAL statement_timeout` → execute → `COMMIT` (or `ROLLBACK` on error) |
+| `mutate_batch` | `BEGIN` → `SET LOCAL statement_timeout` → each statement in order → `COMMIT` or `ROLLBACK` |
 | `dry_run` | `BEGIN` → `SET LOCAL statement_timeout` → execute → `ROLLBACK` (unconditional) |
 | `explain` | single query with `context.WithTimeout`, no explicit transaction |
 | `explain_analyze` | `BEGIN` → `SET LOCAL statement_timeout` → execute → `ROLLBACK` (unconditional — prevents DML inner statements from committing) |
