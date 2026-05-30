@@ -1,0 +1,64 @@
+#! /usr/bin/env  bash
+# Copyright 2024 Raphael Thomazella. All rights reserved.
+# Use of this source code is governed by the BSD-3-Clause
+# license that can be found in the LICENSE file and online
+# at https://opensource.org/license/BSD-3-clause.
+
+set -euo pipefail
+shopt -s globstar
+trap 'echo fatal: $0:$LINENO >&2' ERR
+
+# change to keys/ regardless of call site
+cd "$(dirname "$0")"
+
+cmd="${1:-help}"
+
+build_arch() {
+  version="$(git describe --tags --abbrev=0 --match 'keys/*')"
+  version="${version#keys/}"
+  commit="$(git rev-parse --short HEAD)"
+  date="$(date +%Y.%m.%d.%H:%M)"
+
+  docker buildx build --platform "$1" \
+    --build-arg VERSION="${version}_${commit}_$date" \
+    -t ghcr.io/rthomazel/mcp/keys:latest \
+    --load .
+}
+
+case "$cmd" in
+# -- run golangci-lint
+lint)
+  go tool golangci-lint run ./...
+  ;;
+# -- start the server
+dev)
+  go tool godotenv -f .env go run main.go --config "${KEYS_CONFIG:-_local/config.yaml}"
+  ;;
+# -- run tests
+test)
+  go test -race ./...
+  ;;
+# -- run formatters
+format)
+  go tool gofumpt -l -w .
+  oxfmt .
+  ;;
+# -- build local binary to bin/keys
+build:go)
+  go build -o bin/keys main.go
+  ;;
+# -- build versioned docker image for amd64
+build:amd64)
+  build_arch "linux/amd64"
+  ;;
+# -- build versioned docker image for arm64
+build:arm64)
+  build_arch "linux/arm64"
+  ;;
+help | *)
+  echo "Usage: keys/run <command>"
+  echo ""
+  echo "Commands:"
+  awk '/^# -- /{desc=substr($0, index($0,"-- ")+3)} /\)$/ && desc{cmd=$0; gsub(/[[:space:]()|*]/, "", cmd); printf "  %-20s %s\n", cmd, desc; desc=""}' "$(basename "$0")"
+  ;;
+esac
