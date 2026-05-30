@@ -17,9 +17,11 @@ bench:*)
   exec bench/run "${cmd#bench:}"
   ;;
 help | *)
-  echo "Usage: ./run <command>"
+  echo "Usage: ./run <prefix>:<command>"
+  echo "Prefixes"
+  echo "  bench:  bench mcp commands"
   echo ""
-  echo "Bench commands (delegated to bench/run):"
-  bench/run help | tail -n +3
+  echo "bench:"
+  bench/run help | tail -n +4
   ;;
 esac
