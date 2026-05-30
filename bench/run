@@ -8,8 +8,6 @@ set -euo pipefail
 shopt -s globstar
 trap 'echo fatal: $0:$LINENO >&2' ERR
 
-# AGENTS: run commands directly, you cannot execute this file. if making changes to this file, run chmod u+x on it.
-
 # change to bench/ regardless of call site (supports delegation from root run)
 cd "$(dirname "$0")"
 
