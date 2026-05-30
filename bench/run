@@ -21,7 +21,7 @@ build_arch() {
 
   docker buildx build --platform "$1" \
     --build-arg VERSION="${version}_${commit}_$date" \
-    -t ghcr.io/rthomazel/bench-mcp:latest \
+    -t ghcr.io/rthomazel/mcp/bench:latest \
     --load .
 }
 

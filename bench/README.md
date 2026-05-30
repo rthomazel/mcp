@@ -2,7 +2,7 @@
 
 **Give your AI agent a real workbench.**
 
-[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Frthomazel%2Fbench--mcp-blue?logo=docker)](https://ghcr.io/rthomazel/bench-mcp)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Frthomazel%2Fbench--mcp-blue?logo=docker)](https://ghcr.io/rthomazel/mcp/bench)
 [![License: BSD3](https://img.shields.io/badge/license-BSD3-green)](../LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-lightgrey)](#)
 
@@ -43,7 +43,7 @@ Agents can read and edit files, run tests, run linters, call CLIs, manage git â€
 ### 1. Pull the image
 
 ```bash
-docker pull ghcr.io/rthomazel/bench-mcp:latest
+docker pull ghcr.io/rthomazel/mcp/bench:latest
 # amd64 (most desktops/laptops) and arm64 (Apple Silicon, Raspberry Pi) builds available
 ```
 
