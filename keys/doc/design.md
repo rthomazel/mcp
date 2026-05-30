@@ -8,21 +8,26 @@ names and tool descriptions. `keys` injects credentials at call time server-side
 
 ## responsibilities
 
-- Load secrets at startup from Docker Secrets (or env vars in dev)
+- Load secrets at startup from Docker Secrets (`/run/secrets/`)
 - Read a YAML config file that defines named tools, one per API
 - Register those tools dynamically with the MCP protocol at startup
-- On tool call: build the HTTP request, inject secret headers, execute, return response
+- On tool call: validate and construct the request, inject secret headers, execute, return response
 - Return clear, structured errors without leaking secret values
 - Expose rich tool descriptions so the agent is self-directed toward API docs
 
 **Not responsible for:**
 - Knowing anything about specific API endpoints or request shapes
 - Pagination, retries, or response transformation
-- Any protocol other than HTTP/HTTPS (v1)
+- Any protocol other than HTTPS (plain HTTP supported via per-tool `http: true` flag)
+- Protecting against API data exfiltration through legitimate API calls — `keys` protects
+  credentials from the model, not what the model does with access once granted
 
 ## config schema
 
 ```yaml
+timeout_seconds: 30          # global request timeout; default 30
+max_response_bytes: 1048576  # global response size cap; default 1MB
+
 secrets:
   github_token:
     docker_secret: github_token       # reads /run/secrets/github_token
@@ -59,23 +64,33 @@ tools:
         secret: datadog_app_key
 ```
 
+### `http: true` flag
+
+By default `base_url` must use HTTPS. For local services or testing, set `http: true`
+on the tool:
+
+```yaml
+tools:
+  local_api:
+    description: Local development API.
+    base_url: http://localhost:8080
+    http: true
+    inject: ...
+```
+
 ### secret types
 
-v1 ships with `docker_secret` only. The config schema is designed to accommodate
-additional secret types in future versions without breaking changes:
+v1 ships with `docker_secret` only. Docker Secrets mount at `/run/secrets/<name>` and
+work in both production and development — no separate dev-only mechanism is needed.
+The config schema is designed to accommodate additional secret types in future versions
+without breaking changes:
 
 | type | how it works | unlocks |
 | --- | --- | --- |
-| `docker_secret` | reads `/run/secrets/<name>` | any static token or key |
-| `env` | reads an env var (dev/testing only) | same as above, no file mount needed |
-| `oauth2_client` (v2) | client_id + client_secret → token endpoint → cached bearer | Salesforce, HubSpot, Zoom, enterprise APIs |
-| `google_service_account` (v2) | service account JSON → JWT → token exchange → cached bearer | BigQuery, GCS, Drive, Sheets, Pub/Sub, all Google Cloud |
-| `aws_sigv4` (v3) | request signing, not just header injection — different primitive | all AWS services |
-
-`oauth2_client` and `google_service_account` share the same shape from the agent's
-perspective: a tool call injects an `Authorization: Bearer <token>` header. The server
-handles token acquisition and caching internally. `aws_sigv4` requires a different
-primitive (signing the full request) and is a separate design problem.
+| `docker_secret` (v1) | reads `/run/secrets/<name>`, trims trailing whitespace | any static token or key; works in prod and dev |
+| `oauth2_client` (v2) | client\_id + client\_secret → token endpoint → cached bearer | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS |
+| `google_service_account` (v2) | service account JSON → RS256 JWT → token exchange → cached bearer with refresh | BigQuery, GCS, Drive, Sheets, Pub/Sub, Vertex AI, Cloud Logging |
+| `aws_sigv4` (v3) | request signing — different primitive from header injection | all AWS services |
 
 ## agent-facing tool interface
 
@@ -83,10 +98,10 @@ Every registered tool has the same input schema regardless of which API it targe
 
 ```json
 {
-  "path":    "string (required) — API path, e.g. /api/v2/logs/events/search",
-  "method":  "string (required) — HTTP method: GET, POST, PATCH, DELETE",
-  "body":    "string (optional) — JSON body",
-  "headers": "object (optional) — non-secret headers, e.g. Content-Type"
+  "path":    "string (required) — relative API path, e.g. /api/v2/logs/events/search",
+  "method":  "string (required) — any valid HTTP method: GET, POST, PUT, PATCH, DELETE, etc.",
+  "body":    "string (optional) — raw request body; set Content-Type in headers if needed",
+  "headers": "object (optional) — non-secret headers, e.g. Content-Type: application/json"
 }
 ```
 
@@ -101,6 +116,60 @@ Docs: https://docs.datadoghq.com/api/latest/
 The agent knows where the API lives, where to find the docs, and that auth is handled.
 It is the agent's responsibility to know which endpoints to call and with what body.
 
+## request handling
+
+### path validation
+
+`path` must be a relative path: no scheme, no host, no `://`. The server rejects
+absolute URLs and normalizes `..` segments before joining with `base_url`. The final
+resolved URL's host must exactly match `base_url`'s host. Any path that fails these
+checks returns an error to the agent before any network request is made.
+
+### redirects
+
+Redirects are disabled. The HTTP client does not follow redirects (`CheckRedirect`
+returns `http.ErrUseLastResponse`). The agent receives the redirect response as-is
+and may follow it with a second call.
+
+### agent-supplied headers
+
+Injected headers (from `inject` config) always win — agent-supplied headers with the
+same canonical name are silently dropped before the request is sent. The following
+headers are always rejected: `Host`, `Content-Length`, `Transfer-Encoding`,
+`Connection`, `Upgrade`, `Proxy-Authorization`, `TE`, `Trailer`.
+
+### response shape
+
+The tool returns a structured object:
+
+```json
+{
+  "status":       200,
+  "content_type": "application/json",
+  "body":         "..."
+}
+```
+
+Response headers are not passed through, with the exception of `Content-Type` and
+`X-RateLimit-*` family headers. All other response headers are dropped.
+
+### response scrubbing
+
+Injected header names are stripped from response headers before return. Known secret
+values (held in memory at startup) are scanned for in the response body; if detected,
+a warning is logged and the body is replaced with a redaction notice. This is
+best-effort — it does not cover encoded or nested representations. Only configure APIs
+that do not echo request headers in their responses.
+
+### operational limits
+
+Both limits apply per tool call and return a structured error if exceeded.
+
+| limit | default | config key |
+| --- | --- | --- |
+| request timeout | 30s | `timeout_seconds` |
+| max response body | 1 MB | `max_response_bytes` |
+
 ## security model
 
 ### isolation
@@ -111,13 +180,19 @@ It is the agent's responsibility to know which endpoints to call and with what b
 - No Docker socket mounted
 
 ### secrets
-- All secrets are delivered via Docker Secrets (`/run/secrets/`), not env vars in production
+- All secrets are delivered via Docker Secrets (`/run/secrets/`)
 - Secrets are read once at startup and held in memory only
 - Secret values are never included in any response, log line, or error message
-- Injected headers are never echoed back in the response
+- Trailing whitespace is trimmed from all secret values on load
+
+### logging
+Safe fields only: tool name, HTTP method, normalized path, response status, duration,
+request ID. No headers (injected or agent-supplied), no request body, no response body.
+Docker Secret names are logged at startup (not values). Error messages include tool
+name and status code only.
 
 ### compose config discipline
-- Secret env vars are declared only on the `keys` service, never in shared env files
+- Secrets are declared only on the `keys` service in compose, never in shared env files
 - `bench` cannot `exec` into `keys` — no Docker socket, no `pid: host`
 - Process namespace isolation prevents reading `/proc/<pid>/environ` across containers
 
@@ -125,11 +200,16 @@ It is the agent's responsibility to know which endpoints to call and with what b
 
 ```
 keys/
-  main.go          server wiring, config loading, dynamic tool registration
-  config.go        Config struct, YAML parsing, secret resolution
-  server.go        per-tool HTTP handler, header injection, response formatting
+  main.go            server wiring, MCP protocol, dynamic tool registration
+  internal/
+    config/
+      config.go      Config struct, YAML parsing, validation
+    secrets/
+      secrets.go     secret resolution, Docker Secret loading, value trimming
+    proxy/
+      proxy.go       HTTP client, path validation, header injection, response scrubbing
   doc/
-    design.md      this file
+    design.md        this file
 ```
 
 ## auth machinery taxonomy
@@ -140,17 +220,20 @@ all secret types produce the same result: an injected header on an outbound requ
 
 | secret type | how it works | products unlocked |
 | --- | --- | --- |
-| `docker_secret` / `env` | static value read from file or env | GitHub, Datadog, Stripe, OpenAI, Anthropic, ~80% of SaaS APIs |
+| `docker_secret` (v1) | static value from `/run/secrets/` | GitHub, Datadog, Stripe, OpenAI, Anthropic, ~80% of SaaS APIs |
 | `oauth2_client` (v2) | client\_id + client\_secret → token endpoint → cached bearer | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS |
 | `google_service_account` (v2) | service account JSON → RS256 JWT → token exchange → cached bearer with refresh | BigQuery, GCS, Drive, Sheets, Pub/Sub, Vertex AI, Cloud Logging — entire GCP |
 | `aws_sigv4` (v3) | request signing (not just header injection) — different primitive | all AWS services |
 
-v2 means the `google_service_account` type: one JWT library + one token cache + one
-refresh goroutine. Ships the entire GCP ecosystem. `oauth2_client` is similar scope and
-could be bundled in v2 as well.
+v2 adds OAuth2 and/or Google service account secret types. Both require token
+acquisition, caching, and refresh logic — the implementation complexity is bounded
+but real. OAuth2 scopes, audiences, and token endpoint styles differ across providers.
+`google_service_account` requires RS256 JWT construction and Google's specific token
+exchange flow. From the agent's perspective both still produce
+`Authorization: Bearer <token>`; the difference is entirely internal to `keys`.
 
-`aws_sigv4` is architecturally different — it signs the full request, not just injects
-a header — and is a separate design problem, deferred to v3 if ever.
+`aws_sigv4` signs the full request rather than injecting a header — architecturally
+different and a separate design problem, deferred to v3 if ever.
 
 ## out of scope (v1)
 
@@ -158,7 +241,8 @@ a header — and is a separate design problem, deferred to v3 if ever.
 - AWS services (requires `aws_sigv4` — v3)
 - Database wire protocols — Postgres, MySQL — belong in dedicated MCP servers
 - Response transformation, pagination helpers, retries
-- Any non-HTTP protocol
+- Any non-HTTP/HTTPS protocol
+- Per-tool policy knobs (method allowlists, path prefix restrictions, per-tool timeout overrides)
 
 ## postgres note
 
