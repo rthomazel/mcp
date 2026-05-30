@@ -156,7 +156,7 @@ One new env var and one Docker Secret, both optional:
 | name                                | kind          | description                                                                                                                                                                                                                                                                        |
 | ----------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bench_mcp_stats_encryption_key_v1` | Docker Secret | Enables full command storage. Base64-encoded 32-byte AES-256 key, read from `/run/secrets/bench_mcp_stats_encryption_key_v1`. When present, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When absent, only `base_cmd` and `cmd_hash` are stored. |
-| `BENCH_MCP_STATS_REDACT_PATTERNS`   | env var       | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `[USER REDACTED]`. Patterns that fail to compile are skipped and logged at startup.                                                                                                |
+| `BENCH_MCP_STATS_REDACT_PATTERNS`   | env var       | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `[USER REDACTED]`. Patterns that fail to compile are skipped and logged at startup.                                                                                         |
 
 `BENCH_MCP_HOME` controls the DB directory and is documented in [config.md](config.md).
 
@@ -480,11 +480,11 @@ or row-count cap may be added in a future version.
 
 Tests run with `./run test`. The stats feature adds tests in three files:
 
-| file | scope |
-| ---- | ----- |
-| `internal/stats/destroy_test.go` | `ProcessCommand` pipeline — redaction rules, base_cmd extraction, hash invariants |
-| `internal/stats/writer_test.go` | `QueryStats` integration — inserts and queries against a real temp-file SQLite database |
-| `internal/migrate_test.go` | `MigrateDB` schema bootstrap and idempotency |
+| file                             | scope                                                                                   |
+| -------------------------------- | --------------------------------------------------------------------------------------- |
+| `internal/stats/destroy_test.go` | `ProcessCommand` pipeline — redaction rules, base_cmd extraction, hash invariants       |
+| `internal/stats/writer_test.go`  | `QueryStats` integration — inserts and queries against a real temp-file SQLite database |
+| `internal/migrate_test.go`       | `MigrateDB` schema bootstrap and idempotency                                            |
 
 ### design choices
 
@@ -496,19 +496,19 @@ Tests run with `./run test`. The stats feature adds tests in three files:
 
 `TestQueryStats_*` covers:
 
-| test | what it verifies |
-| ---- | --------------- |
-| `Empty` | empty DB returns an empty report with no error |
-| `WindowLabel` | `window` string reflects the `days` parameter |
-| `ToolCounts` | correct per-tool count and average duration |
-| `P95` | nil when < `StatsP95MinSamples` samples; correct nearest-rank value when ≥ threshold |
-| `DateFilter` | `days=1` excludes rows inserted 31 days ago; `days=0` includes them |
-| `TopCommandsSortedByCount` | most-called commands appear first |
-| `HashGrouping` | two commands identical post-redaction count as one group with the right average |
-| `BGHint` | `HintBG=true` when p95 exceeds the bgHintThreshold; false when under |
-| `NormalizerVersionFiltering` | stale `normalizer_version` rows excluded from top commands but counted in tool totals |
-| `TopLinesCap` | result capped at `StatsTopLines` even with more distinct commands |
-| `FileReplaceNotInTopCommands` | `file_replace` rows appear in tool counts but not top commands |
+| test                          | what it verifies                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------- |
+| `Empty`                       | empty DB returns an empty report with no error                                        |
+| `WindowLabel`                 | `window` string reflects the `days` parameter                                         |
+| `ToolCounts`                  | correct per-tool count and average duration                                           |
+| `P95`                         | nil when < `StatsP95MinSamples` samples; correct nearest-rank value when ≥ threshold  |
+| `DateFilter`                  | `days=1` excludes rows inserted 31 days ago; `days=0` includes them                   |
+| `TopCommandsSortedByCount`    | most-called commands appear first                                                     |
+| `HashGrouping`                | two commands identical post-redaction count as one group with the right average       |
+| `BGHint`                      | `HintBG=true` when p95 exceeds the bgHintThreshold; false when under                  |
+| `NormalizerVersionFiltering`  | stale `normalizer_version` rows excluded from top commands but counted in tool totals |
+| `TopLinesCap`                 | result capped at `StatsTopLines` even with more distinct commands                     |
+| `FileReplaceNotInTopCommands` | `file_replace` rows appear in tool counts but not top commands                        |
 
 ## example queries
 

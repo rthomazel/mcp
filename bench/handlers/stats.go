@@ -7,7 +7,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rthomazel/bench-mcp/internal/stats"
+	"github.com/rthomazel/mcp/bench/internal/stats"
 )
 
 func (h *Handler) HandleStats(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/rthomazel/bench-mcp/internal/file"
+	"github.com/rthomazel/mcp/bench/internal/file"
 )
 
 // editedFile holds the resolved state of a file opened for in-place editing.

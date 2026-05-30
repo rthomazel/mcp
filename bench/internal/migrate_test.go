@@ -7,7 +7,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/rthomazel/bench-mcp/db"
+	"github.com/rthomazel/mcp/bench/db"
 )
 
 func openMigrateTestDB(t *testing.T) *sql.DB {

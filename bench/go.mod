@@ -1,4 +1,4 @@
-module github.com/rthomazel/bench-mcp
+module github.com/rthomazel/mcp/bench
 
 go 1.26.3
 

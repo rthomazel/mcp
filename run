@@ -8,62 +8,18 @@ set -euo pipefail
 shopt -s globstar
 trap 'echo fatal: $0:$LINENO >&2' ERR
 
-# AGENTS: run commands directly, you cannot execute this file. if making changes to this file, run chmod u+x on it.
 cmd="${1:-help}"
 
-build_arch() {
-  version="$(git describe --tags --abbrev=0)"
-  commit="$(git rev-parse --short HEAD)"
-  date="$(date +%Y.%m.%d.%H:%M)"
-
-  docker buildx build --platform "$1" \
-    --build-arg VERSION="${version}_${commit}_$date" \
-    -t ghcr.io/rthomazel/bench-mcp:latest \
-    --load .
-}
-
 case "$cmd" in
-# -- run golangci-lint
-lint)
-  go tool golangci-lint run ./...
-  ;;
-# -- start the server with godotenv
-dev)
-  go tool godotenv -f .env go run main.go
-  ;;
-# -- run tests
-test)
-  go tool godotenv -f .env go test -race ./...
-  ;;
-# -- run formatters
-format)
-  go tool gofumpt -l -w .
-  oxfmt .
-  ;;
-# -- build local binary to bin/server
-build:go)
-  go build -o bin/server main.go
-  ;;
-# -- build versioned docker image tagged latest for amd64
-build:amd64)
-  build_arch "linux/amd64"
-  ;;
-# -- build versioned docker image tagged latest for arm64
-build:arm64)
-  build_arch "linux/arm64"
-  ;;
-# -- bring services UP
-up)
-  docker compose -f docker-compose-http.yml up -d
-  ;;
-# -- bring services DOWN
-down)
-  docker compose -f docker-compose-http.yml down -d
+bench:*)
+  exec bench/run "${cmd#bench:}"
   ;;
 help | *)
-  echo "Usage: ./run <command>"
+  echo "Usage: ./run <prefix>:<command>"
+  echo "Prefixes"
+  echo "  bench:  bench mcp commands"
   echo ""
-  echo "Commands:"
-  awk '/^# -- /{desc=substr($0, index($0,"-- ")+3)} /\)$/ && desc{cmd=$0; gsub(/[[:space:]()|*]/, "", cmd); printf "  %-20s %s\n", cmd, desc; desc=""}' "$0"
+  echo "bench:"
+  bench/run help | tail -n +4
   ;;
 esac

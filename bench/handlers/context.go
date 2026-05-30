@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rthomazel/bench-mcp/internal/pathsnapshot"
-	"github.com/rthomazel/bench-mcp/internal/stats"
+	"github.com/rthomazel/mcp/bench/internal/pathsnapshot"
+	"github.com/rthomazel/mcp/bench/internal/stats"
 	"github.com/samber/lo"
 )
 

@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rthomazel/bench-mcp/internal"
-	"github.com/rthomazel/bench-mcp/internal/stats"
-	"github.com/rthomazel/bench-mcp/internal/xml"
+	"github.com/rthomazel/mcp/bench/internal"
+	"github.com/rthomazel/mcp/bench/internal/stats"
+	"github.com/rthomazel/mcp/bench/internal/xml"
 )
 
 type commandResult struct {

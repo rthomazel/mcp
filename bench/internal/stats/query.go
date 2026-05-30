@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/mcp/bench/internal"
 )
 
 // StatsReport is the result of QueryStats.

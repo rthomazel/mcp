@@ -13,8 +13,8 @@ import (
 	"github.com/samber/lo"
 	_ "modernc.org/sqlite" // register "sqlite" driver
 
-	"github.com/rthomazel/bench-mcp/db"
-	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/mcp/bench/db"
+	"github.com/rthomazel/mcp/bench/internal"
 )
 
 const writeQueueCap = 256

@@ -6,7 +6,7 @@ volumes:
 services:
   bench-mcp:
     container_name: bench-mcp-http
-    image: ghcr.io/rthomazel/bench-mcp:latest
+    image: ghcr.io/rthomazel/mcp/bench:latest
     stdin_open: true
     tty: false
     ports:

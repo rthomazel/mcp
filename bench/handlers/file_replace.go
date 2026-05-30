@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rthomazel/bench-mcp/internal/file"
-	"github.com/rthomazel/bench-mcp/internal/stats"
+	"github.com/rthomazel/mcp/bench/internal/file"
+	"github.com/rthomazel/mcp/bench/internal/stats"
 )
 
 // replacement is a single find/replace pair from a file_replace call.

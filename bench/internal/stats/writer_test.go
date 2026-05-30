@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/mcp/bench/internal"
 )
 
 // openTestWriter creates a Writer backed by a temp-file SQLite database.

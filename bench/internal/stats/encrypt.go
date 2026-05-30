@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rthomazel/bench-mcp/internal"
+	"github.com/rthomazel/mcp/bench/internal"
 )
 
 // LoadKey reads the encryption key from the Docker Secret file.
