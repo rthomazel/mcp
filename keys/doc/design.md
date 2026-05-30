@@ -13,6 +13,7 @@ names and tool descriptions. `keys` injects credentials at call time server-side
 - Register those tools dynamically with the MCP protocol at startup
 - On tool call: validate and construct the request, inject secret headers, execute, return response
 - Return clear, structured errors without leaking secret values
+- Crash on startup if config is invalid or any secret fails to load
 - Expose rich tool descriptions so the agent is self-directed toward API docs
 
 **Not responsible for:**
@@ -27,6 +28,7 @@ names and tool descriptions. `keys` injects credentials at call time server-side
 ```yaml
 timeout_seconds: 30          # global request timeout; default 30
 max_response_bytes: 1048576  # global response size cap; default 1MB
+max_request_bytes: 102400    # agent-supplied body size cap; default 100KB
 
 secrets:
   github_token:
@@ -48,7 +50,7 @@ tools:
     inject:
       Authorization:
         secret: github_token
-        format: "Bearer {value}"
+        format: "Bearer {value}"  # optional; if omitted, raw secret value is used as-is
 
   datadog:
     description: >
@@ -66,7 +68,9 @@ tools:
 
 ### `http: true` flag
 
-By default `base_url` must use HTTPS. For local services or testing, set `http: true`
+By default `base_url` must use HTTPS and must not contain a path component — only
+scheme, host, and optional port are valid (e.g. `https://api.github.com`, not
+`https://api.example.com/v1`). For local services or testing, set `http: true`
 on the tool:
 
 ```yaml
@@ -87,7 +91,7 @@ without breaking changes:
 
 | type | how it works | unlocks |
 | --- | --- | --- |
-| `docker_secret` (v1) | reads `/run/secrets/<name>`, trims trailing whitespace | any static token or key; works in prod and dev |
+| `docker_secret` (v1) | reads `/run/secrets/<name>`, trims trailing whitespace, rejects empty values | any static token or key; works in prod and dev |
 | `oauth2_client` (v2) | client\_id + client\_secret → token endpoint → cached bearer | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS |
 | `google_service_account` (v2) | service account JSON → RS256 JWT → token exchange → cached bearer with refresh | BigQuery, GCS, Drive, Sheets, Pub/Sub, Vertex AI, Cloud Logging |
 | `aws_sigv4` (v3) | request signing — different primitive from header injection | all AWS services |
@@ -144,14 +148,15 @@ The tool returns a structured object:
 
 ```json
 {
-  "status":       200,
-  "content_type": "application/json",
-  "body":         "..."
+  "status":  200,
+  "headers": { "Content-Type": "application/json", "X-RateLimit-Remaining": "59" },
+  "body":    "..."
 }
 ```
 
-Response headers are not passed through, with the exception of `Content-Type` and
-`X-RateLimit-*` family headers. All other response headers are dropped.
+Response headers are not passed through in full. Only `Content-Type` and `X-RateLimit-*`
+family headers are included in the returned `headers` map. All other response headers
+are dropped.
 
 ### response scrubbing
 
@@ -169,12 +174,14 @@ Both limits apply per tool call and return a structured error if exceeded.
 | --- | --- | --- |
 | request timeout | 30s | `timeout_seconds` |
 | max response body | 1 MB | `max_response_bytes` |
+| max request body | 100 KB | `max_request_bytes` |
 
 ## security model
 
 ### isolation
 - `keys` runs as a dedicated non-root user (`uid 9999`) in its container
-- Config file and Docker Secrets are owned by that user, mode `0400`
+- Config file should be owned by that user, mode `0400`; Docker Secret file ownership
+  depends on compose configuration and should be verified per environment
 - The container has no shared volumes with `bench` or other containers
 - `keys` sits on an internal Docker network; only the MCP broker can reach it
 - No Docker socket mounted
@@ -184,9 +191,10 @@ Both limits apply per tool call and return a structured error if exceeded.
 - Secrets are read once at startup and held in memory only
 - Secret values are never included in any response, log line, or error message
 - Trailing whitespace is trimmed from all secret values on load
+- Empty values after trimming are a fatal startup error
 
 ### logging
-Safe fields only: tool name, HTTP method, normalized path, response status, duration,
+Safe fields only: tool name, HTTP method, normalized path (no query string), response status, duration,
 request ID. No headers (injected or agent-supplied), no request body, no response body.
 Docker Secret names are logged at startup (not values). Error messages include tool
 name and status code only.
@@ -242,6 +250,7 @@ different and a separate design problem, deferred to v3 if ever.
 - Database wire protocols — Postgres, MySQL — belong in dedicated MCP servers
 - Response transformation, pagination helpers, retries
 - Any non-HTTP/HTTPS protocol
+- Binary and non-UTF-8 responses (UTF-8 text only in v1)
 - Per-tool policy knobs (method allowlists, path prefix restrictions, per-tool timeout overrides)
 
 ## postgres note
