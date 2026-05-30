@@ -132,6 +132,26 @@ keys/
     design.md      this file
 ```
 
+## auth machinery taxonomy
+
+The complexity of `keys` grows by secret type, not by API. Every API that uses a given
+authentication scheme gets the same implementation for free. From the agent's perspective
+all secret types produce the same result: an injected header on an outbound request.
+
+| secret type | how it works | products unlocked |
+| --- | --- | --- |
+| `docker_secret` / `env` | static value read from file or env | GitHub, Datadog, Stripe, OpenAI, Anthropic, ~80% of SaaS APIs |
+| `oauth2_client` (v2) | client\_id + client\_secret → token endpoint → cached bearer | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS |
+| `google_service_account` (v2) | service account JSON → RS256 JWT → token exchange → cached bearer with refresh | BigQuery, GCS, Drive, Sheets, Pub/Sub, Vertex AI, Cloud Logging — entire GCP |
+| `aws_sigv4` (v3) | request signing (not just header injection) — different primitive | all AWS services |
+
+v2 means the `google_service_account` type: one JWT library + one token cache + one
+refresh goroutine. Ships the entire GCP ecosystem. `oauth2_client` is similar scope and
+could be bundled in v2 as well.
+
+`aws_sigv4` is architecturally different — it signs the full request, not just injects
+a header — and is a separate design problem, deferred to v3 if ever.
+
 ## out of scope (v1)
 
 - BigQuery and any Google Cloud API (requires `google_service_account` secret type — v2)
