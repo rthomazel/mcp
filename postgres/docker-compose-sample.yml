@@ -1,0 +1,22 @@
+services:
+  postgres-mcp:
+    container_name: postgres-mcp-stdio
+    image: ghcr.io/rthomazel/mcp/postgres:latest
+    stdin_open: true
+    tty: false
+    environment:
+      DATABASE_URL: postgres://user:password@host:5432/dbname
+      # query timeout
+      POSTGRES_MCP_QUERY_TIMEOUT: 30s
+      # max rows returned per query
+      POSTGRES_MCP_MAX_ROWS: 500
+      # enable data mutation (INSERT, UPDATE, DELETE, TRUNCATE)
+      # POSTGRES_MCP_ALLOW_DML: "false"
+      # enable schema changes (CREATE, ALTER, DROP)
+      # POSTGRES_MCP_ALLOW_DDL: "false"
+      # enable permission changes (GRANT, REVOKE)
+      # POSTGRES_MCP_ALLOW_DCL: "false"
+      # enable execute_batch and dry_run
+      # POSTGRES_MCP_ALLOW_TRANSACTIONS: "false"
+      # enable explain, active_connections, active_locks
+      # POSTGRES_MCP_ALLOW_DIAGNOSTICS: "false"

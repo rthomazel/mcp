@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "$POSTGRES_MCP_TRANSPORT" = "mcpo" ]; then
+    echo "INFO: starting postgres-mcp with mcpo (OpenAI-compatible HTTP)" >&2
+    exec mcpo --port 8001 -- postgres-mcp
+elif [ "$POSTGRES_MCP_TRANSPORT" = "mcp-proxy" ]; then
+    echo "INFO: starting postgres-mcp with mcp-proxy (native MCP/SSE)" >&2
+    exec mcp-proxy --pass-environment --host 0.0.0.0 --port 8001 -- postgres-mcp
+else
+    echo "INFO: starting postgres-mcp in stdio mode" >&2
+    exec postgres-mcp
+fi

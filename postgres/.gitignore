@@ -1,0 +1,5 @@
+.env
+bin/server
+docker-compose.yml
+docker-compose-http.yml
+_local/*
