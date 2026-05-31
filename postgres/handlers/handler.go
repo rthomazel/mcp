@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,11 +33,9 @@ func (h *Handler) schemaAllowed(schema string) bool {
 		return false
 	}
 checkDenied:
-	for _, s := range h.cfg.DeniedSchemas {
-		if s == schema {
+	if slices.Contains(h.cfg.DeniedSchemas, schema) {
 			return false
 		}
-	}
 	return true
 }
 
