@@ -18,3 +18,11 @@
     - scope is the file, package, or area changed e.g. (config), (proxy), (secrets).
     - Em dash (—) separates the short label from the explanation.
 -->
+
+## [0.1.0](https://github.com/rthomazel/mcp/pull/23) feat: keys server
+
+### feat
+
+- [`0dd4558`](https://github.com/rthomazel/mcp/commit/0dd4558) **(keys)** new `keys` MCP server — config-driven HTTP proxy that holds API credentials and injects them at call time. Secret values are loaded from Docker Secrets and never surfaced to the model.
+- [`0dd4558`](https://github.com/rthomazel/mcp/commit/0dd4558) **(config)** YAML config — `mcp_tools:` block defines tools with `name`, `description`, `base_url`, `auth`, and optional `method`/`headers` overrides; `secrets:` block maps logical secret names to Docker Secret file paths.
+- [`0dd4558`](https://github.com/rthomazel/mcp/commit/0dd4558) **(proxy)** HTTP proxy — validates and joins paths, strips hop-by-hop headers, injects credentials from secrets, redacts secret values from response bodies, enforces request/response size limits. Redirects disabled.
