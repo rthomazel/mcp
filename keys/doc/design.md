@@ -26,7 +26,7 @@ names and tool descriptions. `keys` injects credentials at call time server-side
 
 ## config schema
 
-See [`doc/config-sample.yaml`](./config-sample.yaml) for a full annotated example.
+See [`config.yaml`](../config.yaml) for a full annotated example.
 The structs are defined in [`internal/config/config.go`](../internal/config/config.go).
 
 ```yaml

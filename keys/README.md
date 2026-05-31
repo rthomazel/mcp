@@ -10,7 +10,7 @@ You define tools in a YAML config file. Each tool maps to an external API and li
 
 ## Config
 
-Copy [`doc/config-sample.yaml`](./doc/config-sample.yaml) as a starting point:
+Copy [`config.yaml`](./config.yaml) as a starting point:
 
 ```yaml
 secrets:
