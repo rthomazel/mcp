@@ -7,10 +7,10 @@
 secrets:
   github_token:
     file: ./secrets/github_token
-  # datadog_api_key:
-  #   file: ./secrets/datadog_api_key
-  # datadog_app_key:
-  #   file: ./secrets/datadog_app_key
+  datadog_api_key:
+    file: ./secrets/datadog_api_key
+  datadog_app_key:
+    file: ./secrets/datadog_app_key
 
 services:
   keys:
@@ -27,9 +27,9 @@ services:
       KEYS_MCP_TRANSPORT: mcp-proxy
     volumes:
       # >>> copy config.yaml from the repo, fill in your secret names, then mount it <<<
-      - ./config.yaml:/etc/keys/config.yaml:ro
+      - ./config.yaml:/config/config.yaml:ro
     secrets:
       - github_token
-      # - datadog_api_key
-      # - datadog_app_key
+      - datadog_api_key
+      - datadog_app_key
     user: "9999:9999"

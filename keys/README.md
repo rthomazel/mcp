@@ -46,14 +46,14 @@ services:
     image: ghcr.io/rthomazel/mcp/keys:latest
     user: "9999:9999"
     volumes:
-      - ./config.yaml:/etc/keys/config.yaml:ro
+      - ./config.yaml:/config/config.yaml:ro
     secrets:
       - github_token
     networks:
       - mcp-internal
 ```
 
-The default config path is `/etc/keys/config.yaml`. Override with `--config <path>`.
+The default config path is `/config/config.yaml`. Override with `--config <path>`.
 
 ## Development
 

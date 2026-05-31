@@ -11,7 +11,7 @@ import (
 
 const (
 	// DefaultConfigPath is the default path to the YAML config file.
-	DefaultConfigPath = "/etc/keys/config.yaml"
+	DefaultConfigPath = "/config/config.yaml"
 )
 
 // SecretsDir is the directory Docker Secrets are mounted into.
