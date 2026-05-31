@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/samber/lo"
 )
 
 // HandleListSchemas lists all allowed schemas.
@@ -119,7 +120,7 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 		if err := rows.Scan(&colName, &dataType, &isNullable, &colDefault, &comment); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
-		colRows = append(colRows, []string{colName, dataType, isNullable, fromPtr(colDefault), fromPtr(comment)})
+		colRows = append(colRows, []string{colName, dataType, isNullable, lo.FromPtr(colDefault), lo.FromPtr(comment)})
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -295,7 +296,7 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 		if err := rows.Scan(&name, &routineType, &returnType); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
-		funcRows = append(funcRows, []string{name, routineType, fromPtr(returnType)})
+		funcRows = append(funcRows, []string{name, routineType, lo.FromPtr(returnType)})
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
