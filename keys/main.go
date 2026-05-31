@@ -1,13 +1,13 @@
 package main
 
 import (
-	"strings"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -28,7 +28,7 @@ func main() {
 }
 
 func run() error {
-	configPath := flag.String("config", "/etc/keys/config.yaml", "path to YAML config file")
+	configPath := flag.String("config", config.DefaultConfigPath, "path to YAML config file")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(
@@ -53,7 +53,8 @@ func run() error {
 		toolNames = append(toolNames, name)
 	}
 
-	slog.Info("keys starting",
+	slog.Info(
+		"keys starting",
 		"version", version,
 		"timeout_seconds", cfg.TimeoutSeconds,
 		"tools", toolNames,
@@ -66,7 +67,8 @@ func run() error {
 	theServer := server.NewMCPServer("keys", version, server.WithToolCapabilities(false))
 
 	for toolName, toolCfg := range cfg.Tools {
-		var desc strings.Builder; desc.WriteString(toolCfg.Description)
+		var desc strings.Builder
+		desc.WriteString(toolCfg.Description)
 
 		if len(toolCfg.Docs) > 0 {
 			desc.WriteString("\nDocs:\n")
@@ -76,7 +78,8 @@ func run() error {
 		}
 
 		theServer.AddTool(
-			mcp.NewTool(toolName,
+			mcp.NewTool(
+				toolName,
 				mcp.WithDescription(desc.String()),
 				mcp.WithString("path", mcp.Required(), mcp.Description("Relative API path, e.g. /repos/owner/repo/pulls")),
 				mcp.WithString("method", mcp.Required(), mcp.Description("HTTP method")),
@@ -84,12 +87,13 @@ func run() error {
 				mcp.WithObject("headers", mcp.Description("Optional non-secret headers, e.g. {\"Content-Type\": \"application/json\"}")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				reqPath, _ := req.Params.Arguments["path"].(string)
-				method, _ := req.Params.Arguments["method"].(string)
-				body, _ := req.Params.Arguments["body"].(string)
+				args, _ := req.Params.Arguments.(map[string]any)
+				reqPath, _ := args["path"].(string)
+				method, _ := args["method"].(string)
+				body, _ := args["body"].(string)
 
 				agentHeaders := make(map[string]string)
-				if raw, ok := req.Params.Arguments["headers"].(map[string]any); ok {
+				if raw, ok := args["headers"].(map[string]any); ok {
 					for k, v := range raw {
 						if sv, ok := v.(string); ok {
 							agentHeaders[k] = sv

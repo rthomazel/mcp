@@ -64,7 +64,7 @@ func New(timeout time.Duration, maxResponseBytes, maxRequestBytes int64, store *
 func (p *Proxy) Do(ctx context.Context, toolName string, toolCfg config.ToolConfig, reqPath, method, body string, agentHeaders map[string]string) (*Response, error) {
 	// Check request body size.
 	if int64(len(body)) > p.maxRequestBytes {
-		return nil, fmt.Errorf("tool %q: request body exceeds limit", toolName)
+		return nil, fmt.Errorf("tool %q: request body exceeds limit (%d bytes max)", toolName, p.maxRequestBytes)
 	}
 
 	// Validate and join URL.
@@ -125,12 +125,12 @@ func (p *Proxy) Do(ctx context.Context, toolName string, toolCfg config.ToolConf
 		return nil, fmt.Errorf("tool %q: response body exceeds limit", toolName)
 	}
 
-	// Scrub response body for leaked secret values.
-	respBody := scrubBody(string(respBytes), p.store.Values())
+	// Redact response body if it contains secret values.
+	respBody := redactBody(string(respBytes), p.store.Values())
 
 	return &Response{
 		Status:  resp.StatusCode,
-		Headers: allowedHeaders(resp),
+		Headers: responseHeaders(resp, p.store.Values()),
 		Body:    respBody,
 	}, nil
 }
@@ -168,8 +168,8 @@ func validateAndJoinURL(baseURL, reqPath string) (string, error) {
 	return parsedBase.String(), nil
 }
 
-// scrubBody replaces the body with a redaction notice if any secret value is found.
-func scrubBody(body string, secretValues []string) string {
+// redactBody replaces the body with a redaction notice if any secret value is found in it.
+func redactBody(body string, secretValues []string) string {
 	for _, secret := range secretValues {
 		if strings.Contains(body, secret) {
 			return "[redacted: response contained secret values]"
@@ -178,18 +178,39 @@ func scrubBody(body string, secretValues []string) string {
 	return body
 }
 
-// allowedHeaders extracts safe response headers: Content-Type and X-Ratelimit-* family.
-func allowedHeaders(resp *http.Response) map[string]string {
+// hopByHop is the set of connection-specific headers that are meaningless outside
+// the immediate TCP connection and are always stripped from responses.
+var hopByHop = map[string]bool{
+	"Connection":          true,
+	"Keep-Alive":          true,
+	"Proxy-Authenticate":  true,
+	"Proxy-Authorization": true,
+	"Te":                  true,
+	"Trailer":             true,
+	"Transfer-Encoding":   true,
+	"Upgrade":             true,
+}
+
+// responseHeaders returns all response headers except hop-by-hop ones.
+// Any header value containing a known secret is redacted.
+func responseHeaders(resp *http.Response, secretValues []string) map[string]string {
 	result := make(map[string]string)
 
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		result["Content-Type"] = ct
-	}
-
-	for k, v := range resp.Header {
-		if strings.HasPrefix(http.CanonicalHeaderKey(k), "X-Ratelimit-") && len(v) > 0 {
-			result[http.CanonicalHeaderKey(k)] = v[0]
+	for k, vals := range resp.Header {
+		canonical := http.CanonicalHeaderKey(k)
+		if hopByHop[canonical] || len(vals) == 0 {
+			continue
 		}
+
+		val := vals[0]
+		for _, secret := range secretValues {
+			if strings.Contains(val, secret) {
+				val = "[redacted]"
+				break
+			}
+		}
+
+		result[canonical] = val
 	}
 
 	return result

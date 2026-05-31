@@ -46,7 +46,7 @@ func TestValidateAndJoinURL(t *testing.T) {
 	}
 }
 
-func TestScrubBody(t *testing.T) {
+func TestRedactBody(t *testing.T) {
 	tests := []struct {
 		name    string
 		body    string
@@ -61,29 +61,33 @@ func TestScrubBody(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, scrubBody(tt.body, tt.secrets))
+			assert.Equal(t, tt.want, redactBody(tt.body, tt.secrets))
 		})
 	}
 }
 
-func TestAllowedHeaders(t *testing.T) {
+func TestResponseHeaders(t *testing.T) {
 	tests := []struct {
 		name    string
 		headers http.Header
+		secrets []string
 		want    map[string]string
 	}{
-		{"content-type included", http.Header{"Content-Type": {"application/json"}}, map[string]string{"Content-Type": "application/json"}},
-		{"x-ratelimit-remaining included", http.Header{"X-Ratelimit-Remaining": {"59"}}, map[string]string{"X-Ratelimit-Remaining": "59"}},
-		{"x-ratelimit varied case", http.Header{"X-Ratelimit-Limit": {"5000"}}, map[string]string{"X-Ratelimit-Limit": "5000"}},
-		{"authorization dropped", http.Header{"Authorization": {"Bearer tok"}}, map[string]string{}},
-		{"set-cookie dropped", http.Header{"Set-Cookie": {"session=abc"}}, map[string]string{}},
-		{"no headers", http.Header{}, map[string]string{}},
+		{"content-type passed through", http.Header{"Content-Type": {"application/json"}}, nil, map[string]string{"Content-Type": "application/json"}},
+		{"x-request-id passed through", http.Header{"X-Request-Id": {"abc123"}}, nil, map[string]string{"X-Request-Id": "abc123"}},
+		{"arbitrary header passed through", http.Header{"X-Custom-Thing": {"val"}}, nil, map[string]string{"X-Custom-Thing": "val"}},
+		{"header value containing secret redacted", http.Header{"Authorization": {"Bearer mysecret"}}, []string{"mysecret"}, map[string]string{"Authorization": "[redacted]"}},
+		{"hop-by-hop Connection stripped", http.Header{"Connection": {"keep-alive"}}, nil, map[string]string{}},
+		{"hop-by-hop Transfer-Encoding stripped", http.Header{"Transfer-Encoding": {"chunked"}}, nil, map[string]string{}},
+		{"hop-by-hop Keep-Alive stripped", http.Header{"Keep-Alive": {"timeout=5"}}, nil, map[string]string{}},
+		{"hop-by-hop Upgrade stripped", http.Header{"Upgrade": {"websocket"}}, nil, map[string]string{}},
+		{"no headers", http.Header{}, nil, map[string]string{}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp := &http.Response{StatusCode: 200, Header: tt.headers}
-			assert.Equal(t, tt.want, allowedHeaders(resp))
+			assert.Equal(t, tt.want, responseHeaders(resp, tt.secrets))
 		})
 	}
 }
@@ -178,7 +182,7 @@ func TestDo(t *testing.T) {
 		defer srv.Close()
 
 		store := secrets.NewStoreForTest(map[string]string{})
-		p := New(5*time.Second, 1024*1024, 100, store) // 100B request limit
+		p := New(5*time.Second, 1024*1024, 100, store)
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
 		_, err := p.Do(context.Background(), "tool", tcfg, "/", "POST", strings.Repeat("x", 101), nil)
@@ -189,7 +193,6 @@ func TestDo(t *testing.T) {
 	t.Run("response body over limit", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			// write 1025 KB — just over the 1MB limit
 			for range 1025 {
 				io.WriteString(w, strings.Repeat("x", 1024))
 			}

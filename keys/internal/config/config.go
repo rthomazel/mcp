@@ -9,6 +9,15 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+const (
+	// DefaultConfigPath is the default path to the YAML config file.
+	DefaultConfigPath = "/etc/keys/config.yaml"
+)
+
+// SecretsDir is the directory Docker Secrets are mounted into.
+// Override in tests via t.TempDir().
+var SecretsDir = "/run/secrets"
+
 // Config is the top-level config parsed from YAML.
 type Config struct {
 	TimeoutSeconds   int                     `yaml:"timeout_seconds"`

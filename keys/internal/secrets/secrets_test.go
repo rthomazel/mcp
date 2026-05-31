@@ -11,12 +11,14 @@ import (
 
 func makeStore(t *testing.T, values map[string]string) *secrets.Store {
 	t.Helper()
+
 	tmpDir := t.TempDir()
-	oldDir := secrets.SecretsDir
-	secrets.SecretsDir = tmpDir
-	t.Cleanup(func() { secrets.SecretsDir = oldDir })
+	oldDir := config.SecretsDir
+	config.SecretsDir = tmpDir
+	t.Cleanup(func() { config.SecretsDir = oldDir })
 
 	cfg := make(map[string]config.SecretConfig)
+
 	for name, value := range values {
 		require.NoError(t, os.WriteFile(tmpDir+"/"+name, []byte(value), 0o600))
 		cfg[name] = config.SecretConfig{DockerSecret: name}
@@ -24,6 +26,7 @@ func makeStore(t *testing.T, values map[string]string) *secrets.Store {
 
 	store, err := secrets.Load(cfg)
 	require.NoError(t, err)
+
 	return store
 }
 
@@ -40,9 +43,9 @@ func TestLoad(t *testing.T) {
 
 	t.Run("empty value after trim returns error", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		oldDir := secrets.SecretsDir
-		secrets.SecretsDir = tmpDir
-		t.Cleanup(func() { secrets.SecretsDir = oldDir })
+		oldDir := config.SecretsDir
+		config.SecretsDir = tmpDir
+		t.Cleanup(func() { config.SecretsDir = oldDir })
 
 		require.NoError(t, os.WriteFile(tmpDir+"/tok", []byte("   \n"), 0o600))
 		_, err := secrets.Load(map[string]config.SecretConfig{"tok": {DockerSecret: "tok"}})
@@ -51,9 +54,9 @@ func TestLoad(t *testing.T) {
 
 	t.Run("missing file returns error", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		oldDir := secrets.SecretsDir
-		secrets.SecretsDir = tmpDir
-		t.Cleanup(func() { secrets.SecretsDir = oldDir })
+		oldDir := config.SecretsDir
+		config.SecretsDir = tmpDir
+		t.Cleanup(func() { config.SecretsDir = oldDir })
 
 		_, err := secrets.Load(map[string]config.SecretConfig{"tok": {DockerSecret: "nonexistent"}})
 		require.Error(t, err)

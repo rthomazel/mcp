@@ -11,10 +11,6 @@ import (
 	"github.com/rthomazel/mcp/keys/internal/config"
 )
 
-// SecretsDir is the directory Docker Secrets are mounted into.
-// Override in tests via t.TempDir().
-var SecretsDir = "/run/secrets"
-
 // Store holds resolved secret values, keyed by the name defined in config.
 type Store struct {
 	values map[string]string
@@ -29,7 +25,7 @@ func Load(cfg map[string]config.SecretConfig) (*Store, error) {
 	values := make(map[string]string)
 
 	for name, secret := range cfg {
-		filePath := filepath.Join(SecretsDir, secret.DockerSecret)
+		filePath := filepath.Join(config.SecretsDir, secret.DockerSecret)
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("read secret %q: %w", name, err)

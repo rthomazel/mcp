@@ -26,6 +26,9 @@ names and tool descriptions. `keys` injects credentials at call time server-side
 
 ## config schema
 
+See [`doc/config-sample.yaml`](./config-sample.yaml) for a full annotated example.
+The structs are defined in [`internal/config/config.go`](../internal/config/config.go).
+
 ```yaml
 timeout_seconds: 30 # global request timeout; default 30
 max_response_bytes: 1048576 # global response size cap; default 1MB
@@ -155,9 +158,10 @@ The tool returns a structured object:
 }
 ```
 
-Response headers are not passed through in full. Only `Content-Type` and `X-RateLimit-*`
-family headers are included in the returned `headers` map. All other response headers
-are dropped.
+All response headers are passed through except hop-by-hop headers (`Connection`,
+`Keep-Alive`, `Transfer-Encoding`, `Upgrade`, `TE`, `Trailer`, `Proxy-Authenticate`,
+`Proxy-Authorization`). Any header whose value contains a known secret is replaced
+with `[redacted]` using the same value-scan used for the response body.
 
 ### response scrubbing
 
