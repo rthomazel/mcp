@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rthomazel/mcp/postgres/internal"
+	"github.com/samber/lo"
 )
 
 // Handler holds shared state for all tool handlers.
@@ -86,10 +87,6 @@ func collectRows(rows pgx.Rows, maxRows int) (headers []string, data [][]string,
 	return headers, data, rows.Err()
 }
 
-// derefStr returns the string a pointer points to, or "" if nil.
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
+// fromPtr dereferences a pointer, returning the zero value of T if nil.
+// Wraps lo.FromPtr for convenient local use.
+var fromPtr = lo.FromPtr[string]

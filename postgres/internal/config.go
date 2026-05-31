@@ -57,7 +57,7 @@ func LoadConfig(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open config %q: %w", path, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // read-only; close error is not actionable
 
 	var raw configFile
 	dec := yaml.NewDecoder(f)

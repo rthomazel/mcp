@@ -8,7 +8,7 @@ RUN go mod download
 ARG VERSION
 RUN CGO_ENABLED=0 go build \
     -ldflags="-s -w -X main.version=${VERSION:-local}" \
-    -o postgresmcp .
+    -o postgres-mcp .
 
 # ── Stage 2: runtime ────────────────────────────────────────────────────────────────────────────
 FROM debian:trixie-slim
@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install mcpo mcp-proxy --break-system-packages
 
-COPY --from=builder /build/postgresmcp /usr/local/bin/postgresmcp
+COPY --from=builder /build/postgres-mcp /usr/local/bin/postgres-mcp
 COPY ./bin/postgresmcphttp /usr/local/bin/postgresmcphttp
 RUN chmod +x /usr/local/bin/postgresmcphttp
 

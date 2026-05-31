@@ -2,7 +2,7 @@
 postgres-mcp.yaml
 
 # build output
-bin/postgresmcp
+bin/postgres-mcp
 
 # docker-compose override
 docker-compose.yml
