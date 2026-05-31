@@ -14,12 +14,19 @@ case "$cmd" in
 bench:*)
   exec bench/run "${cmd#bench:}"
   ;;
+keys:*)
+  exec keys/run "${cmd#keys:}"
+  ;;
 help | *)
   echo "Usage: ./run <prefix>:<command>"
-  echo "Prefixes"
+  echo "Prefixes:"
   echo "  bench:  bench mcp commands"
+  echo "  keys:   keys mcp commands"
   echo ""
   echo "bench:"
   bench/run help | tail -n +4
+  echo ""
+  echo "keys:"
+  keys/run help | tail -n +4
   ;;
 esac
