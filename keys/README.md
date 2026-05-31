@@ -53,7 +53,7 @@ services:
       - mcp-internal
 ```
 
-The default config path is `/config/config.yaml`. Override with `--config <path>`.
+The default config file is `config.yaml` in the working directory. In the Docker image the working directory is `/config`, so the default resolves to `/config/config.yaml`. Override with `--config <path>`.
 
 ## Development
 

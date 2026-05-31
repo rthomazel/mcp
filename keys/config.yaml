@@ -2,7 +2,7 @@
 #
 # Copy this file to your Docker secret mount location or local path,
 # fill in real docker_secret names, and pass --config <path> on startup.
-# The default config path is /config/config.yaml.
+# Default: config.yaml in the working directory (resolves to /config/config.yaml in the Docker image).
 
 # Global limits (these are the defaults — you can omit them)
 timeout_seconds: 30

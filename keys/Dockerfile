@@ -28,6 +28,10 @@ COPY --from=builder /build/keys /usr/local/bin/keys
 COPY ./bin/keysmcphttp /usr/local/bin/keysmcphttp
 RUN chmod +x /usr/local/bin/keysmcphttp
 
+# config.yaml is the default config file; WORKDIR sets CWD so the default
+# path resolves to /config/config.yaml — bind-mount your config here.
+WORKDIR /config
+
 USER keys
 
 EXPOSE 8001
