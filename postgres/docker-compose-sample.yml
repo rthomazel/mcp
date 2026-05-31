@@ -4,9 +4,7 @@ services:
     image: ghcr.io/rthomazel/mcp/postgres:latest
     stdin_open: true
     tty: false
-    environment:
-      # Path to the config file inside the container.
-      POSTGRES_MCP_CONFIG: /config/postgres-mcp.yaml
+    command: ["--config", "/config/postgres-mcp.yaml"]
     volumes:
       # Mount your config file (contains DSN and all settings).
       - ./postgres-mcp.yaml:/config/postgres-mcp.yaml:ro

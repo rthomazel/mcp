@@ -9,6 +9,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// DefaultConfigPath is the config file name resolved relative to the working directory
+// when no --config flag is provided.
+const DefaultConfigPath = "postgres-mcp.yaml"
+
 // configFile is the raw YAML structure decoded from the config file.
 // Duration fields are stored as strings and parsed separately.
 type configFile struct {
@@ -40,15 +44,6 @@ type Config struct {
 	AllowExplainAnalyze    bool
 	AllowedSchemas         []string
 	DeniedSchemas          []string
-}
-
-// Path returns the config file path.
-// Reads POSTGRES_MCP_CONFIG env var; defaults to "postgres-mcp.yaml".
-func Path() string {
-	if p := os.Getenv("POSTGRES_MCP_CONFIG"); p != "" {
-		return p
-	}
-	return "postgres-mcp.yaml"
 }
 
 // LoadConfig reads and validates the YAML config file at path.
