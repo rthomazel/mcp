@@ -20,7 +20,7 @@ secrets:
   datadog_app_key:
     docker_secret: datadog_app_key
 
-tools:
+mcp_tools:
   # Each tool becomes an MCP tool with the name used as the key here.
   # The agent calls it with: path, method, body (optional), headers (optional).
   # Injected headers are added server-side — the agent never sees secret values.

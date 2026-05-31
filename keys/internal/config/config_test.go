@@ -16,7 +16,7 @@ max_request_bytes: 102400
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com"
@@ -53,7 +53,7 @@ func TestLoad(t *testing.T) {
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com"
@@ -67,13 +67,13 @@ tools:
 		},
 		{
 			name:       "empty secrets block",
-			yaml:       `secrets: {}\ntools:\n  t:\n    description: x\n    base_url: https://api.example.com\n`,
+			yaml:       `secrets: {}\nmcp_tools:\n  t:\n    description: x\n    base_url: https://api.example.com\n`,
 			createFile: true,
 			wantErr:    true,
 		},
 		{
 			name:       "empty tools block",
-			yaml:       `secrets:\n  s:\n    docker_secret: s\ntools: {}\n`,
+			yaml:       `secrets:\n  s:\n    docker_secret: s\nmcp_tools: {}\n`,
 			createFile: true,
 			wantErr:    true,
 		},
@@ -83,7 +83,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: ""
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com"
@@ -97,7 +97,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: ""
     base_url: "https://api.example.com"
@@ -111,7 +111,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: ""
@@ -125,7 +125,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com/v1"
@@ -139,7 +139,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "http://api.example.com"
@@ -153,7 +153,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "http://api.example.com"
@@ -167,7 +167,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com"
@@ -181,7 +181,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com"
@@ -198,7 +198,7 @@ tools:
 secrets:
   my_secret:
     docker_secret: secret_name
-tools:
+mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com"

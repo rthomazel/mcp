@@ -178,9 +178,9 @@ func redactBody(body string, secretValues []string) string {
 	return body
 }
 
-// hopByHop is the set of connection-specific headers that are meaningless outside
-// the immediate TCP connection and are always stripped from responses.
-var hopByHop = map[string]bool{
+// strippedHeaders is the set of hop-by-hop headers that are connection-specific
+// and meaningless to the agent outside the immediate TCP connection.
+var strippedHeaders = map[string]bool{
 	"Connection":          true,
 	"Keep-Alive":          true,
 	"Proxy-Authenticate":  true,
@@ -198,7 +198,7 @@ func responseHeaders(resp *http.Response, secretValues []string) map[string]stri
 
 	for k, vals := range resp.Header {
 		canonical := http.CanonicalHeaderKey(k)
-		if hopByHop[canonical] || len(vals) == 0 {
+		if strippedHeaders[canonical] || len(vals) == 0 {
 			continue
 		}
 

@@ -42,7 +42,7 @@ secrets:
   datadog_app_key:
     docker_secret: datadog_app_key
 
-tools:
+mcp_tools:
   github:
     description: >
       Make authenticated requests to the GitHub REST and GraphQL API.
@@ -78,7 +78,7 @@ scheme, host, and optional port are valid (e.g. `https://api.github.com`, not
 on the tool:
 
 ```yaml
-tools:
+mcp_tools:
   local_api:
     description: Local development API.
     base_url: http://localhost:8080

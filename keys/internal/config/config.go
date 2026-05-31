@@ -24,7 +24,7 @@ type Config struct {
 	MaxResponseBytes int64                   `yaml:"max_response_bytes"`
 	MaxRequestBytes  int64                   `yaml:"max_request_bytes"`
 	Secrets          map[string]SecretConfig `yaml:"secrets"`
-	Tools            map[string]ToolConfig   `yaml:"tools"`
+	Tools            map[string]ToolConfig   `yaml:"mcp_tools"`
 }
 
 // SecretConfig defines a single secret source. Only docker_secret is supported in v1.
