@@ -10,17 +10,19 @@ import (
 	"github.com/rthomazel/mcp/postgres/internal/sqlcheck"
 )
 
-// sqlClassify returns the appropriate allowlist and flag-check function for a SQL statement.
-// Uses sqlcheck to strip comments and get the first token.
+// dryRunPrefix is the standard prefix on all dry_run results.
+const dryRunPrefix = "[dry run — changes rolled back]\n"
+
+// sqlClassify returns the allowlist and flag check for a SQL statement based on its first token.
 func (h *Handler) sqlClassify(sql string) (allowlist []string, flagAllowed bool, flagName string, err error) {
 	token := sqlcheck.FirstToken(sqlcheck.StripComments(sql))
 	switch token {
 	case "INSERT", "UPDATE", "DELETE", "TRUNCATE":
-		return dmlAllowlist, h.cfg.AllowDML, "POSTGRES_MCP_ALLOW_DML", nil
+		return dmlAllowlist, h.cfg.AllowMutate, "allow_mutate", nil
 	case "CREATE", "ALTER", "DROP":
-		return ddlAllowlist, h.cfg.AllowDDL, "POSTGRES_MCP_ALLOW_DDL", nil
+		return ddlAllowlist, h.cfg.AllowMutateSchema, "allow_mutate_schema", nil
 	case "GRANT", "REVOKE":
-		return dclAllowlist, h.cfg.AllowDCL, "POSTGRES_MCP_ALLOW_DCL", nil
+		return dclAllowlist, h.cfg.AllowMutatePermissions, "allow_mutate_permissions", nil
 	case "SELECT", "SHOW", "TABLE", "WITH":
 		return dqlAllowlist, true, "", nil
 	default:
@@ -32,12 +34,13 @@ func (h *Handler) sqlClassify(sql string) (allowlist []string, flagAllowed bool,
 }
 
 // HandleMutateBatch executes multiple SQL statements in a single transaction.
+// Requires allow_transactions: true in config. Class flags still apply per statement.
 func (h *Handler) HandleMutateBatch(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowTransactions {
-		return mcp.NewToolResultError("mutate_batch is disabled: set POSTGRES_MCP_ALLOW_TRANSACTIONS=true to enable"), nil
+		return mcp.NewToolResultError("mutate_batch is disabled: set allow_transactions: true in config"), nil
 	}
 
-	rawStatements, _ := req.Params.Arguments["statements"].([]any)
+	rawStatements, _ := req.GetArguments()["statements"].([]any)
 	if len(rawStatements) == 0 {
 		return mcp.NewToolResultError("no statements provided"), nil
 	}
@@ -51,7 +54,7 @@ func (h *Handler) HandleMutateBatch(ctx context.Context, req mcp.CallToolRequest
 		statements[i] = stmt
 	}
 
-	// Validate all statements before starting the transaction.
+	// Validate all statements before opening the transaction.
 	cleanedStmts := make([]string, len(statements))
 	for i, stmt := range statements {
 		allowlist, flagAllowed, flagName, err := h.sqlClassify(stmt)
@@ -59,7 +62,7 @@ func (h *Handler) HandleMutateBatch(ctx context.Context, req mcp.CallToolRequest
 			return mcp.NewToolResultError(fmt.Sprintf("statement %d: %v", i, err)), nil
 		}
 		if !flagAllowed {
-			return mcp.NewToolResultError(fmt.Sprintf("statement %d requires %s=true", i, flagName)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("statement %d requires %s: true in config", i, flagName)), nil
 		}
 		cleaned, err := sqlcheck.Validate(stmt, allowlist)
 		if err != nil {
@@ -91,12 +94,13 @@ func (h *Handler) HandleMutateBatch(ctx context.Context, req mcp.CallToolRequest
 }
 
 // HandleDryRun executes a statement in a transaction then unconditionally rolls back.
+// Requires allow_transactions: true in config plus the class flag for the statement type.
 func (h *Handler) HandleDryRun(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowTransactions {
-		return mcp.NewToolResultError("dry_run is disabled: set POSTGRES_MCP_ALLOW_TRANSACTIONS=true to enable"), nil
+		return mcp.NewToolResultError("dry_run is disabled: set allow_transactions: true in config"), nil
 	}
 
-	sql, _ := req.Params.Arguments["sql"].(string)
+	sql := req.GetString("sql", "")
 	if strings.TrimSpace(sql) == "" {
 		return mcp.NewToolResultError("sql parameter is required"), nil
 	}
@@ -106,7 +110,7 @@ func (h *Handler) HandleDryRun(ctx context.Context, req mcp.CallToolRequest) (*m
 		return mcp.NewToolResultError(fmt.Sprintf("classification failed: %v", err)), nil
 	}
 	if !flagAllowed {
-		return mcp.NewToolResultError(fmt.Sprintf("dry_run with this statement requires %s=true", flagName)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("dry_run with this statement requires %s: true in config", flagName)), nil
 	}
 
 	cleaned, err := sqlcheck.Validate(sql, allowlist)
@@ -125,54 +129,32 @@ func (h *Handler) HandleDryRun(ctx context.Context, req mcp.CallToolRequest) (*m
 	}
 
 	token := sqlcheck.FirstToken(sqlcheck.StripComments(sql))
-	const prefix = "[dry run — changes rolled back]\n"
-
 	switch token {
 	case "SELECT", "SHOW", "TABLE", "WITH":
 		rows, err := tx.Query(ctx, cleaned)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("query error: %v", err)), nil
 		}
-		defer rows.Close()
-		var headers []string
-		for _, fd := range rows.FieldDescriptions() {
-			headers = append(headers, fd.Name)
-		}
-		var rowData [][]string
-		for rows.Next() && len(rowData) < h.cfg.MaxRows {
-			vals, err := rows.Values()
-			if err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("row values: %v", err)), nil
-			}
-			row := make([]string, len(vals))
-			for i, v := range vals {
-				if v == nil {
-					row[i] = ""
-				} else {
-					row[i] = fmt.Sprintf("%v", v)
-				}
-			}
-			rowData = append(rowData, row)
-		}
-		if err := rows.Err(); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
+		headers, rowData, err := collectRows(rows, h.cfg.MaxRows)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("read rows: %v", err)), nil
 		}
 		if len(rowData) == 0 {
-			return mcp.NewToolResultText(prefix + "query returned no results"), nil
+			return mcp.NewToolResultText(dryRunPrefix + "query returned no results"), nil
 		}
-		return mcp.NewToolResultText(prefix + formatTable(headers, rowData)), nil
+		return mcp.NewToolResultText(dryRunPrefix + formatTable(headers, rowData)), nil
 
 	case "INSERT", "UPDATE", "DELETE", "TRUNCATE":
 		tag, err := tx.Exec(ctx, cleaned)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("execution error: %v", err)), nil
 		}
-		return mcp.NewToolResultText(fmt.Sprintf("%sdry_run: would affect %d rows (rolled back)", prefix, tag.RowsAffected())), nil
+		return mcp.NewToolResultText(fmt.Sprintf("%sdry_run: would affect %d rows", dryRunPrefix, tag.RowsAffected())), nil
 
 	default:
 		if _, err := tx.Exec(ctx, cleaned); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("execution error: %v", err)), nil
 		}
-		return mcp.NewToolResultText(prefix + "dry_run: statement executed (rolled back)"), nil
+		return mcp.NewToolResultText(dryRunPrefix + "dry_run: statement executed"), nil
 	}
 }

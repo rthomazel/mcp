@@ -2,8 +2,10 @@
 package handlers
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rthomazel/mcp/postgres/internal"
 )
@@ -20,18 +22,19 @@ func New(cfg *internal.Config, pool *pgxpool.Pool) *Handler {
 }
 
 // schemaAllowed returns true if schema passes the AllowedSchemas/DeniedSchemas filters.
-// If AllowedSchemas is non-empty, schema must be in the list.
-// schema must not be in DeniedSchemas.
 func (h *Handler) schemaAllowed(schema string) bool {
 	if len(h.cfg.AllowedSchemas) > 0 {
+		found := false
 		for _, s := range h.cfg.AllowedSchemas {
 			if s == schema {
-				goto checkDenied
+				found = true
+				break
 			}
 		}
-		return false
+		if !found {
+			return false
+		}
 	}
-checkDenied:
 	for _, s := range h.cfg.DeniedSchemas {
 		if s == schema {
 			return false
@@ -40,7 +43,7 @@ checkDenied:
 	return true
 }
 
-// allowlists for each SQL class, used by query, transaction, and diagnostic handlers.
+// allowlists for each SQL class.
 var (
 	dqlAllowlist = []string{"SELECT", "SHOW", "TABLE", "WITH"}
 	dmlAllowlist = []string{"INSERT", "UPDATE", "DELETE", "TRUNCATE"}
@@ -49,7 +52,6 @@ var (
 )
 
 // formatTable returns a plain-text tab-separated table from headers and rows.
-// Each nil cell value is rendered as empty string.
 func formatTable(headers []string, rows [][]string) string {
 	var buf strings.Builder
 	buf.WriteString(strings.Join(headers, "\t"))
@@ -58,4 +60,36 @@ func formatTable(headers []string, rows [][]string) string {
 		buf.WriteString(strings.Join(row, "\t"))
 	}
 	return buf.String()
+}
+
+// collectRows reads all columns from pgx.Rows generically, capping at maxRows.
+// Returns column names, row data as [][]string, and any error.
+func collectRows(rows pgx.Rows, maxRows int) (headers []string, data [][]string, err error) {
+	for _, fd := range rows.FieldDescriptions() {
+		headers = append(headers, fd.Name)
+	}
+	for rows.Next() && len(data) < maxRows {
+		vals, scanErr := rows.Values()
+		if scanErr != nil {
+			return nil, nil, scanErr
+		}
+		row := make([]string, len(vals))
+		for i, v := range vals {
+			if v == nil {
+				row[i] = ""
+			} else {
+				row[i] = fmt.Sprintf("%v", v)
+			}
+		}
+		data = append(data, row)
+	}
+	return headers, data, rows.Err()
+}
+
+// derefStr returns the string a pointer points to, or "" if nil.
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

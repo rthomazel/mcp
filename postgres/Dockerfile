@@ -8,13 +8,15 @@ RUN go mod download
 ARG VERSION
 RUN CGO_ENABLED=0 go build \
     -ldflags="-s -w -X main.version=${VERSION:-local}" \
-    -o postgres-mcp .
+    -o postgresmcp .
 
-# ── Stage 2: runtime ─────────────────────────────────────────────────────────────────────────────
+# ── Stage 2: runtime ────────────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# ca-certificates: TLS for database connections
+# python3 + pip: mcpo and mcp-proxy transports
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     python3 python3-pip \
@@ -22,7 +24,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install mcpo mcp-proxy --break-system-packages
 
-COPY --from=builder /build/postgres-mcp /usr/local/bin/postgres-mcp
+COPY --from=builder /build/postgresmcp /usr/local/bin/postgresmcp
 COPY ./bin/postgresmcphttp /usr/local/bin/postgresmcphttp
 RUN chmod +x /usr/local/bin/postgresmcphttp
 

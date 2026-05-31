@@ -10,13 +10,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func nullStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // HandleListSchemas lists all allowed schemas.
 func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, h.cfg.QueryTimeout)
@@ -29,7 +22,7 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 	defer rows.Close()
 
 	var schemas []string
-	for rows.Next() {
+	for rows.Next() && len(schemas) < h.cfg.MaxRows {
 		var schema string
 		if err := rows.Scan(&schema); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
@@ -49,9 +42,9 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 
 // HandleListTables lists tables in a schema.
 func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -69,7 +62,7 @@ func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest)
 	defer rows.Close()
 
 	var tableRows [][]string
-	for rows.Next() {
+	for rows.Next() && len(tableRows) < h.cfg.MaxRows {
 		var tableName, tableType string
 		if err := rows.Scan(&tableName, &tableType); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
@@ -87,13 +80,13 @@ func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest)
 
 // HandleDescribeTable describes columns of a table.
 func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	table, _ := req.Params.Arguments["table"].(string)
+	table := req.GetString("table", "")
 	if table == "" {
 		return mcp.NewToolResultError("table parameter is required"), nil
 	}
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -126,7 +119,7 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 		if err := rows.Scan(&colName, &dataType, &isNullable, &colDefault, &comment); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
-		colRows = append(colRows, []string{colName, dataType, isNullable, nullStr(colDefault), nullStr(comment)})
+		colRows = append(colRows, []string{colName, dataType, isNullable, derefStr(colDefault), derefStr(comment)})
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -139,13 +132,13 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 
 // HandleListIndexes lists indexes on a table.
 func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	table, _ := req.Params.Arguments["table"].(string)
+	table := req.GetString("table", "")
 	if table == "" {
 		return mcp.NewToolResultError("table parameter is required"), nil
 	}
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -166,7 +159,7 @@ func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest
 	defer rows.Close()
 
 	var idxRows [][]string
-	for rows.Next() {
+	for rows.Next() && len(idxRows) < h.cfg.MaxRows {
 		var name, def, unique string
 		if err := rows.Scan(&name, &def, &unique); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
@@ -184,13 +177,13 @@ func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest
 
 // HandleListForeignKeys lists foreign key constraints on a table.
 func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	table, _ := req.Params.Arguments["table"].(string)
+	table := req.GetString("table", "")
 	if table == "" {
 		return mcp.NewToolResultError("table parameter is required"), nil
 	}
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -220,7 +213,7 @@ func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolReq
 	defer rows.Close()
 
 	var fkRows [][]string
-	for rows.Next() {
+	for rows.Next() && len(fkRows) < h.cfg.MaxRows {
 		var constraint, col, fSchema, fTable, fCol string
 		if err := rows.Scan(&constraint, &col, &fSchema, &fTable, &fCol); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
@@ -238,9 +231,9 @@ func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolReq
 
 // HandleListViews lists views in a schema.
 func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -258,7 +251,7 @@ func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) 
 	defer rows.Close()
 
 	var viewRows [][]string
-	for rows.Next() {
+	for rows.Next() && len(viewRows) < h.cfg.MaxRows {
 		var name, def string
 		if err := rows.Scan(&name, &def); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
@@ -276,9 +269,9 @@ func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) 
 
 // HandleListFunctions lists functions and stored procedures in a schema.
 func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -296,13 +289,13 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 	defer rows.Close()
 
 	var funcRows [][]string
-	for rows.Next() {
+	for rows.Next() && len(funcRows) < h.cfg.MaxRows {
 		var name, routineType string
 		var returnType *string
 		if err := rows.Scan(&name, &routineType, &returnType); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
-		funcRows = append(funcRows, []string{name, routineType, nullStr(returnType)})
+		funcRows = append(funcRows, []string{name, routineType, derefStr(returnType)})
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -315,13 +308,13 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 
 // HandleTableStats returns row count and maintenance stats for a table.
 func (h *Handler) HandleTableStats(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	table, _ := req.Params.Arguments["table"].(string)
+	table := req.GetString("table", "")
 	if table == "" {
 		return mcp.NewToolResultError("table parameter is required"), nil
 	}
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -396,7 +389,7 @@ func (h *Handler) HandleDatabaseSize(ctx context.Context, req mcp.CallToolReques
 
 // HandleSearchSchema searches table, column, and view names by keyword.
 func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	term, _ := req.Params.Arguments["term"].(string)
+	term := req.GetString("term", "")
 	if term == "" {
 		return mcp.NewToolResultError("term parameter is required"), nil
 	}
@@ -440,9 +433,9 @@ func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolReques
 
 // HandleERDiagram generates a Mermaid ERD from FK relationships.
 func (h *Handler) HandleERDiagram(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	schema, _ := req.Params.Arguments["schema"].(string)
+	schema := req.GetString("schema", "")
 	if schema == "" {
-		schema = "public"
+		schema = h.cfg.DefaultSchema
 	}
 	if !h.schemaAllowed(schema) {
 		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
@@ -470,7 +463,7 @@ func (h *Handler) HandleERDiagram(ctx context.Context, req mcp.CallToolRequest) 
 	defer rows.Close()
 
 	var lines []string
-	for rows.Next() {
+	for rows.Next() && len(lines) < h.cfg.MaxRows {
 		var fromTable, fromCol, toTable, toCol string
 		if err := rows.Scan(&fromTable, &fromCol, &toTable, &toCol); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil

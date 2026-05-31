@@ -4,108 +4,107 @@ package internal
 import (
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
+// configFile is the raw YAML structure decoded from the config file.
+// Duration fields are stored as strings and parsed separately.
+type configFile struct {
+	DSN                    string   `yaml:"dsn"`
+	QueryTimeout           string   `yaml:"query_timeout"`
+	MaxRows                int      `yaml:"max_rows"`
+	DefaultSchema          string   `yaml:"default_schema"`
+	AllowMutate            bool     `yaml:"allow_mutate"`
+	AllowMutateSchema      bool     `yaml:"allow_mutate_schema"`
+	AllowMutatePermissions bool     `yaml:"allow_mutate_permissions"`
+	AllowTransactions      bool     `yaml:"allow_transactions"`
+	AllowDiagnostics       bool     `yaml:"allow_diagnostics"`
+	AllowExplainAnalyze    bool     `yaml:"allow_explain_analyze"`
+	AllowedSchemas         []string `yaml:"allowed_schemas"`
+	DeniedSchemas          []string `yaml:"denied_schemas"`
+}
+
+// Config holds validated, parsed configuration for postgres-mcp.
 type Config struct {
-	DatabaseURL         string
-	QueryTimeout        time.Duration
-	PoolSize            int
-	MaxRows             int
-	Transport           string
-	AllowDML            bool
-	AllowDDL            bool
-	AllowDCL            bool
-	AllowTransactions   bool
-	AllowDiagnostics    bool
-	AllowExplainAnalyze bool
-	AllowedSchemas      []string
-	DeniedSchemas       []string
+	DSN                    string
+	QueryTimeout           time.Duration
+	MaxRows                int
+	DefaultSchema          string
+	AllowMutate            bool
+	AllowMutateSchema      bool
+	AllowMutatePermissions bool
+	AllowTransactions      bool
+	AllowDiagnostics       bool
+	AllowExplainAnalyze    bool
+	AllowedSchemas         []string
+	DeniedSchemas          []string
 }
 
-var defaults = Config{
-	QueryTimeout:  30 * time.Second,
-	PoolSize:      5,
-	MaxRows:       500,
-	DeniedSchemas: []string{"pg_toast", "pg_catalog", "information_schema"},
+// Path returns the config file path.
+// Reads POSTGRES_MCP_CONFIG env var; defaults to "postgres-mcp.yaml".
+func Path() string {
+	if p := os.Getenv("POSTGRES_MCP_CONFIG"); p != "" {
+		return p
+	}
+	return "postgres-mcp.yaml"
 }
 
-func LoadConfig() (*Config, error) {
+// LoadConfig reads and validates the YAML config file at path.
+func LoadConfig(path string) (*Config, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open config %q: %w", path, err)
+	}
+	defer f.Close()
+
+	var raw configFile
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
+
+	if err := dec.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("parse config %q: %w", path, err)
+	}
+
 	cfg := &Config{
-		QueryTimeout:  defaults.QueryTimeout,
-		PoolSize:      defaults.PoolSize,
-		MaxRows:       defaults.MaxRows,
-		DeniedSchemas: defaults.DeniedSchemas,
+		DSN:                    raw.DSN,
+		MaxRows:                raw.MaxRows,
+		DefaultSchema:          raw.DefaultSchema,
+		AllowMutate:            raw.AllowMutate,
+		AllowMutateSchema:      raw.AllowMutateSchema,
+		AllowMutatePermissions: raw.AllowMutatePermissions,
+		AllowTransactions:      raw.AllowTransactions,
+		AllowDiagnostics:       raw.AllowDiagnostics,
+		AllowExplainAnalyze:    raw.AllowExplainAnalyze,
+		AllowedSchemas:         raw.AllowedSchemas,
+		DeniedSchemas:          raw.DeniedSchemas,
 	}
 
-	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
-	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is required")
-	}
-
-	if raw := os.Getenv("POSTGRES_MCP_QUERY_TIMEOUT"); raw != "" {
-		d, err := time.ParseDuration(raw)
+	if raw.QueryTimeout != "" {
+		d, err := time.ParseDuration(raw.QueryTimeout)
 		if err != nil {
-			return nil, fmt.Errorf("POSTGRES_MCP_QUERY_TIMEOUT invalid: %w", err)
+			return nil, fmt.Errorf("query_timeout invalid: %w", err)
 		}
 		cfg.QueryTimeout = d
 	}
 
-	if raw := os.Getenv("POSTGRES_MCP_POOL_SIZE"); raw != "" {
-		size, err := strconv.Atoi(raw)
-		if err != nil || size < 1 {
-			return nil, fmt.Errorf("POSTGRES_MCP_POOL_SIZE invalid: must be a positive integer")
-		}
-		cfg.PoolSize = size
+	// defaults for zero values
+	if cfg.QueryTimeout == 0 {
+		cfg.QueryTimeout = 30 * time.Second
+	}
+	if cfg.MaxRows <= 0 {
+		cfg.MaxRows = 100
+	}
+	if cfg.DefaultSchema == "" {
+		cfg.DefaultSchema = "public"
+	}
+	if len(cfg.DeniedSchemas) == 0 {
+		cfg.DeniedSchemas = []string{"pg_toast", "pg_catalog", "information_schema"}
 	}
 
-	if raw := os.Getenv("POSTGRES_MCP_MAX_ROWS"); raw != "" {
-		maxRows, err := strconv.Atoi(raw)
-		if err != nil || maxRows < 1 {
-			return nil, fmt.Errorf("POSTGRES_MCP_MAX_ROWS invalid: must be a positive integer")
-		}
-		cfg.MaxRows = maxRows
-	}
-
-	cfg.Transport = os.Getenv("POSTGRES_MCP_TRANSPORT")
-
-	for _, pair := range []struct {
-		env string
-		dst *bool
-	}{
-		{"POSTGRES_MCP_ALLOW_DML", &cfg.AllowDML},
-		{"POSTGRES_MCP_ALLOW_DDL", &cfg.AllowDDL},
-		{"POSTGRES_MCP_ALLOW_DCL", &cfg.AllowDCL},
-		{"POSTGRES_MCP_ALLOW_TRANSACTIONS", &cfg.AllowTransactions},
-		{"POSTGRES_MCP_ALLOW_DIAGNOSTICS", &cfg.AllowDiagnostics},
-		{"POSTGRES_MCP_ALLOW_EXPLAIN_ANALYZE", &cfg.AllowExplainAnalyze},
-	} {
-		if raw := os.Getenv(pair.env); raw != "" {
-			val, err := strconv.ParseBool(raw)
-			if err != nil {
-				return nil, fmt.Errorf("%s invalid: %w", pair.env, err)
-			}
-			*pair.dst = val
-		}
-	}
-
-	parseSchemas := func(raw string) []string {
-		var out []string
-		for _, s := range strings.Split(raw, ",") {
-			if trimmed := strings.TrimSpace(s); trimmed != "" {
-				out = append(out, trimmed)
-			}
-		}
-		return out
-	}
-
-	if raw := os.Getenv("POSTGRES_MCP_ALLOWED_SCHEMAS"); raw != "" {
-		cfg.AllowedSchemas = parseSchemas(raw)
-	}
-	if raw := os.Getenv("POSTGRES_MCP_DENIED_SCHEMAS"); raw != "" {
-		cfg.DeniedSchemas = parseSchemas(raw)
+	if cfg.DSN == "" {
+		return nil, fmt.Errorf("dsn is required")
 	}
 
 	return cfg, nil

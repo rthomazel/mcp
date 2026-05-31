@@ -13,7 +13,7 @@ import (
 // HandleQuery executes a read-only DQL statement (SELECT, SHOW, TABLE, WITH).
 // Always runs inside BEGIN READ ONLY ... ROLLBACK.
 func (h *Handler) HandleQuery(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	sql, _ := req.Params.Arguments["sql"].(string)
+	sql := req.GetString("sql", "")
 	if strings.TrimSpace(sql) == "" {
 		return mcp.NewToolResultError("sql parameter is required"), nil
 	}
@@ -37,31 +37,10 @@ func (h *Handler) HandleQuery(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("query error: %v", err)), nil
 	}
-	defer rows.Close()
 
-	var headers []string
-	for _, fd := range rows.FieldDescriptions() {
-		headers = append(headers, fd.Name)
-	}
-
-	var rowData [][]string
-	for rows.Next() && len(rowData) < h.cfg.MaxRows {
-		vals, err := rows.Values()
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("row values: %v", err)), nil
-		}
-		row := make([]string, len(vals))
-		for i, v := range vals {
-			if v == nil {
-				row[i] = ""
-			} else {
-				row[i] = fmt.Sprintf("%v", v)
-			}
-		}
-		rowData = append(rowData, row)
-	}
-	if err := rows.Err(); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
+	headers, rowData, err := collectRows(rows, h.cfg.MaxRows)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("read rows: %v", err)), nil
 	}
 	if len(rowData) == 0 {
 		return mcp.NewToolResultText("query returned no results"), nil
@@ -70,12 +49,13 @@ func (h *Handler) HandleQuery(ctx context.Context, req mcp.CallToolRequest) (*mc
 }
 
 // HandleMutate executes a DML statement (INSERT, UPDATE, DELETE, TRUNCATE).
+// Requires allow_mutate: true in config.
 func (h *Handler) HandleMutate(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if !h.cfg.AllowDML {
-		return mcp.NewToolResultError("mutate is disabled: set POSTGRES_MCP_ALLOW_DML=true to enable"), nil
+	if !h.cfg.AllowMutate {
+		return mcp.NewToolResultError("mutate is disabled: set allow_mutate: true in config"), nil
 	}
 
-	sql, _ := req.Params.Arguments["sql"].(string)
+	sql := req.GetString("sql", "")
 	if strings.TrimSpace(sql) == "" {
 		return mcp.NewToolResultError("sql parameter is required"), nil
 	}
@@ -106,12 +86,13 @@ func (h *Handler) HandleMutate(ctx context.Context, req mcp.CallToolRequest) (*m
 }
 
 // HandleMutateSchema executes a DDL statement (CREATE, ALTER, DROP).
+// Requires allow_mutate_schema: true in config.
 func (h *Handler) HandleMutateSchema(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if !h.cfg.AllowDDL {
-		return mcp.NewToolResultError("mutate_schema is disabled: set POSTGRES_MCP_ALLOW_DDL=true to enable"), nil
+	if !h.cfg.AllowMutateSchema {
+		return mcp.NewToolResultError("mutate_schema is disabled: set allow_mutate_schema: true in config"), nil
 	}
 
-	sql, _ := req.Params.Arguments["sql"].(string)
+	sql := req.GetString("sql", "")
 	if strings.TrimSpace(sql) == "" {
 		return mcp.NewToolResultError("sql parameter is required"), nil
 	}
@@ -141,12 +122,13 @@ func (h *Handler) HandleMutateSchema(ctx context.Context, req mcp.CallToolReques
 }
 
 // HandleMutatePermissions executes a DCL statement (GRANT, REVOKE).
+// Requires allow_mutate_permissions: true in config.
 func (h *Handler) HandleMutatePermissions(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if !h.cfg.AllowDCL {
-		return mcp.NewToolResultError("mutate_permissions is disabled: set POSTGRES_MCP_ALLOW_DCL=true to enable"), nil
+	if !h.cfg.AllowMutatePermissions {
+		return mcp.NewToolResultError("mutate_permissions is disabled: set allow_mutate_permissions: true in config"), nil
 	}
 
-	sql, _ := req.Params.Arguments["sql"].(string)
+	sql := req.GetString("sql", "")
 	if strings.TrimSpace(sql) == "" {
 		return mcp.NewToolResultError("sql parameter is required"), nil
 	}

@@ -8,7 +8,6 @@ set -euo pipefail
 shopt -s globstar
 trap 'echo fatal: $0:$LINENO >&2' ERR
 
-# change to postgres/ regardless of call site
 cd "$(dirname "$0")"
 
 cmd="${1:-help}"
@@ -30,18 +29,17 @@ case "$cmd" in
 lint)
   go tool golangci-lint run ./...
   ;;
-# -- start the server with godotenv
+# -- start the server (requires postgres-mcp.yaml)
 dev)
-  go tool godotenv -f .env go run main.go
+  go run main.go
   ;;
 # -- run tests
 test)
-  go tool godotenv -f .env go test -race ./...
+  go test -race ./...
   ;;
 # -- run formatters
 format)
   go tool gofumpt -l -w .
-  oxfmt .
   ;;
 # -- build local binary to bin/server
 build:go)

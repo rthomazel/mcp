@@ -7,8 +7,8 @@ import (
 	"unicode"
 )
 
-// txnControlKeywords lists first tokens that are always blocked across all tools.
-var txnControlKeywords = map[string]bool{
+// txControlKeywords lists first tokens that are always blocked across all tools.
+var txControlKeywords = map[string]bool{
 	"BEGIN":     true,
 	"COMMIT":    true,
 	"ROLLBACK":  true,
@@ -56,10 +56,9 @@ func FirstToken(sql string) string {
 	return strings.ToUpper(sql[:end])
 }
 
-// Validate strips comments from sql, rejects multiple statements,
-// rejects transaction-control keywords, then verifies the first token
-// is in allowlist (entries are matched case-insensitively).
-// Returns the stripped SQL (original casing) and any error.
+// Validate strips comments from sql, rejects multiple statements, rejects
+// transaction-control keywords, verifies the first token is in allowlist,
+// then ensures a trailing semicolon. Returns the normalized SQL and any error.
 func Validate(sql string, allowlist []string) (string, error) {
 	stripped := StripComments(sql)
 
@@ -73,15 +72,22 @@ func Validate(sql string, allowlist []string) (string, error) {
 
 	token := FirstToken(stripped)
 
-	if txnControlKeywords[token] {
+	if txControlKeywords[token] {
 		return "", fmt.Errorf("transaction-control statements are not allowed")
 	}
 
 	for _, allowed := range allowlist {
 		if token == strings.ToUpper(allowed) {
+			// Ensure trailing semicolon.
+			if lastIdx == -1 {
+				return ";", nil
+			}
+			if stripped[lastIdx] != ';' {
+				stripped = stripped[:lastIdx+1] + ";"
+			}
 			return stripped, nil
 		}
 	}
 
-	return "", fmt.Errorf("statement type %q is not allowed by this tool", token)
+	return "", fmt.Errorf("statement type %q is not allowed by this tool (found: %s)", token, token)
 }

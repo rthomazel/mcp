@@ -99,30 +99,30 @@ func TestSqlClassify(t *testing.T) {
 	tests := []struct {
 		name            string
 		sql             string
-		allowDML        bool
-		allowDDL        bool
-		allowDCL        bool
+		allowMutate        bool
+		allowMutateSchema        bool
+		allowMutatePermissions        bool
 		wantAllowlist   []string
 		wantFlagAllowed bool
 		wantFlagName    string
 		wantErr         bool
 		wantErrContains string
 	}{
-		{name: "INSERT", sql: "INSERT INTO foo VALUES (1)", allowDML: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DML"},
-		{name: "UPDATE", sql: "UPDATE foo SET x=1", allowDML: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DML"},
-		{name: "DELETE", sql: "DELETE FROM foo", allowDML: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DML"},
-		{name: "TRUNCATE", sql: "TRUNCATE foo", allowDML: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DML"},
-		{name: "CREATE", sql: "CREATE TABLE foo ()", allowDDL: true, wantAllowlist: ddlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DDL"},
-		{name: "ALTER", sql: "ALTER TABLE foo ADD COLUMN x int", allowDDL: true, wantAllowlist: ddlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DDL"},
-		{name: "DROP", sql: "DROP TABLE foo", allowDDL: true, wantAllowlist: ddlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DDL"},
-		{name: "GRANT", sql: "GRANT SELECT ON foo TO user1", allowDCL: true, wantAllowlist: dclAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DCL"},
-		{name: "REVOKE", sql: "REVOKE SELECT ON foo FROM user1", allowDCL: true, wantAllowlist: dclAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DCL"},
+		{name: "INSERT", sql: "INSERT INTO foo VALUES (1)", allowMutate: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate"},
+		{name: "UPDATE", sql: "UPDATE foo SET x=1", allowMutate: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate"},
+		{name: "DELETE", sql: "DELETE FROM foo", allowMutate: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate"},
+		{name: "TRUNCATE", sql: "TRUNCATE foo", allowMutate: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate"},
+		{name: "CREATE", sql: "CREATE TABLE foo ()", allowMutateSchema: true, wantAllowlist: ddlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate_schema"},
+		{name: "ALTER", sql: "ALTER TABLE foo ADD COLUMN x int", allowMutateSchema: true, wantAllowlist: ddlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate_schema"},
+		{name: "DROP", sql: "DROP TABLE foo", allowMutateSchema: true, wantAllowlist: ddlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate_schema"},
+		{name: "GRANT", sql: "GRANT SELECT ON foo TO user1", allowMutatePermissions: true, wantAllowlist: dclAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate_permissions"},
+		{name: "REVOKE", sql: "REVOKE SELECT ON foo FROM user1", allowMutatePermissions: true, wantAllowlist: dclAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate_permissions"},
 		{name: "SELECT", sql: "SELECT * FROM foo", wantAllowlist: dqlAllowlist, wantFlagAllowed: true, wantFlagName: ""},
 		{name: "SHOW", sql: "SHOW search_path", wantAllowlist: dqlAllowlist, wantFlagAllowed: true, wantFlagName: ""},
 		{name: "TABLE", sql: "TABLE foo", wantAllowlist: dqlAllowlist, wantFlagAllowed: true, wantFlagName: ""},
 		{name: "WITH", sql: "WITH cte AS (SELECT 1) SELECT * FROM cte", wantAllowlist: dqlAllowlist, wantFlagAllowed: true, wantFlagName: ""},
-		{name: "lowercase insert", sql: "insert into foo values (1)", allowDML: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_DML"},
-		{name: "DML flag off", sql: "INSERT INTO foo VALUES (1)", allowDML: false, wantAllowlist: dmlAllowlist, wantFlagAllowed: false, wantFlagName: "POSTGRES_MCP_ALLOW_DML"},
+		{name: "lowercase insert", sql: "insert into foo values (1)", allowMutate: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "allow_mutate"},
+		{name: "DML flag off", sql: "INSERT INTO foo VALUES (1)", allowMutate: false, wantAllowlist: dmlAllowlist, wantFlagAllowed: false, wantFlagName: "allow_mutate"},
 		{name: "whitespace only", sql: "  ", wantErr: true, wantErrContains: "empty"},
 		{name: "unknown token", sql: "UNKNOWN blah", wantErr: true, wantErrContains: "not recognized"},
 	}
@@ -130,9 +130,9 @@ func TestSqlClassify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newTestHandler(&internal.Config{
-				AllowDML: tt.allowDML,
-				AllowDDL: tt.allowDDL,
-				AllowDCL: tt.allowDCL,
+				AllowMutate: tt.allowMutate,
+				AllowMutateSchema: tt.allowMutateSchema,
+				AllowMutatePermissions: tt.allowMutatePermissions,
 			})
 			gotAllowlist, gotFlagAllowed, gotFlagName, err := h.sqlClassify(tt.sql)
 
