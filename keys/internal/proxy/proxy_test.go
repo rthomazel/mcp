@@ -103,7 +103,7 @@ func TestDo(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			receivedAuth = r.Header.Get("Authorization")
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, `{"ok":true}`)
+			_, _ = io.WriteString(w, `{"ok":true}`)
 		}))
 		defer srv.Close()
 
@@ -125,7 +125,7 @@ func TestDo(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			receivedAuth = r.Header.Get("Authorization")
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, `{}`)
+			_, _ = io.WriteString(w, `{}`)
 		}))
 		defer srv.Close()
 
@@ -147,7 +147,7 @@ func TestDo(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			received = r.Header.Get("Connection")
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, `{}`)
+			_, _ = io.WriteString(w, `{}`)
 		}))
 		defer srv.Close()
 
@@ -194,7 +194,7 @@ func TestDo(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			for range 1025 {
-				io.WriteString(w, strings.Repeat("x", 1024))
+				_, _ = io.WriteString(w, strings.Repeat("x", 1024))
 			}
 		}))
 		defer srv.Close()
@@ -211,7 +211,7 @@ func TestDo(t *testing.T) {
 	t.Run("response body scrubbed when secret present", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, `{"token":"supersecret"}`)
+			_, _ = io.WriteString(w, `{"token":"supersecret"}`)
 		}))
 		defer srv.Close()
 
@@ -227,7 +227,7 @@ func TestDo(t *testing.T) {
 	t.Run("server returns 404 no error", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
-			io.WriteString(w, `{"error":"not found"}`)
+			_, _ = io.WriteString(w, `{"error":"not found"}`)
 		}))
 		defer srv.Close()
 

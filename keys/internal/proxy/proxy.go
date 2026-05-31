@@ -109,11 +109,11 @@ func (p *Proxy) Do(ctx context.Context, toolName string, toolCfg config.ToolConf
 	resp, err := p.client.Do(req)
 	if err != nil {
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		return nil, fmt.Errorf("tool %q: request failed: %w", toolName, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response up to limit+1 to detect oversize.
 	limited := io.LimitReader(resp.Body, p.maxResponseBytes+1)
