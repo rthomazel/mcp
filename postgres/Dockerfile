@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 go build \
     -o postgresmcp .
 
 # ── Stage 2: runtime ────────────────────────────────────────────────────────────────────────────
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 

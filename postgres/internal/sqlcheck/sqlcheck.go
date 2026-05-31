@@ -73,7 +73,7 @@ func Validate(sql string, allowlist []string) (string, error) {
 	token := FirstToken(stripped)
 
 	if txControlKeywords[token] {
-		return "", fmt.Errorf("transaction-control statements are not allowed")
+		return "", fmt.Errorf("transaction-control statement %q is not allowed", token)
 	}
 
 	for _, allowed := range allowlist {

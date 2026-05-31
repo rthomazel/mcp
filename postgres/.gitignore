@@ -1,4 +1,10 @@
+# local config (contains DSN)
 postgres-mcp.yaml
-bin/server
+
+# build output
+bin/postgresmcp
+
+# docker-compose override
 docker-compose.yml
+
 _local/*

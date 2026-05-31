@@ -41,9 +41,9 @@ test)
 format)
   go tool gofumpt -l -w .
   ;;
-# -- build local binary to bin/server
+# -- build local binary to bin/postgresmcp
 build:go)
-  go build -o bin/server main.go
+  go build -o bin/postgresmcp main.go
   ;;
 # -- build versioned docker image for amd64
 build:amd64)
