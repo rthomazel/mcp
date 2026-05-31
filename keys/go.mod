@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/mark3labs/mcp-go v0.18.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	go.yaml.in/yaml/v3 v3.0.4
 )
 

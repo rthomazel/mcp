@@ -17,6 +17,7 @@ names and tool descriptions. `keys` injects credentials at call time server-side
 - Expose rich tool descriptions so the agent is self-directed toward API docs
 
 **Not responsible for:**
+
 - Knowing anything about specific API endpoints or request shapes
 - Pagination, retries, or response transformation
 - Any protocol other than HTTPS (plain HTTP supported via per-tool `http: true` flag)
@@ -26,13 +27,13 @@ names and tool descriptions. `keys` injects credentials at call time server-side
 ## config schema
 
 ```yaml
-timeout_seconds: 30          # global request timeout; default 30
-max_response_bytes: 1048576  # global response size cap; default 1MB
-max_request_bytes: 102400    # agent-supplied body size cap; default 100KB
+timeout_seconds: 30 # global request timeout; default 30
+max_response_bytes: 1048576 # global response size cap; default 1MB
+max_request_bytes: 102400 # agent-supplied body size cap; default 100KB
 
 secrets:
   github_token:
-    docker_secret: github_token       # reads /run/secrets/github_token
+    docker_secret: github_token # reads /run/secrets/github_token
   datadog_api_key:
     docker_secret: datadog_api_key
   datadog_app_key:
@@ -50,7 +51,7 @@ tools:
     inject:
       Authorization:
         secret: github_token
-        format: "Bearer {value}"  # optional; if omitted, raw secret value is used as-is
+        format: "Bearer {value}" # optional; if omitted, raw secret value is used as-is
 
   datadog:
     description: >
@@ -89,12 +90,12 @@ work in both production and development — no separate dev-only mechanism is ne
 The config schema is designed to accommodate additional secret types in future versions
 without breaking changes:
 
-| type | how it works | unlocks |
-| --- | --- | --- |
-| `docker_secret` (v1) | reads `/run/secrets/<name>`, trims trailing whitespace, rejects empty values | any static token or key; works in prod and dev |
-| `oauth2_client` (v2) | client\_id + client\_secret → token endpoint → cached bearer | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS |
+| type                          | how it works                                                                   | unlocks                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `docker_secret` (v1)          | reads `/run/secrets/<name>`, trims trailing whitespace, rejects empty values   | any static token or key; works in prod and dev                  |
+| `oauth2_client` (v2)          | client_id + client_secret → token endpoint → cached bearer                     | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS          |
 | `google_service_account` (v2) | service account JSON → RS256 JWT → token exchange → cached bearer with refresh | BigQuery, GCS, Drive, Sheets, Pub/Sub, Vertex AI, Cloud Logging |
-| `aws_sigv4` (v3) | request signing — different primitive from header injection | all AWS services |
+| `aws_sigv4` (v3)              | request signing — different primitive from header injection                    | all AWS services                                                |
 
 ## agent-facing tool interface
 
@@ -102,9 +103,9 @@ Every registered tool has the same input schema regardless of which API it targe
 
 ```json
 {
-  "path":    "string (required) — relative API path, e.g. /api/v2/logs/events/search",
-  "method":  "string (required) — any valid HTTP method: GET, POST, PUT, PATCH, DELETE, etc.",
-  "body":    "string (optional) — raw request body; set Content-Type in headers if needed",
+  "path": "string (required) — relative API path, e.g. /api/v2/logs/events/search",
+  "method": "string (required) — any valid HTTP method: GET, POST, PUT, PATCH, DELETE, etc.",
+  "body": "string (optional) — raw request body; set Content-Type in headers if needed",
   "headers": "object (optional) — non-secret headers, e.g. Content-Type: application/json"
 }
 ```
@@ -148,9 +149,9 @@ The tool returns a structured object:
 
 ```json
 {
-  "status":  200,
+  "status": 200,
   "headers": { "Content-Type": "application/json", "X-RateLimit-Remaining": "59" },
-  "body":    "..."
+  "body": "..."
 }
 ```
 
@@ -170,15 +171,16 @@ that do not echo request headers in their responses.
 
 Both limits apply per tool call and return a structured error if exceeded.
 
-| limit | default | config key |
-| --- | --- | --- |
-| request timeout | 30s | `timeout_seconds` |
-| max response body | 1 MB | `max_response_bytes` |
-| max request body | 100 KB | `max_request_bytes` |
+| limit             | default | config key           |
+| ----------------- | ------- | -------------------- |
+| request timeout   | 30s     | `timeout_seconds`    |
+| max response body | 1 MB    | `max_response_bytes` |
+| max request body  | 100 KB  | `max_request_bytes`  |
 
 ## security model
 
 ### isolation
+
 - `keys` runs as a dedicated non-root user (`uid 9999`) in its container
 - Config file should be owned by that user, mode `0400`; Docker Secret file ownership
   depends on compose configuration and should be verified per environment
@@ -187,6 +189,7 @@ Both limits apply per tool call and return a structured error if exceeded.
 - No Docker socket mounted
 
 ### secrets
+
 - All secrets are delivered via Docker Secrets (`/run/secrets/`)
 - Secrets are read once at startup and held in memory only
 - Secret values are never included in any response, log line, or error message
@@ -194,12 +197,14 @@ Both limits apply per tool call and return a structured error if exceeded.
 - Empty values after trimming are a fatal startup error
 
 ### logging
+
 Safe fields only: tool name, HTTP method, normalized path (no query string), response status, duration,
 request ID. No headers (injected or agent-supplied), no request body, no response body.
 Docker Secret names are logged at startup (not values). Error messages include tool
 name and status code only.
 
 ### compose config discipline
+
 - Secrets are declared only on the `keys` service in compose, never in shared env files
 - `bench` cannot `exec` into `keys` — no Docker socket, no `pid: host`
 - Process namespace isolation prevents reading `/proc/<pid>/environ` across containers
@@ -226,12 +231,12 @@ The complexity of `keys` grows by secret type, not by API. Every API that uses a
 authentication scheme gets the same implementation for free. From the agent's perspective
 all secret types produce the same result: an injected header on an outbound request.
 
-| secret type | how it works | products unlocked |
-| --- | --- | --- |
-| `docker_secret` (v1) | static value from `/run/secrets/` | GitHub, Datadog, Stripe, OpenAI, Anthropic, ~80% of SaaS APIs |
-| `oauth2_client` (v2) | client\_id + client\_secret → token endpoint → cached bearer | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS |
+| secret type                   | how it works                                                                   | products unlocked                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `docker_secret` (v1)          | static value from `/run/secrets/`                                              | GitHub, Datadog, Stripe, OpenAI, Anthropic, ~80% of SaaS APIs                |
+| `oauth2_client` (v2)          | client_id + client_secret → token endpoint → cached bearer                     | Salesforce, HubSpot, Zoom, Slack, most enterprise SaaS                       |
 | `google_service_account` (v2) | service account JSON → RS256 JWT → token exchange → cached bearer with refresh | BigQuery, GCS, Drive, Sheets, Pub/Sub, Vertex AI, Cloud Logging — entire GCP |
-| `aws_sigv4` (v3) | request signing (not just header injection) — different primitive | all AWS services |
+| `aws_sigv4` (v3)              | request signing (not just header injection) — different primitive              | all AWS services                                                             |
 
 v2 adds OAuth2 and/or Google service account secret types. Both require token
 acquisition, caching, and refresh logic — the implementation complexity is bounded

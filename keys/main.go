@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"context"
 	"encoding/json"
 	"flag"
@@ -60,28 +61,25 @@ func run() error {
 	)
 
 	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
-	p := proxy.New(timeout, cfg.MaxResponseBytes, cfg.MaxRequestBytes, store)
+	theProxy := proxy.New(timeout, cfg.MaxResponseBytes, cfg.MaxRequestBytes, store)
 
-	s := server.NewMCPServer("keys", version, server.WithToolCapabilities(false))
+	theServer := server.NewMCPServer("keys", version, server.WithToolCapabilities(false))
 
 	for toolName, toolCfg := range cfg.Tools {
-		// Capture loop vars by value before the closure.
-		name := toolName
-		tcfg := toolCfg
+		var desc strings.Builder; desc.WriteString(toolCfg.Description)
 
-		desc := tcfg.Description
-		if len(tcfg.Docs) > 0 {
-			desc += "\nDocs:\n"
-			for _, doc := range tcfg.Docs {
-				desc += doc + "\n"
+		if len(toolCfg.Docs) > 0 {
+			desc.WriteString("\nDocs:\n")
+			for _, doc := range toolCfg.Docs {
+				desc.WriteString(doc + "\n")
 			}
 		}
 
-		s.AddTool(
-			mcp.NewTool(name,
-				mcp.WithDescription(desc),
+		theServer.AddTool(
+			mcp.NewTool(toolName,
+				mcp.WithDescription(desc.String()),
 				mcp.WithString("path", mcp.Required(), mcp.Description("Relative API path, e.g. /repos/owner/repo/pulls")),
-				mcp.WithString("method", mcp.Required(), mcp.Description("HTTP method: GET, POST, PUT, PATCH, DELETE, etc.")),
+				mcp.WithString("method", mcp.Required(), mcp.Description("HTTP method")),
 				mcp.WithString("body", mcp.Description("Optional request body. Set Content-Type in headers if needed.")),
 				mcp.WithObject("headers", mcp.Description("Optional non-secret headers, e.g. {\"Content-Type\": \"application/json\"}")),
 			),
@@ -106,7 +104,7 @@ func run() error {
 					return mcp.NewToolResultError("method is required"), nil
 				}
 
-				resp, err := p.Do(ctx, name, tcfg, reqPath, method, body, agentHeaders)
+				resp, err := theProxy.Do(ctx, toolName, toolCfg, reqPath, method, body, agentHeaders)
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
@@ -122,7 +120,7 @@ func run() error {
 	}
 
 	slog.Info("serving on stdio")
-	if err := server.ServeStdio(s); err != nil {
+	if err := server.ServeStdio(theServer); err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
 
