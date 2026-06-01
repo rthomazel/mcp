@@ -23,7 +23,6 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 	defer rows.Close()
 
 	var schemas []string
-	var capped bool
 	for rows.Next() {
 		var schema string
 		if err := rows.Scan(&schema); err != nil {
@@ -31,10 +30,6 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 		}
 		if h.schemaAllowed(schema) {
 			schemas = append(schemas, schema)
-			if len(schemas) == h.cfg.MaxRows {
-				capped = rows.Next()
-				break
-			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -43,11 +38,7 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 	if len(schemas) == 0 {
 		return mcp.NewToolResultText("no schemas found"), nil
 	}
-	out := strings.Join(schemas, "\n")
-	if capped {
-		out = h.cfg.CapNote() + out
-	}
-	return mcp.NewToolResultText(out), nil
+	return mcp.NewToolResultText(strings.Join(schemas, "\n")), nil
 }
 
 // HandleListTables lists tables in a schema.
@@ -72,17 +63,12 @@ func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest)
 	defer rows.Close()
 
 	var tableRows [][]string
-	var capped bool
 	for rows.Next() {
 		var tableName, tableType string
 		if err := rows.Scan(&tableName, &tableType); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		tableRows = append(tableRows, []string{tableName, tableType})
-		if len(tableRows) == h.cfg.MaxRows {
-			capped = rows.Next()
-			break
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -90,7 +76,7 @@ func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest)
 	if len(tableRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no tables found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"table", "type"}, tableRows, capped, h.cfg.CapNote())), nil
+	return mcp.NewToolResultText(formatTable([]string{"table", "type"}, tableRows)), nil
 }
 
 // HandleDescribeTable describes columns of a table.
@@ -128,7 +114,6 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 	defer rows.Close()
 
 	var colRows [][]string
-	var capped bool
 	for rows.Next() {
 		var colName, dataType, isNullable string
 		var colDefault, comment *string
@@ -136,10 +121,6 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		colRows = append(colRows, []string{colName, dataType, isNullable, lo.FromPtr(colDefault), lo.FromPtr(comment)})
-		if len(colRows) == h.cfg.MaxRows {
-			capped = rows.Next()
-			break
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -147,7 +128,7 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 	if len(colRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("table %s.%s not found or has no columns", schema, table)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"column", "type", "nullable", "default", "comment"}, colRows, capped, h.cfg.CapNote())), nil
+	return mcp.NewToolResultText(formatTable([]string{"column", "type", "nullable", "default", "comment"}, colRows)), nil
 }
 
 // HandleListIndexes lists indexes on a table.
@@ -179,17 +160,12 @@ func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest
 	defer rows.Close()
 
 	var idxRows [][]string
-	var capped bool
 	for rows.Next() {
 		var name, def, unique string
 		if err := rows.Scan(&name, &def, &unique); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		idxRows = append(idxRows, []string{name, def, unique})
-		if len(idxRows) == h.cfg.MaxRows {
-			capped = rows.Next()
-			break
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -197,7 +173,7 @@ func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest
 	if len(idxRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no indexes found on %s.%s", schema, table)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"index", "definition", "unique"}, idxRows, capped, h.cfg.CapNote())), nil
+	return mcp.NewToolResultText(formatTable([]string{"index", "definition", "unique"}, idxRows)), nil
 }
 
 // HandleListForeignKeys lists foreign key constraints on a table.
@@ -238,17 +214,12 @@ func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolReq
 	defer rows.Close()
 
 	var fkRows [][]string
-	var capped bool
 	for rows.Next() {
 		var constraint, col, fSchema, fTable, fCol string
 		if err := rows.Scan(&constraint, &col, &fSchema, &fTable, &fCol); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		fkRows = append(fkRows, []string{constraint, col, fSchema, fTable, fCol})
-		if len(fkRows) == h.cfg.MaxRows {
-			capped = rows.Next()
-			break
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -256,7 +227,7 @@ func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolReq
 	if len(fkRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no foreign keys found on %s.%s", schema, table)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"constraint", "column", "foreign_schema", "foreign_table", "foreign_column"}, fkRows, capped, h.cfg.CapNote())), nil
+	return mcp.NewToolResultText(formatTable([]string{"constraint", "column", "foreign_schema", "foreign_table", "foreign_column"}, fkRows)), nil
 }
 
 // HandleListViews lists views in a schema.
@@ -281,17 +252,12 @@ func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) 
 	defer rows.Close()
 
 	var viewRows [][]string
-	var capped bool
 	for rows.Next() {
 		var name, def string
 		if err := rows.Scan(&name, &def); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		viewRows = append(viewRows, []string{name, def})
-		if len(viewRows) == h.cfg.MaxRows {
-			capped = rows.Next()
-			break
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -299,7 +265,7 @@ func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) 
 	if len(viewRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no views found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"view", "definition"}, viewRows, capped, h.cfg.CapNote())), nil
+	return mcp.NewToolResultText(formatTable([]string{"view", "definition"}, viewRows)), nil
 }
 
 // HandleListFunctions lists functions and stored procedures in a schema.
@@ -324,7 +290,6 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 	defer rows.Close()
 
 	var funcRows [][]string
-	var capped bool
 	for rows.Next() {
 		var name, routineType string
 		var returnType *string
@@ -332,10 +297,6 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		funcRows = append(funcRows, []string{name, routineType, lo.FromPtr(returnType)})
-		if len(funcRows) == h.cfg.MaxRows {
-			capped = rows.Next()
-			break
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -343,7 +304,7 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 	if len(funcRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no functions found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"function", "type", "returns"}, funcRows, capped, h.cfg.CapNote())), nil
+	return mcp.NewToolResultText(formatTable([]string{"function", "type", "returns"}, funcRows)), nil
 }
 
 // HandleTableStats returns row count and maintenance stats for a table.
@@ -445,13 +406,17 @@ func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolReques
 	defer cancel()
 
 	rows, err := h.pool.Query(ctx, `
-		SELECT 'table' AS kind, table_schema, table_name, ''
+		SELECT 'table' AS kind, table_schema, table_name, '' AS column, '' AS type
 		FROM information_schema.tables WHERE table_name ILIKE '%' || $1 || '%'
 		UNION ALL
-		SELECT 'column', table_schema, table_name, column_name
-		FROM information_schema.columns WHERE column_name ILIKE '%' || $1 || '%'
+		SELECT 'column', table_schema, table_name, column_name,
+			CASE WHEN data_type = 'USER-DEFINED' THEN udt_name ELSE data_type END
+		FROM information_schema.columns
+		WHERE column_name ILIKE '%' || $1 || '%'
+		   OR data_type   ILIKE '%' || $1 || '%'
+		   OR udt_name    ILIKE '%' || $1 || '%'
 		UNION ALL
-		SELECT 'view', table_schema, table_name, ''
+		SELECT 'view', table_schema, table_name, '', ''
 		FROM information_schema.views WHERE table_name ILIKE '%' || $1 || '%'
 		ORDER BY 1, 2, 3`, term)
 	if err != nil {
@@ -462,12 +427,12 @@ func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolReques
 	var searchRows [][]string
 	var capped bool
 	for rows.Next() {
-		var kind, schema, name, detail string
-		if err := rows.Scan(&kind, &schema, &name, &detail); err != nil {
+		var kind, schema, table, column, typ string
+		if err := rows.Scan(&kind, &schema, &table, &column, &typ); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		if h.schemaAllowed(schema) {
-			searchRows = append(searchRows, []string{kind, schema, name, detail})
+			searchRows = append(searchRows, []string{kind, schema, table, column, typ})
 			if len(searchRows) == h.cfg.MaxRows {
 				capped = rows.Next()
 				break
@@ -480,7 +445,7 @@ func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolReques
 	if len(searchRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no matches for term %q", term)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"kind", "schema", "name", "detail"}, searchRows, capped, h.cfg.CapNote())), nil
+	return mcp.NewToolResultText(tableResult([]string{"kind", "schema", "table", "column", "type"}, searchRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleERDiagram generates a Mermaid ERD from FK relationships.
@@ -515,17 +480,12 @@ func (h *Handler) HandleERDiagram(ctx context.Context, req mcp.CallToolRequest) 
 	defer rows.Close()
 
 	var lines []string
-	var capped bool
 	for rows.Next() {
 		var fromTable, fromCol, toTable, toCol string
 		if err := rows.Scan(&fromTable, &fromCol, &toTable, &toCol); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		lines = append(lines, fmt.Sprintf("    %s ||--o{ %s : \"%s -> %s\"", fromTable, toTable, fromCol, toCol))
-		if len(lines) == h.cfg.MaxRows {
-			capped = rows.Next()
-			break
-		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -533,9 +493,68 @@ func (h *Handler) HandleERDiagram(ctx context.Context, req mcp.CallToolRequest) 
 	if len(lines) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no foreign key relationships found in schema %s", schema)), nil
 	}
-	out := "erDiagram\n" + strings.Join(lines, "\n")
-	if capped {
-		out = h.cfg.CapNote() + out
+	return mcp.NewToolResultText("erDiagram\n" + strings.Join(lines, "\n")), nil
+}
+
+// HandleDescribeSchema returns a high-level summary of every table and view in a schema.
+// Intended as the first call in a session for orientation: names, types, row estimates, sizes, comments.
+func (h *Handler) HandleDescribeSchema(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	schema := req.GetString("schema", "")
+	if schema == "" {
+		schema = h.cfg.DefaultSchema
 	}
-	return mcp.NewToolResultText(out), nil
+	if !h.schemaAllowed(schema) {
+		return mcp.NewToolResultError(fmt.Sprintf("schema %q is not allowed", schema)), nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, h.cfg.QueryTimeout)
+	defer cancel()
+
+	rows, err := h.pool.Query(ctx, `
+		SELECT
+			t.table_name,
+			CASE t.table_type WHEN 'BASE TABLE' THEN 'table' ELSE 'view' END,
+			CASE t.table_type
+				WHEN 'BASE TABLE' THEN COALESCE(s.n_live_tup::text, '—')
+				ELSE '—'
+			END,
+			CASE t.table_type
+				WHEN 'BASE TABLE' THEN
+					pg_size_pretty(pg_total_relation_size(
+						quote_ident(t.table_schema) || '.' || quote_ident(t.table_name)
+					))
+				ELSE '—'
+			END,
+			COALESCE(obj_description(
+				(quote_ident(t.table_schema) || '.' || quote_ident(t.table_name))::regclass::oid,
+				'pg_class'
+			), '')
+		FROM information_schema.tables t
+		LEFT JOIN pg_catalog.pg_stat_user_tables s
+			ON s.schemaname = t.table_schema AND s.relname = t.table_name
+		WHERE t.table_schema = $1
+		ORDER BY t.table_type ASC, t.table_name ASC`, schema)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("query failed: %v", err)), nil
+	}
+	defer rows.Close()
+
+	var schemaRows [][]string
+	for rows.Next() {
+		var name, typ, rowCount, size, comment string
+		if err := rows.Scan(&name, &typ, &rowCount, &size, &comment); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
+		}
+		schemaRows = append(schemaRows, []string{name, typ, rowCount, size, comment})
+	}
+	if err := rows.Err(); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
+	}
+	if len(schemaRows) == 0 {
+		return mcp.NewToolResultText(fmt.Sprintf("no tables or views found in schema %s", schema)), nil
+	}
+	return mcp.NewToolResultText(formatTable(
+		[]string{"table", "type", "rows", "size", "comment"},
+		schemaRows,
+	)), nil
 }
