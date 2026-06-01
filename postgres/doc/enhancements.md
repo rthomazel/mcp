@@ -18,6 +18,7 @@ public    user_role               admin, clinician, staff, patient
 ```
 
 **Query sketch:**
+
 ```sql
 SELECT
     n.nspname AS schema,
@@ -55,6 +56,7 @@ appointments_slot_unique    UNIQUE        slot_id, provider_id
 ```
 
 **Query sketch:**
+
 ```sql
 SELECT
     c.conname AS constraint,

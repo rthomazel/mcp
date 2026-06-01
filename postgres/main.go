@@ -69,12 +69,14 @@ func run() error {
 		mcp.WithDescription("List all schemas in the database."),
 	), h.HandleListSchemas)
 
-	s.AddTool(mcp.NewTool("describe_schema",
+	s.AddTool(mcp.NewTool(
+		"describe_schema",
 		mcp.WithDescription("High-level overview of all tables and views in a schema: row estimates, sizes, and comments. Best first call for session orientation."),
 		mcp.WithString("schema", mcp.Description("Schema name. Defaults to '"+cfg.DefaultSchema+"'.")),
 	), h.HandleDescribeSchema)
 
-	s.AddTool(mcp.NewTool("list_tables",
+	s.AddTool(mcp.NewTool(
+		"list_tables",
 		mcp.WithDescription("List all tables in a schema."),
 		mcp.WithString("schema", mcp.Description("Schema name. Defaults to '"+cfg.DefaultSchema+"'.")),
 	), h.HandleListTables)
