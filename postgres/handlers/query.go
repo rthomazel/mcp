@@ -45,7 +45,7 @@ func (h *Handler) HandleQuery(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if len(rowData) == 0 {
 		return mcp.NewToolResultText("query returned no results"), nil
 	}
-	return mcp.NewToolResultText(tableResult(headers, rowData, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult(headers, rowData, capped, h.cfg.CapNote())), nil
 }
 
 // HandleMutate executes a DML statement (INSERT, UPDATE, DELETE, TRUNCATE).

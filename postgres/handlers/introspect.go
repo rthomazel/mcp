@@ -45,7 +45,7 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 	}
 	out := strings.Join(schemas, "\n")
 	if capped {
-		out = capNote(h.cfg.MaxRows) + out
+		out = h.cfg.CapNote() + out
 	}
 	return mcp.NewToolResultText(out), nil
 }
@@ -90,7 +90,7 @@ func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest)
 	if len(tableRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no tables found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"table", "type"}, tableRows, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"table", "type"}, tableRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleDescribeTable describes columns of a table.
@@ -147,7 +147,7 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 	if len(colRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("table %s.%s not found or has no columns", schema, table)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"column", "type", "nullable", "default", "comment"}, colRows, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"column", "type", "nullable", "default", "comment"}, colRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleListIndexes lists indexes on a table.
@@ -197,7 +197,7 @@ func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest
 	if len(idxRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no indexes found on %s.%s", schema, table)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"index", "definition", "unique"}, idxRows, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"index", "definition", "unique"}, idxRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleListForeignKeys lists foreign key constraints on a table.
@@ -256,7 +256,7 @@ func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolReq
 	if len(fkRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no foreign keys found on %s.%s", schema, table)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"constraint", "column", "foreign_schema", "foreign_table", "foreign_column"}, fkRows, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"constraint", "column", "foreign_schema", "foreign_table", "foreign_column"}, fkRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleListViews lists views in a schema.
@@ -299,7 +299,7 @@ func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) 
 	if len(viewRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no views found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"view", "definition"}, viewRows, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"view", "definition"}, viewRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleListFunctions lists functions and stored procedures in a schema.
@@ -343,7 +343,7 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 	if len(funcRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no functions found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"function", "type", "returns"}, funcRows, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"function", "type", "returns"}, funcRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleTableStats returns row count and maintenance stats for a table.
@@ -384,7 +384,7 @@ func (h *Handler) HandleTableStats(ctx context.Context, req mcp.CallToolRequest)
 	return mcp.NewToolResultText(tableResult(
 		[]string{"live_rows", "dead_rows", "last_vacuum", "last_autovacuum", "last_analyze", "last_autoanalyze"},
 		[][]string{{liveRows, deadRows, lastVacuum, lastAutovacuum, lastAnalyze, lastAutoanalyze}},
-		false, h.cfg.MaxRows,
+		false, h.cfg.CapNote(),
 	)), nil
 }
 
@@ -429,7 +429,7 @@ func (h *Handler) HandleDatabaseSize(ctx context.Context, req mcp.CallToolReques
 
 	tableSizes := formatTable([]string{"schema", "table", "size"}, tableRows)
 	if capped {
-		tableSizes = capNote(h.cfg.MaxRows) + tableSizes
+		tableSizes = h.cfg.CapNote() + tableSizes
 	}
 	return mcp.NewToolResultText(fmt.Sprintf("Total database size: %s\n\ntable_sizes:\n%s", totalSize, tableSizes)), nil
 }
@@ -480,7 +480,7 @@ func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolReques
 	if len(searchRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no matches for term %q", term)), nil
 	}
-	return mcp.NewToolResultText(tableResult([]string{"kind", "schema", "name", "detail"}, searchRows, capped, h.cfg.MaxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"kind", "schema", "name", "detail"}, searchRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleERDiagram generates a Mermaid ERD from FK relationships.
@@ -535,7 +535,7 @@ func (h *Handler) HandleERDiagram(ctx context.Context, req mcp.CallToolRequest) 
 	}
 	out := "erDiagram\n" + strings.Join(lines, "\n")
 	if capped {
-		out = capNote(h.cfg.MaxRows) + out
+		out = h.cfg.CapNote() + out
 	}
 	return mcp.NewToolResultText(out), nil
 }

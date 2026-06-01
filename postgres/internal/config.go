@@ -25,6 +25,11 @@ type Config struct {
 	DeniedSchemas          []string
 }
 
+// CapNote returns the standard cap-warning prepended to truncated result sets.
+func (c *Config) CapNote() string {
+	return fmt.Sprintf("[results capped at %d rows — use LIMIT/OFFSET to paginate]\n\n", c.MaxRows)
+}
+
 // LoadConfig reads configuration from environment variables (all prefixed POSTGRES_MCP_).
 func LoadConfig() (*Config, error) {
 	cfg := &Config{

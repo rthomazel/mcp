@@ -51,22 +51,18 @@ var (
 	dclAllowlist = []string{"GRANT", "REVOKE"}
 )
 
-// tableResult formats data as a tab-separated table, prepending a cap note when capped is true.
+// tableResult formats data as a tab-separated table, prepending note when capped is true.
+// note is the cap-warning string from Config.CapNote().
 // Returns an empty string if data is empty — callers should emit their own context-specific empty message.
-func tableResult(headers []string, data [][]string, capped bool, maxRows int) string {
+func tableResult(headers []string, data [][]string, capped bool, note string) string {
 	if len(data) == 0 {
 		return ""
 	}
 	out := formatTable(headers, data)
 	if capped {
-		out = capNote(maxRows) + out
+		out = note + out
 	}
 	return out
-}
-
-// capNote returns the standard cap-warning prefix prepended to capped result sets.
-func capNote(maxRows int) string {
-	return fmt.Sprintf("[results capped at %d rows — use LIMIT/OFFSET to paginate]\n\n", maxRows)
 }
 
 // formatTable returns a plain-text tab-separated table from headers and rows.

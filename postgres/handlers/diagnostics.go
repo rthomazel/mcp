@@ -172,7 +172,7 @@ func (h *Handler) HandleActiveConnections(ctx context.Context, req mcp.CallToolR
 	}
 	return mcp.NewToolResultText(tableResult(
 		[]string{"pid", "user", "application", "client", "state", "wait_type", "wait_event", "query_start"},
-		connRows, capped, h.cfg.MaxRows)), nil
+		connRows, capped, h.cfg.CapNote())), nil
 }
 
 // HandleActiveLocks shows blocking lock chains from pg_locks.
@@ -230,5 +230,5 @@ func (h *Handler) HandleActiveLocks(ctx context.Context, req mcp.CallToolRequest
 	}
 	return mcp.NewToolResultText(tableResult(
 		[]string{"blocked_pid", "blocked_user", "blocking_pid", "blocking_user", "query"},
-		lockRows, capped, h.cfg.MaxRows)), nil
+		lockRows, capped, h.cfg.CapNote())), nil
 }
