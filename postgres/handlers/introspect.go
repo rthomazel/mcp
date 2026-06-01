@@ -23,13 +23,18 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 	defer rows.Close()
 
 	var schemas []string
-	for rows.Next() && len(schemas) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var schema string
 		if err := rows.Scan(&schema); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		if h.schemaAllowed(schema) {
 			schemas = append(schemas, schema)
+			if len(schemas) == h.cfg.MaxRows {
+				capped = rows.Next()
+				break
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -38,7 +43,11 @@ func (h *Handler) HandleListSchemas(ctx context.Context, req mcp.CallToolRequest
 	if len(schemas) == 0 {
 		return mcp.NewToolResultText("no schemas found"), nil
 	}
-	return mcp.NewToolResultText(strings.Join(schemas, "\n")), nil
+	out := strings.Join(schemas, "\n")
+	if capped {
+		out = capNote(h.cfg.MaxRows) + out
+	}
+	return mcp.NewToolResultText(out), nil
 }
 
 // HandleListTables lists tables in a schema.
@@ -63,12 +72,17 @@ func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest)
 	defer rows.Close()
 
 	var tableRows [][]string
-	for rows.Next() && len(tableRows) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var tableName, tableType string
 		if err := rows.Scan(&tableName, &tableType); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		tableRows = append(tableRows, []string{tableName, tableType})
+		if len(tableRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -76,7 +90,7 @@ func (h *Handler) HandleListTables(ctx context.Context, req mcp.CallToolRequest)
 	if len(tableRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no tables found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(formatTable([]string{"table", "type"}, tableRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"table", "type"}, tableRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleDescribeTable describes columns of a table.
@@ -114,6 +128,7 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 	defer rows.Close()
 
 	var colRows [][]string
+	var capped bool
 	for rows.Next() {
 		var colName, dataType, isNullable string
 		var colDefault, comment *string
@@ -121,6 +136,10 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		colRows = append(colRows, []string{colName, dataType, isNullable, lo.FromPtr(colDefault), lo.FromPtr(comment)})
+		if len(colRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -128,7 +147,7 @@ func (h *Handler) HandleDescribeTable(ctx context.Context, req mcp.CallToolReque
 	if len(colRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("table %s.%s not found or has no columns", schema, table)), nil
 	}
-	return mcp.NewToolResultText(formatTable([]string{"column", "type", "nullable", "default", "comment"}, colRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"column", "type", "nullable", "default", "comment"}, colRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleListIndexes lists indexes on a table.
@@ -160,12 +179,17 @@ func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest
 	defer rows.Close()
 
 	var idxRows [][]string
-	for rows.Next() && len(idxRows) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var name, def, unique string
 		if err := rows.Scan(&name, &def, &unique); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		idxRows = append(idxRows, []string{name, def, unique})
+		if len(idxRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -173,7 +197,7 @@ func (h *Handler) HandleListIndexes(ctx context.Context, req mcp.CallToolRequest
 	if len(idxRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no indexes found on %s.%s", schema, table)), nil
 	}
-	return mcp.NewToolResultText(formatTable([]string{"index", "definition", "unique"}, idxRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"index", "definition", "unique"}, idxRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleListForeignKeys lists foreign key constraints on a table.
@@ -214,12 +238,17 @@ func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolReq
 	defer rows.Close()
 
 	var fkRows [][]string
-	for rows.Next() && len(fkRows) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var constraint, col, fSchema, fTable, fCol string
 		if err := rows.Scan(&constraint, &col, &fSchema, &fTable, &fCol); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		fkRows = append(fkRows, []string{constraint, col, fSchema, fTable, fCol})
+		if len(fkRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -227,7 +256,7 @@ func (h *Handler) HandleListForeignKeys(ctx context.Context, req mcp.CallToolReq
 	if len(fkRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no foreign keys found on %s.%s", schema, table)), nil
 	}
-	return mcp.NewToolResultText(formatTable([]string{"constraint", "column", "foreign_schema", "foreign_table", "foreign_column"}, fkRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"constraint", "column", "foreign_schema", "foreign_table", "foreign_column"}, fkRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleListViews lists views in a schema.
@@ -252,12 +281,17 @@ func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) 
 	defer rows.Close()
 
 	var viewRows [][]string
-	for rows.Next() && len(viewRows) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var name, def string
 		if err := rows.Scan(&name, &def); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		viewRows = append(viewRows, []string{name, def})
+		if len(viewRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -265,7 +299,7 @@ func (h *Handler) HandleListViews(ctx context.Context, req mcp.CallToolRequest) 
 	if len(viewRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no views found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(formatTable([]string{"view", "definition"}, viewRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"view", "definition"}, viewRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleListFunctions lists functions and stored procedures in a schema.
@@ -290,13 +324,18 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 	defer rows.Close()
 
 	var funcRows [][]string
-	for rows.Next() && len(funcRows) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var name, routineType string
 		var returnType *string
 		if err := rows.Scan(&name, &routineType, &returnType); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		funcRows = append(funcRows, []string{name, routineType, lo.FromPtr(returnType)})
+		if len(funcRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -304,7 +343,7 @@ func (h *Handler) HandleListFunctions(ctx context.Context, req mcp.CallToolReque
 	if len(funcRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no functions found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText(formatTable([]string{"function", "type", "returns"}, funcRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"function", "type", "returns"}, funcRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleTableStats returns row count and maintenance stats for a table.
@@ -342,11 +381,11 @@ func (h *Handler) HandleTableStats(ctx context.Context, req mcp.CallToolRequest)
 		}
 		return mcp.NewToolResultError(fmt.Sprintf("query failed: %v", err)), nil
 	}
-	result := formatTable(
+	return mcp.NewToolResultText(tableResult(
 		[]string{"live_rows", "dead_rows", "last_vacuum", "last_autovacuum", "last_analyze", "last_autoanalyze"},
 		[][]string{{liveRows, deadRows, lastVacuum, lastAutovacuum, lastAnalyze, lastAutoanalyze}},
-	)
-	return mcp.NewToolResultText(result), nil
+		false, h.cfg.MaxRows,
+	)), nil
 }
 
 // HandleDatabaseSize returns total database size and per-table sizes.
@@ -370,22 +409,29 @@ func (h *Handler) HandleDatabaseSize(ctx context.Context, req mcp.CallToolReques
 	defer rows.Close()
 
 	var tableRows [][]string
-	for rows.Next() && len(tableRows) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var schemaName, tableName, size string
 		if err := rows.Scan(&schemaName, &tableName, &size); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		if h.schemaAllowed(schemaName) {
 			tableRows = append(tableRows, []string{schemaName, tableName, size})
+			if len(tableRows) == h.cfg.MaxRows {
+				capped = rows.Next()
+				break
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
 	}
 
-	result := fmt.Sprintf("Total database size: %s\n\ntable_sizes:\n%s",
-		totalSize, formatTable([]string{"schema", "table", "size"}, tableRows))
-	return mcp.NewToolResultText(result), nil
+	tableSizes := formatTable([]string{"schema", "table", "size"}, tableRows)
+	if capped {
+		tableSizes = capNote(h.cfg.MaxRows) + tableSizes
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Total database size: %s\n\ntable_sizes:\n%s", totalSize, tableSizes)), nil
 }
 
 // HandleSearchSchema searches table, column, and view names by keyword.
@@ -414,13 +460,18 @@ func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolReques
 	defer rows.Close()
 
 	var searchRows [][]string
-	for rows.Next() && len(searchRows) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var kind, schema, name, detail string
 		if err := rows.Scan(&kind, &schema, &name, &detail); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		if h.schemaAllowed(schema) {
 			searchRows = append(searchRows, []string{kind, schema, name, detail})
+			if len(searchRows) == h.cfg.MaxRows {
+				capped = rows.Next()
+				break
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -429,7 +480,7 @@ func (h *Handler) HandleSearchSchema(ctx context.Context, req mcp.CallToolReques
 	if len(searchRows) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no matches for term %q", term)), nil
 	}
-	return mcp.NewToolResultText(formatTable([]string{"kind", "schema", "name", "detail"}, searchRows)), nil
+	return mcp.NewToolResultText(tableResult([]string{"kind", "schema", "name", "detail"}, searchRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleERDiagram generates a Mermaid ERD from FK relationships.
@@ -464,12 +515,17 @@ func (h *Handler) HandleERDiagram(ctx context.Context, req mcp.CallToolRequest) 
 	defer rows.Close()
 
 	var lines []string
-	for rows.Next() && len(lines) < h.cfg.MaxRows {
+	var capped bool
+	for rows.Next() {
 		var fromTable, fromCol, toTable, toCol string
 		if err := rows.Scan(&fromTable, &fromCol, &toTable, &toCol); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		lines = append(lines, fmt.Sprintf("    %s ||--o{ %s : \"%s -> %s\"", fromTable, toTable, fromCol, toCol))
+		if len(lines) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -477,5 +533,9 @@ func (h *Handler) HandleERDiagram(ctx context.Context, req mcp.CallToolRequest) 
 	if len(lines) == 0 {
 		return mcp.NewToolResultText(fmt.Sprintf("no foreign key relationships found in schema %s", schema)), nil
 	}
-	return mcp.NewToolResultText("erDiagram\n" + strings.Join(lines, "\n")), nil
+	out := "erDiagram\n" + strings.Join(lines, "\n")
+	if capped {
+		out = capNote(h.cfg.MaxRows) + out
+	}
+	return mcp.NewToolResultText(out), nil
 }

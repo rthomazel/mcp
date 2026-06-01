@@ -45,11 +45,7 @@ func (h *Handler) HandleQuery(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if len(rowData) == 0 {
 		return mcp.NewToolResultText("query returned no results"), nil
 	}
-	result := formatTable(headers, rowData)
-	if capped {
-		result = fmt.Sprintf("[results capped at %d rows — use LIMIT/OFFSET to paginate]\n\n", h.cfg.MaxRows) + result
-	}
-	return mcp.NewToolResultText(result), nil
+	return mcp.NewToolResultText(tableResult(headers, rowData, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleMutate executes a DML statement (INSERT, UPDATE, DELETE, TRUNCATE).

@@ -142,11 +142,8 @@ func (h *Handler) HandleDryRun(ctx context.Context, req mcp.CallToolRequest) (*m
 		if len(rowData) == 0 {
 			return mcp.NewToolResultText(dryRunPrefix + "query returned no results"), nil
 		}
-		result := dryRunPrefix + formatTable(headers, rowData)
-		if capped {
-			result = fmt.Sprintf("[results capped at %d rows]\n\n", h.cfg.MaxRows) + result
-		}
-		return mcp.NewToolResultText(result), nil
+		out := dryRunPrefix + tableResult(headers, rowData, capped, h.cfg.MaxRows)
+		return mcp.NewToolResultText(out), nil
 
 	case "INSERT", "UPDATE", "DELETE", "TRUNCATE":
 		tag, err := tx.Exec(ctx, cleaned)

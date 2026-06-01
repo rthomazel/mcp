@@ -152,12 +152,17 @@ func (h *Handler) HandleActiveConnections(ctx context.Context, req mcp.CallToolR
 	defer rows.Close()
 
 	var connRows [][]string
+	var capped bool
 	for rows.Next() {
 		var pid, user, app, client, state, waitType, waitEvent, queryStart string
 		if err := rows.Scan(&pid, &user, &app, &client, &state, &waitType, &waitEvent, &queryStart); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		connRows = append(connRows, []string{pid, user, app, client, state, waitType, waitEvent, queryStart})
+		if len(connRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -165,9 +170,9 @@ func (h *Handler) HandleActiveConnections(ctx context.Context, req mcp.CallToolR
 	if len(connRows) == 0 {
 		return mcp.NewToolResultText("no active connections"), nil
 	}
-	return mcp.NewToolResultText(formatTable(
+	return mcp.NewToolResultText(tableResult(
 		[]string{"pid", "user", "application", "client", "state", "wait_type", "wait_event", "query_start"},
-		connRows)), nil
+		connRows, capped, h.cfg.MaxRows)), nil
 }
 
 // HandleActiveLocks shows blocking lock chains from pg_locks.
@@ -205,12 +210,17 @@ func (h *Handler) HandleActiveLocks(ctx context.Context, req mcp.CallToolRequest
 	defer rows.Close()
 
 	var lockRows [][]string
+	var capped bool
 	for rows.Next() {
 		var blockedPID, blockedUser, blockingPID, blockingUser, query string
 		if err := rows.Scan(&blockedPID, &blockedUser, &blockingPID, &blockingUser, &query); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 		lockRows = append(lockRows, []string{blockedPID, blockedUser, blockingPID, blockingUser, query})
+		if len(lockRows) == h.cfg.MaxRows {
+			capped = rows.Next()
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("rows error: %v", err)), nil
@@ -218,7 +228,7 @@ func (h *Handler) HandleActiveLocks(ctx context.Context, req mcp.CallToolRequest
 	if len(lockRows) == 0 {
 		return mcp.NewToolResultText("no active locks found"), nil
 	}
-	return mcp.NewToolResultText(formatTable(
+	return mcp.NewToolResultText(tableResult(
 		[]string{"blocked_pid", "blocked_user", "blocking_pid", "blocking_user", "query"},
-		lockRows)), nil
+		lockRows, capped, h.cfg.MaxRows)), nil
 }
