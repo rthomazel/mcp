@@ -36,57 +36,57 @@ func TestValidate(t *testing.T) {
 		wantSQL   string
 	}{
 		{
-			name: "valid SELECT without semicolon gets one added",
+			name:  "valid SELECT without semicolon gets one added",
 			input: "SELECT * FROM users", allowlist: []string{"SELECT"},
 			wantSQL: "SELECT * FROM users;",
 		},
 		{
-			name: "trailing semicolon preserved when present",
+			name:  "trailing semicolon preserved when present",
 			input: "SELECT 1;", allowlist: []string{"SELECT"},
 			wantSQL: "SELECT 1;",
 		},
 		{
-			name: "case insensitive input",
+			name:  "case insensitive input",
 			input: "select * from users", allowlist: []string{"SELECT"},
 			wantSQL: "select * from users;",
 		},
 		{
-			name: "valid WITH CTE",
+			name:  "valid WITH CTE",
 			input: "WITH cte AS (SELECT 1) SELECT * FROM cte", allowlist: []string{"SELECT", "WITH"},
 			wantSQL: "WITH cte AS (SELECT 1) SELECT * FROM cte;",
 		},
 		{
-			name: "multiple statements rejected",
+			name:  "multiple statements rejected",
 			input: "SELECT 1; SELECT 2", allowlist: []string{"SELECT"},
 			wantErr: true, errMsg: "multiple statements are not allowed",
 		},
 		{
-			name: "multiple statements with trailing semicolon rejected",
+			name:  "multiple statements with trailing semicolon rejected",
 			input: "SELECT 1; SELECT 2;", allowlist: []string{"SELECT"},
 			wantErr: true, errMsg: "multiple statements are not allowed",
 		},
 		{
-			name: "BEGIN rejected",
+			name:  "BEGIN rejected",
 			input: "BEGIN", allowlist: []string{"SELECT"},
 			wantErr: true,
 		},
 		{
-			name: "COMMIT rejected",
+			name:  "COMMIT rejected",
 			input: "COMMIT", allowlist: []string{"SELECT"},
 			wantErr: true,
 		},
 		{
-			name: "ROLLBACK rejected",
+			name:  "ROLLBACK rejected",
 			input: "ROLLBACK", allowlist: []string{"SELECT"},
 			wantErr: true,
 		},
 		{
-			name: "SAVEPOINT rejected",
+			name:  "SAVEPOINT rejected",
 			input: "SAVEPOINT sp1", allowlist: []string{"SELECT"},
 			wantErr: true,
 		},
 		{
-			name: "wrong SQL class rejected",
+			name:  "wrong SQL class rejected",
 			input: "INSERT INTO users VALUES (1)", allowlist: []string{"SELECT", "WITH"},
 			wantErr: true,
 		},

@@ -11,6 +11,7 @@ Unit tests cover logic that is complex, stateful, or has edge cases that matter 
 ### `internal/config` — `LoadConfig`
 
 Tests the env-var parsing pipeline. Covers:
+
 - All defaults are applied when no env vars are set (except `DATABASE_URL`)
 - Missing `DATABASE_URL` returns an error
 - Each duration var (`QUERY_TIMEOUT`) rejects invalid values and accepts valid Go duration strings
@@ -22,6 +23,7 @@ Tests the env-var parsing pipeline. Covers:
 ### `handlers` — `schemaAllowed`
 
 The allowlist/denylist interaction has four cases worth pinning:
+
 - No allowlist, no denylist: all schemas pass
 - Allowlist set: only listed schemas pass, others are rejected
 - Denylist set: listed schemas are rejected, others pass
@@ -32,6 +34,7 @@ These are pure logic tests with no DB dependency — just construct a `Handler` 
 ### `handlers` — `sqlClassify`
 
 The token → allowlist/flag mapping in `transaction.go`. Covers:
+
 - Each known DML token maps to `dmlAllowlist` and `AllowDML`
 - Each known DDL token maps to `ddlAllowlist` and `AllowDDL`
 - Each known DCL token maps to `dclAllowlist` and `AllowDCL`
@@ -43,6 +46,7 @@ The token → allowlist/flag mapping in `transaction.go`. Covers:
 ### `handlers` — `formatTable`
 
 The output formatting function. Covers:
+
 - Empty rows returns just the header line
 - Single row produces two lines, tab-separated
 - Multi-row output has correct line count

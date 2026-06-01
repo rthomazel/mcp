@@ -24,7 +24,7 @@ func TestSchemaAllowed(t *testing.T) {
 		want           bool
 	}{
 		{
-			name: "no allowlist no denylist - public passes",
+			name:   "no allowlist no denylist - public passes",
 			schema: "public",
 			want:   true,
 		},
@@ -97,16 +97,16 @@ func TestSchemaAllowed(t *testing.T) {
 
 func TestSqlClassify(t *testing.T) {
 	tests := []struct {
-		name            string
-		sql             string
-		allowMutate        bool
-		allowMutateSchema        bool
-		allowMutatePermissions        bool
-		wantAllowlist   []string
-		wantFlagAllowed bool
-		wantFlagName    string
-		wantErr         bool
-		wantErrContains string
+		name                   string
+		sql                    string
+		allowMutate            bool
+		allowMutateSchema      bool
+		allowMutatePermissions bool
+		wantAllowlist          []string
+		wantFlagAllowed        bool
+		wantFlagName           string
+		wantErr                bool
+		wantErrContains        string
 	}{
 		{name: "INSERT", sql: "INSERT INTO foo VALUES (1)", allowMutate: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_MUTATE"},
 		{name: "UPDATE", sql: "UPDATE foo SET x=1", allowMutate: true, wantAllowlist: dmlAllowlist, wantFlagAllowed: true, wantFlagName: "POSTGRES_MCP_ALLOW_MUTATE"},
@@ -130,8 +130,8 @@ func TestSqlClassify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newTestHandler(&internal.Config{
-				AllowMutate: tt.allowMutate,
-				AllowMutateSchema: tt.allowMutateSchema,
+				AllowMutate:            tt.allowMutate,
+				AllowMutateSchema:      tt.allowMutateSchema,
 				AllowMutatePermissions: tt.allowMutatePermissions,
 			})
 			gotAllowlist, gotFlagAllowed, gotFlagName, err := h.sqlClassify(tt.sql)
