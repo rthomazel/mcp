@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -26,14 +25,11 @@ func main() {
 }
 
 func run() error {
-	configPath := flag.String("config", internal.DefaultConfigPath(), "path to config file")
-	flag.Parse()
-
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})))
 
-	cfg, err := internal.LoadConfig(*configPath)
+	cfg, err := internal.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}

@@ -4,39 +4,10 @@ package internal
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
-
-// DefaultConfigPath returns the default config file path.
-// Resolves to $HOME/.config/github.com.rthomazel/mcp/postgres-config.yaml,
-// falling back to postgres-config.yaml in the working directory if $HOME is unavailable.
-func DefaultConfigPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "postgres-config.yaml"
-	}
-	return filepath.Join(home, ".config", "github.com.rthomazel", "mcp", "postgres-config.yaml")
-}
-
-// configFile is the raw YAML structure decoded from the config file.
-// Duration fields are stored as strings and parsed separately.
-type configFile struct {
-	DSN                    string   `yaml:"dsn"`
-	QueryTimeout           string   `yaml:"query_timeout"`
-	MaxRows                int      `yaml:"max_rows"`
-	DefaultSchema          string   `yaml:"default_schema"`
-	AllowMutate            bool     `yaml:"allow_mutate"`
-	AllowMutateSchema      bool     `yaml:"allow_mutate_schema"`
-	AllowMutatePermissions bool     `yaml:"allow_mutate_permissions"`
-	AllowTransactions      bool     `yaml:"allow_transactions"`
-	AllowDiagnostics       bool     `yaml:"allow_diagnostics"`
-	AllowExplainAnalyze    bool     `yaml:"allow_explain_analyze"`
-	AllowedSchemas         []string `yaml:"allowed_schemas"`
-	DeniedSchemas          []string `yaml:"denied_schemas"`
-}
 
 // Config holds validated, parsed configuration for postgres-mcp.
 type Config struct {
@@ -54,42 +25,41 @@ type Config struct {
 	DeniedSchemas          []string
 }
 
-// LoadConfig reads and validates the YAML config file at path.
-func LoadConfig(path string) (*Config, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open config %q: %w", path, err)
-	}
-	defer f.Close() //nolint:errcheck // read-only; close error is not actionable
-
-	var raw configFile
-	dec := yaml.NewDecoder(f)
-	dec.KnownFields(true)
-
-	if err := dec.Decode(&raw); err != nil {
-		return nil, fmt.Errorf("parse config %q: %w", path, err)
-	}
-
+// LoadConfig reads configuration from environment variables (all prefixed POSTGRES_MCP_).
+func LoadConfig() (*Config, error) {
 	cfg := &Config{
-		DSN:                    raw.DSN,
-		MaxRows:                raw.MaxRows,
-		DefaultSchema:          raw.DefaultSchema,
-		AllowMutate:            raw.AllowMutate,
-		AllowMutateSchema:      raw.AllowMutateSchema,
-		AllowMutatePermissions: raw.AllowMutatePermissions,
-		AllowTransactions:      raw.AllowTransactions,
-		AllowDiagnostics:       raw.AllowDiagnostics,
-		AllowExplainAnalyze:    raw.AllowExplainAnalyze,
-		AllowedSchemas:         raw.AllowedSchemas,
-		DeniedSchemas:          raw.DeniedSchemas,
+		DSN:                    os.Getenv("POSTGRES_MCP_DSN"),
+		DefaultSchema:          os.Getenv("POSTGRES_MCP_DEFAULT_SCHEMA"),
+		AllowMutate:            envBool("POSTGRES_MCP_ALLOW_MUTATE"),
+		AllowMutateSchema:      envBool("POSTGRES_MCP_ALLOW_MUTATE_SCHEMA"),
+		AllowMutatePermissions: envBool("POSTGRES_MCP_ALLOW_MUTATE_PERMISSIONS"),
+		AllowTransactions:      envBool("POSTGRES_MCP_ALLOW_TRANSACTIONS"),
+		AllowDiagnostics:       envBool("POSTGRES_MCP_ALLOW_DIAGNOSTICS"),
+		AllowExplainAnalyze:    envBool("POSTGRES_MCP_ALLOW_EXPLAIN_ANALYZE"),
 	}
 
-	if raw.QueryTimeout != "" {
-		d, err := time.ParseDuration(raw.QueryTimeout)
+	if v := os.Getenv("POSTGRES_MCP_QUERY_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
 		if err != nil {
-			return nil, fmt.Errorf("query_timeout invalid: %w", err)
+			return nil, fmt.Errorf("POSTGRES_MCP_QUERY_TIMEOUT invalid: %w", err)
 		}
 		cfg.QueryTimeout = d
+	}
+
+	if v := os.Getenv("POSTGRES_MCP_MAX_ROWS"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("POSTGRES_MCP_MAX_ROWS invalid: %w", err)
+		}
+		cfg.MaxRows = n
+	}
+
+	if v := os.Getenv("POSTGRES_MCP_ALLOWED_SCHEMAS"); v != "" {
+		cfg.AllowedSchemas = strings.Split(v, ",")
+	}
+
+	if v := os.Getenv("POSTGRES_MCP_DENIED_SCHEMAS"); v != "" {
+		cfg.DeniedSchemas = strings.Split(v, ",")
 	}
 
 	// defaults for zero values
@@ -107,8 +77,13 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	if cfg.DSN == "" {
-		return nil, fmt.Errorf("dsn is required")
+		return nil, fmt.Errorf("POSTGRES_MCP_DSN is required")
 	}
 
 	return cfg, nil
+}
+
+// envBool returns true if the named env var is set to "true" (case-insensitive).
+func envBool(name string) bool {
+	return strings.EqualFold(os.Getenv(name), "true")
 }

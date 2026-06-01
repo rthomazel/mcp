@@ -31,7 +31,7 @@ func (h *Handler) HandlePing(ctx context.Context, req mcp.CallToolRequest) (*mcp
 // Requires allow_diagnostics: true in config.
 func (h *Handler) HandleExplain(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowDiagnostics {
-		return mcp.NewToolResultError("explain is disabled: set allow_diagnostics: true in config"), nil
+		return mcp.NewToolResultError("explain is disabled (set POSTGRES_MCP_ALLOW_DIAGNOSTICS=true)"), nil
 	}
 
 	innerSQL := req.GetString("sql", "")
@@ -71,7 +71,7 @@ func (h *Handler) HandleExplain(ctx context.Context, req mcp.CallToolRequest) (*
 // Requires allow_explain_analyze: true in config. DML inner statements also require allow_mutate: true.
 func (h *Handler) HandleExplainAnalyze(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowExplainAnalyze {
-		return mcp.NewToolResultError("explain_analyze is disabled: set allow_explain_analyze: true in config"), nil
+		return mcp.NewToolResultError("explain_analyze is disabled (set POSTGRES_MCP_ALLOW_EXPLAIN_ANALYZE=true)"), nil
 	}
 
 	innerSQL := req.GetString("sql", "")
@@ -86,7 +86,7 @@ func (h *Handler) HandleExplainAnalyze(ctx context.Context, req mcp.CallToolRequ
 	switch token {
 	case "INSERT", "UPDATE", "DELETE", "TRUNCATE":
 		if !h.cfg.AllowMutate {
-			return mcp.NewToolResultError("explain_analyze with a DML statement requires allow_mutate: true in config"), nil
+			return mcp.NewToolResultError("explain_analyze with a DML statement requires POSTGRES_MCP_ALLOW_MUTATE=true"), nil
 		}
 	}
 
@@ -127,7 +127,7 @@ func (h *Handler) HandleExplainAnalyze(ctx context.Context, req mcp.CallToolRequ
 // Requires allow_diagnostics: true in config.
 func (h *Handler) HandleActiveConnections(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowDiagnostics {
-		return mcp.NewToolResultError("active_connections is disabled: set allow_diagnostics: true in config"), nil
+		return mcp.NewToolResultError("active_connections is disabled (set POSTGRES_MCP_ALLOW_DIAGNOSTICS=true)"), nil
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, h.cfg.QueryTimeout)
@@ -174,7 +174,7 @@ func (h *Handler) HandleActiveConnections(ctx context.Context, req mcp.CallToolR
 // Requires allow_diagnostics: true in config.
 func (h *Handler) HandleActiveLocks(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowDiagnostics {
-		return mcp.NewToolResultError("active_locks is disabled: set allow_diagnostics: true in config"), nil
+		return mcp.NewToolResultError("active_locks is disabled (set POSTGRES_MCP_ALLOW_DIAGNOSTICS=true)"), nil
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, h.cfg.QueryTimeout)

@@ -1,24 +1,13 @@
 package internal
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
-func writeConfig(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "postgres-mcp.yaml")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-	return path
-}
-
 func TestLoadConfig_Defaults(t *testing.T) {
-	path := writeConfig(t, "dsn: postgres://localhost/test\n")
-	cfg, err := LoadConfig(path)
+	t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
@@ -53,27 +42,17 @@ func TestLoadConfig_Defaults(t *testing.T) {
 }
 
 func TestLoadConfig_MissingDSNReturnsError(t *testing.T) {
-	path := writeConfig(t, "max_rows: 50\n")
-	_, err := LoadConfig(path)
+	_, err := LoadConfig()
 	if err == nil {
 		t.Fatal("expected error for missing dsn")
-	}
-	if err.Error() != "dsn is required" {
-		t.Errorf("error = %q, want %q", err.Error(), "dsn is required")
-	}
-}
-
-func TestLoadConfig_MissingFileReturnsError(t *testing.T) {
-	_, err := LoadConfig("/no/such/file.yaml")
-	if err == nil {
-		t.Fatal("expected error for missing file")
 	}
 }
 
 func TestLoadConfig_QueryTimeout(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		path := writeConfig(t, "dsn: postgres://localhost/test\nquery_timeout: 1m\n")
-		cfg, err := LoadConfig(path)
+		t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+		t.Setenv("POSTGRES_MCP_QUERY_TIMEOUT", "1m")
+		cfg, err := LoadConfig()
 		if err != nil {
 			t.Fatalf("LoadConfig() error = %v", err)
 		}
@@ -82,8 +61,9 @@ func TestLoadConfig_QueryTimeout(t *testing.T) {
 		}
 	})
 	t.Run("invalid", func(t *testing.T) {
-		path := writeConfig(t, "dsn: postgres://localhost/test\nquery_timeout: bad\n")
-		_, err := LoadConfig(path)
+		t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+		t.Setenv("POSTGRES_MCP_QUERY_TIMEOUT", "bad")
+		_, err := LoadConfig()
 		if err == nil {
 			t.Fatal("expected error for invalid duration")
 		}
@@ -92,8 +72,9 @@ func TestLoadConfig_QueryTimeout(t *testing.T) {
 
 func TestLoadConfig_MaxRows(t *testing.T) {
 	t.Run("explicit value", func(t *testing.T) {
-		path := writeConfig(t, "dsn: postgres://localhost/test\nmax_rows: 250\n")
-		cfg, err := LoadConfig(path)
+		t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+		t.Setenv("POSTGRES_MCP_MAX_ROWS", "250")
+		cfg, err := LoadConfig()
 		if err != nil {
 			t.Fatalf("LoadConfig() error = %v", err)
 		}
@@ -102,8 +83,9 @@ func TestLoadConfig_MaxRows(t *testing.T) {
 		}
 	})
 	t.Run("zero uses default", func(t *testing.T) {
-		path := writeConfig(t, "dsn: postgres://localhost/test\nmax_rows: 0\n")
-		cfg, err := LoadConfig(path)
+		t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+		t.Setenv("POSTGRES_MCP_MAX_ROWS", "0")
+		cfg, err := LoadConfig()
 		if err != nil {
 			t.Fatalf("LoadConfig() error = %v", err)
 		}
@@ -111,36 +93,35 @@ func TestLoadConfig_MaxRows(t *testing.T) {
 			t.Errorf("MaxRows = %d, want 100 (default)", cfg.MaxRows)
 		}
 	})
-	t.Run("negative uses default", func(t *testing.T) {
-		path := writeConfig(t, "dsn: postgres://localhost/test\nmax_rows: -1\n")
-		cfg, err := LoadConfig(path)
-		if err != nil {
-			t.Fatalf("LoadConfig() error = %v", err)
-		}
-		if cfg.MaxRows != 100 {
-			t.Errorf("MaxRows = %d, want 100 (default)", cfg.MaxRows)
+	t.Run("invalid", func(t *testing.T) {
+		t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+		t.Setenv("POSTGRES_MCP_MAX_ROWS", "notanumber")
+		_, err := LoadConfig()
+		if err == nil {
+			t.Fatal("expected error for invalid max_rows")
 		}
 	})
 }
 
 func TestLoadConfig_BoolFlags(t *testing.T) {
 	type boolCase struct {
-		yamlKey string
-		field   func(*Config) bool
-		name    string
+		envKey string
+		field  func(*Config) bool
+		name   string
 	}
 	flags := []boolCase{
-		{"allow_mutate", func(c *Config) bool { return c.AllowMutate }, "AllowMutate"},
-		{"allow_mutate_schema", func(c *Config) bool { return c.AllowMutateSchema }, "AllowMutateSchema"},
-		{"allow_mutate_permissions", func(c *Config) bool { return c.AllowMutatePermissions }, "AllowMutatePermissions"},
-		{"allow_transactions", func(c *Config) bool { return c.AllowTransactions }, "AllowTransactions"},
-		{"allow_diagnostics", func(c *Config) bool { return c.AllowDiagnostics }, "AllowDiagnostics"},
-		{"allow_explain_analyze", func(c *Config) bool { return c.AllowExplainAnalyze }, "AllowExplainAnalyze"},
+		{"POSTGRES_MCP_ALLOW_MUTATE", func(c *Config) bool { return c.AllowMutate }, "AllowMutate"},
+		{"POSTGRES_MCP_ALLOW_MUTATE_SCHEMA", func(c *Config) bool { return c.AllowMutateSchema }, "AllowMutateSchema"},
+		{"POSTGRES_MCP_ALLOW_MUTATE_PERMISSIONS", func(c *Config) bool { return c.AllowMutatePermissions }, "AllowMutatePermissions"},
+		{"POSTGRES_MCP_ALLOW_TRANSACTIONS", func(c *Config) bool { return c.AllowTransactions }, "AllowTransactions"},
+		{"POSTGRES_MCP_ALLOW_DIAGNOSTICS", func(c *Config) bool { return c.AllowDiagnostics }, "AllowDiagnostics"},
+		{"POSTGRES_MCP_ALLOW_EXPLAIN_ANALYZE", func(c *Config) bool { return c.AllowExplainAnalyze }, "AllowExplainAnalyze"},
 	}
 	for _, ff := range flags {
 		t.Run(ff.name+"=true", func(t *testing.T) {
-			path := writeConfig(t, "dsn: postgres://localhost/test\n"+ff.yamlKey+": true\n")
-			cfg, err := LoadConfig(path)
+			t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+			t.Setenv(ff.envKey, "true")
+			cfg, err := LoadConfig()
 			if err != nil {
 				t.Fatalf("LoadConfig() error = %v", err)
 			}
@@ -149,8 +130,9 @@ func TestLoadConfig_BoolFlags(t *testing.T) {
 			}
 		})
 		t.Run(ff.name+"=false", func(t *testing.T) {
-			path := writeConfig(t, "dsn: postgres://localhost/test\n"+ff.yamlKey+": false\n")
-			cfg, err := LoadConfig(path)
+			t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+			t.Setenv(ff.envKey, "false")
+			cfg, err := LoadConfig()
 			if err != nil {
 				t.Fatalf("LoadConfig() error = %v", err)
 			}
@@ -162,8 +144,9 @@ func TestLoadConfig_BoolFlags(t *testing.T) {
 }
 
 func TestLoadConfig_AllowedSchemas(t *testing.T) {
-	path := writeConfig(t, "dsn: postgres://localhost/test\nallowed_schemas:\n  - public\n  - app\n")
-	cfg, err := LoadConfig(path)
+	t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+	t.Setenv("POSTGRES_MCP_ALLOWED_SCHEMAS", "public,app")
+	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
@@ -179,8 +162,9 @@ func TestLoadConfig_AllowedSchemas(t *testing.T) {
 }
 
 func TestLoadConfig_DeniedSchemasOverridesDefault(t *testing.T) {
-	path := writeConfig(t, "dsn: postgres://localhost/test\ndenied_schemas:\n  - myschema\n")
-	cfg, err := LoadConfig(path)
+	t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+	t.Setenv("POSTGRES_MCP_DENIED_SCHEMAS", "myschema")
+	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
@@ -190,8 +174,9 @@ func TestLoadConfig_DeniedSchemasOverridesDefault(t *testing.T) {
 }
 
 func TestLoadConfig_DefaultSchemaOverride(t *testing.T) {
-	path := writeConfig(t, "dsn: postgres://localhost/test\ndefault_schema: myapp\n")
-	cfg, err := LoadConfig(path)
+	t.Setenv("POSTGRES_MCP_DSN", "postgres://localhost/test")
+	t.Setenv("POSTGRES_MCP_DEFAULT_SCHEMA", "myapp")
+	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}

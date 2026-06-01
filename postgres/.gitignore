@@ -1,6 +1,3 @@
-# local config (contains DSN — never commit)
-postgres-config.yaml
-
 # build output
 bin/postgres-mcp
 

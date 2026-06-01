@@ -38,21 +38,25 @@ func (h *Handler) HandleQuery(ctx context.Context, req mcp.CallToolRequest) (*mc
 		return mcp.NewToolResultError(fmt.Sprintf("query error: %v", err)), nil
 	}
 
-	headers, rowData, err := collectRows(rows, h.cfg.MaxRows)
+	headers, rowData, capped, err := collectRows(rows, h.cfg.MaxRows)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("read rows: %v", err)), nil
 	}
 	if len(rowData) == 0 {
 		return mcp.NewToolResultText("query returned no results"), nil
 	}
-	return mcp.NewToolResultText(formatTable(headers, rowData)), nil
+	result := formatTable(headers, rowData)
+	if capped {
+		result = fmt.Sprintf("[results capped at %d rows — use LIMIT/OFFSET to paginate]\n\n", h.cfg.MaxRows) + result
+	}
+	return mcp.NewToolResultText(result), nil
 }
 
 // HandleMutate executes a DML statement (INSERT, UPDATE, DELETE, TRUNCATE).
-// Requires allow_mutate: true in config.
+// Requires POSTGRES_MCP_ALLOW_MUTATE=true.
 func (h *Handler) HandleMutate(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowMutate {
-		return mcp.NewToolResultError("mutate is disabled: set allow_mutate: true in config"), nil
+		return mcp.NewToolResultError("mutate is disabled (set POSTGRES_MCP_ALLOW_MUTATE=true)"), nil
 	}
 
 	sql := req.GetString("sql", "")
@@ -86,10 +90,10 @@ func (h *Handler) HandleMutate(ctx context.Context, req mcp.CallToolRequest) (*m
 }
 
 // HandleMutateSchema executes a DDL statement (CREATE, ALTER, DROP).
-// Requires allow_mutate_schema: true in config.
+// Requires POSTGRES_MCP_ALLOW_MUTATE_SCHEMA=true.
 func (h *Handler) HandleMutateSchema(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowMutateSchema {
-		return mcp.NewToolResultError("mutate_schema is disabled: set allow_mutate_schema: true in config"), nil
+		return mcp.NewToolResultError("mutate_schema is disabled (set POSTGRES_MCP_ALLOW_MUTATE_SCHEMA=true)"), nil
 	}
 
 	sql := req.GetString("sql", "")
@@ -122,10 +126,10 @@ func (h *Handler) HandleMutateSchema(ctx context.Context, req mcp.CallToolReques
 }
 
 // HandleMutatePermissions executes a DCL statement (GRANT, REVOKE).
-// Requires allow_mutate_permissions: true in config.
+// Requires POSTGRES_MCP_ALLOW_MUTATE_PERMISSIONS=true.
 func (h *Handler) HandleMutatePermissions(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !h.cfg.AllowMutatePermissions {
-		return mcp.NewToolResultError("mutate_permissions is disabled: set allow_mutate_permissions: true in config"), nil
+		return mcp.NewToolResultError("mutate_permissions is disabled (set POSTGRES_MCP_ALLOW_MUTATE_PERMISSIONS=true)"), nil
 	}
 
 	sql := req.GetString("sql", "")
