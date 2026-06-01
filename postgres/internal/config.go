@@ -4,14 +4,22 @@ package internal
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
-// DefaultConfigPath is the config file name resolved relative to the working directory
-// when no --config flag is provided.
-const DefaultConfigPath = "postgres-mcp.yaml"
+// DefaultConfigPath returns the default config file path.
+// Resolves to $HOME/.config/github.com.rthomazel/mcp/postgres-config.yaml,
+// falling back to postgres-config.yaml in the working directory if $HOME is unavailable.
+func DefaultConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "postgres-config.yaml"
+	}
+	return filepath.Join(home, ".config", "github.com.rthomazel", "mcp", "postgres-config.yaml")
+}
 
 // configFile is the raw YAML structure decoded from the config file.
 // Duration fields are stored as strings and parsed separately.

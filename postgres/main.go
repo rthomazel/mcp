@@ -26,7 +26,7 @@ func main() {
 }
 
 func run() error {
-	configPath := flag.String("config", internal.DefaultConfigPath, "path to postgres-mcp.yaml")
+	configPath := flag.String("config", internal.DefaultConfigPath(), "path to config file")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{

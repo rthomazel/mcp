@@ -1,5 +1,5 @@
 # Serves postgres-mcp over mcp-proxy (SSE) or mcpo (OpenAI REST).
-# Copy to your working directory alongside postgres-mcp.yaml and run:
+# Copy to your working directory and run:
 #   POSTGRES_MCP_TRANSPORT=mcp-proxy docker compose up
 
 services:
@@ -10,7 +10,6 @@ services:
     tty: false
     ports:
       - "8001:8001"
-    command: ["--config", "/config/postgres-mcp.yaml"]
     environment:
       # mcp-proxy: native MCP/SSE (for LibreChat, Claude Desktop, MCP-native clients)
       POSTGRES_MCP_TRANSPORT: mcp-proxy
@@ -18,4 +17,5 @@ services:
       # POSTGRES_MCP_TRANSPORT: mcpo
     volumes:
       # Mount your config file (contains DSN and all settings).
-      - ./postgres-mcp.yaml:/config/postgres-mcp.yaml:ro
+      # Mounts your config to the default path inside the container — no --config flag needed.
+      - ./postgres-config.yaml:/root/.config/github.com.rthomazel/mcp/postgres-config.yaml:ro

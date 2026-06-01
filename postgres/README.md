@@ -83,7 +83,7 @@ All config is environment variables. Copy `.env-default` to `.env` and edit.
 ### stdio
 
 ```bash
-cp postgres-mcp-sample.yaml postgres-mcp.yaml
+cp postgres-config.yaml ~/.config/github.com.rthomazel/mcp/postgres-config.yaml
 # edit dsn and any allow_* flags
 cp docker-compose-sample.yml docker-compose.yml
 docker compose run --rm postgres-mcp
@@ -99,7 +99,7 @@ Set `POSTGRES_MCP_TRANSPORT=mcpo` (OpenAI-compatible) or `POSTGRES_MCP_TRANSPORT
 
 ```bash
 # run locally (requires .env with DATABASE_URL)
-./run dev  # requires postgres-mcp.yaml
+./run dev  # requires ~/.config/github.com.rthomazel/mcp/postgres-config.yaml
 
 # tests
 ./run test

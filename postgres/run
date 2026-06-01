@@ -29,7 +29,7 @@ case "$cmd" in
 lint)
   go tool golangci-lint run ./...
   ;;
-# -- start the server requires postgres-mcp.yaml
+# -- start the server (requires ~/.config/github.com.rthomazel/mcp/postgres-config.yaml)
 dev)
   go run main.go
   ;;

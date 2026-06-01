@@ -11,7 +11,7 @@
 - **(transactions)** `mutate_batch` — multi-statement atomic transaction; `dry_run` — executes then unconditionally rolls back
 - **(diagnostics)** `ping`, `explain`, `explain_analyze`, `active_connections`, `active_locks`
 - **(sqlcheck)** comment stripping, multi-statement rejection, tx-control keyword block, trailing semicolon normalisation
-- **(config)** YAML config file (`postgres-mcp.yaml`) with sensible defaults; `POSTGRES_MCP_CONFIG` env var for custom path
+- **(config)** YAML config file; default path `~/.config/github.com.rthomazel/mcp/postgres-config.yaml`; override with `--config <path>`
 - **(container)** multi-arch Docker image (`linux/amd64`, `linux/arm64`), Debian trixie-slim runtime, `postgresmcphttp` entrypoint supporting stdio / mcpo / mcp-proxy transports
 - **(ci)** `postgres-pr` and `postgres-release` GitHub Actions workflows
 

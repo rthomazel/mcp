@@ -1,6 +1,6 @@
 # postgres-mcp configuration
-# Copy to postgres-mcp.yaml and edit before starting the server.
-# postgres-mcp.yaml is gitignored — this sample is safe to commit.
+# Copy to ~/.config/github.com.rthomazel/mcp/postgres-config.yaml and edit before starting the server.
+# That path is gitignored — this sample is safe to commit.
 
 # PostgreSQL connection string (required)
 dsn: postgres://user:password@localhost:5432/dbname
