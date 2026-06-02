@@ -100,10 +100,6 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("tool %q: base_url invalid: %w", toolName, err)
 		}
 
-		if parsed.Path != "" && parsed.Path != "/" {
-			return nil, fmt.Errorf("tool %q: base_url must not contain a path component", toolName)
-		}
-
 		// http:true allows http or https; http:false requires https.
 		if !tool.HTTP && parsed.Scheme != "https" {
 			return nil, fmt.Errorf("tool %q: base_url must use https scheme (set http: true to allow plain http)", toolName)

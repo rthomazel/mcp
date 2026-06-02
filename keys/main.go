@@ -85,12 +85,14 @@ func run() error {
 				mcp.WithString("method", mcp.Required(), mcp.Description("HTTP method")),
 				mcp.WithString("body", mcp.Description("Optional request body. Set Content-Type in headers if needed.")),
 				mcp.WithObject("headers", mcp.Description("Optional non-secret headers, e.g. {\"Content-Type\": \"application/json\"}")),
+				mcp.WithString("response_headers", mcp.Description("Controls which response headers are returned. NONE (default): omit all headers. ALL: include all headers. Comma-separated names: include only those headers, e.g. \"Content-Type,X-RateLimit-Remaining\".")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				args, _ := req.Params.Arguments.(map[string]any)
 				reqPath, _ := args["path"].(string)
 				method, _ := args["method"].(string)
 				body, _ := args["body"].(string)
+				responseHeadersFilter, _ := args["response_headers"].(string)
 
 				agentHeaders := make(map[string]string)
 				if raw, ok := args["headers"].(map[string]any); ok {
@@ -108,7 +110,7 @@ func run() error {
 					return mcp.NewToolResultError("method is required"), nil
 				}
 
-				resp, err := theProxy.Do(ctx, toolName, toolCfg, reqPath, method, body, agentHeaders)
+				resp, err := theProxy.Do(ctx, toolName, toolCfg, reqPath, method, body, agentHeaders, responseHeadersFilter)
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}

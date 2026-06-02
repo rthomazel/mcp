@@ -18,7 +18,7 @@ import (
 // Response is the structured response returned to the agent.
 type Response struct {
 	Status  int               `json:"status"`
-	Headers map[string]string `json:"headers"`
+	Headers map[string]string `json:"headers,omitempty"`
 	Body    string            `json:"body"`
 }
 
@@ -59,9 +59,9 @@ func New(timeout time.Duration, maxResponseBytes, maxRequestBytes int64, store *
 }
 
 // Do executes an authenticated HTTP request for the given tool.
-// path, method, body, agentHeaders come from the agent\'s tool call.
+// path, method, body, agentHeaders, responseHeadersFilter come from the agent\'s tool call.
 // Returns a Response or a descriptive error. Errors never contain secret values.
-func (p *Proxy) Do(ctx context.Context, toolName string, toolCfg config.ToolConfig, reqPath, method, body string, agentHeaders map[string]string) (*Response, error) {
+func (p *Proxy) Do(ctx context.Context, toolName string, toolCfg config.ToolConfig, reqPath, method, body string, agentHeaders map[string]string, responseHeadersFilter string) (*Response, error) {
 	// Check request body size.
 	if int64(len(body)) > p.maxRequestBytes {
 		return nil, fmt.Errorf("tool %q: request body exceeds limit (%d bytes max)", toolName, p.maxRequestBytes)
@@ -130,7 +130,7 @@ func (p *Proxy) Do(ctx context.Context, toolName string, toolCfg config.ToolConf
 
 	return &Response{
 		Status:  resp.StatusCode,
-		Headers: responseHeaders(resp, p.store.Values()),
+		Headers: responseHeaders(resp, p.store.Values(), responseHeadersFilter),
 		Body:    respBody,
 	}, nil
 }
@@ -159,9 +159,10 @@ func validateAndJoinURL(baseURL, reqPath string) (string, error) {
 	if !strings.HasPrefix(apiPath, "/") {
 		apiPath = "/" + apiPath
 	}
-	apiPath = path.Clean(apiPath)
 
-	parsedBase.Path = apiPath
+	// Prepend any existing base path (e.g. base_url "https://api.example.com/v1").
+	basePath := strings.TrimSuffix(parsedBase.Path, "/")
+	parsedBase.Path = path.Clean(basePath + apiPath)
 	parsedBase.RawQuery = parsedPath.RawQuery
 	parsedBase.Fragment = ""
 
@@ -191,14 +192,34 @@ var strippedHeaders = map[string]bool{
 	"Upgrade":             true,
 }
 
-// responseHeaders returns all response headers except hop-by-hop ones.
+// responseHeaders returns response headers filtered by filter.
+// filter "" or "NONE": returns nil (no headers in output).
+// filter "ALL": returns all headers except hop-by-hop ones.
+// Any other value: treated as a comma-separated list of canonical header names to include.
 // Any header value containing a known secret is redacted.
-func responseHeaders(resp *http.Response, secretValues []string) map[string]string {
+func responseHeaders(resp *http.Response, secretValues []string, filter string) map[string]string {
+	normalized := strings.ToUpper(strings.TrimSpace(filter))
+	if normalized == "" || normalized == "NONE" {
+		return nil
+	}
+
+	// Build an allowlist for string filters.
+	var allowed map[string]bool
+	if normalized != "ALL" {
+		allowed = make(map[string]bool)
+		for _, name := range strings.Split(filter, ",") {
+			allowed[http.CanonicalHeaderKey(strings.TrimSpace(name))] = true
+		}
+	}
+
 	result := make(map[string]string)
 
 	for k, vals := range resp.Header {
 		canonical := http.CanonicalHeaderKey(k)
 		if strippedHeaders[canonical] || len(vals) == 0 {
+			continue
+		}
+		if allowed != nil && !allowed[canonical] {
 			continue
 		}
 
@@ -213,5 +234,8 @@ func responseHeaders(resp *http.Response, secretValues []string) map[string]stri
 		result[canonical] = val
 	}
 
+	if len(result) == 0 {
+		return nil
+	}
 	return result
 }

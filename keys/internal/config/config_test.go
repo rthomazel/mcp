@@ -120,7 +120,7 @@ mcp_tools:
 			wantErr:    true,
 		},
 		{
-			name: "base_url contains path component",
+			name: "base_url with path component is allowed",
 			yaml: `
 secrets:
   my_secret:
@@ -129,9 +129,11 @@ mcp_tools:
   my_tool:
     description: "A tool"
     base_url: "https://api.example.com/v1"
+    inject:
+      Authorization:
+        secret: my_secret
 `,
 			createFile: true,
-			wantErr:    true,
 		},
 		{
 			name: "base_url non-https without http:true",
