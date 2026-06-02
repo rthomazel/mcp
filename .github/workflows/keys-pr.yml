@@ -1,0 +1,81 @@
+name: keys pr
+run-name: ${{ github.head_ref }}@${{ github.sha }}
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'keys/**'
+      - '.github/workflows/keys-pr.yml'
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.26"
+
+      - run: ./run keys:build:go
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.26"
+
+      - run: ./run keys:test
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.26"
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.10
+          working-directory: keys
+
+  go-mod:
+    name: go_mod_tidy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.26"
+
+      - uses: j0hnsmith/go-mod-check@v1.0.0
+        with:
+          working-directory: keys
+
+  changelog:
+    name: changelog
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
+
+      - name: check CHANGELOG.md is updated
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -q '^keys/CHANGELOG.md$'; then
+            echo "CHANGELOG.md is updated."
+          else
+            echo "::warning::CHANGELOG.md was not updated in this PR."
+            exit 1
+          fi

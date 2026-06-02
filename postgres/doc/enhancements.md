@@ -1,5 +1,7 @@
 # Possible Enhancements
 
+- When using MCPO proxy to use this server with multiple databases, a single bad database that is disconnected crashes the parent process. 
+
 Ideas that did not make it into the initial release. Prioritised by value-to-effort ratio.
 
 ---

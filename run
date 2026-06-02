@@ -14,6 +14,9 @@ case "$cmd" in
 bench:*)
   exec bench/run "${cmd#bench:}"
   ;;
+keys:*)
+  exec keys/run "${cmd#keys:}"
+  ;;
 postgres:*)
   exec postgres/run "${cmd#postgres:}"
   ;;
@@ -23,6 +26,8 @@ help | *)
   echo "bench:"
   bench/run help | tail -n +4
   echo
+  echo "keys:"
+  keys/run help | tail -n +4
   echo "postgres:"
   postgres/run help | tail -n +4
   ;;

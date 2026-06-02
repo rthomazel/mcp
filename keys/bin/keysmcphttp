@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "$KEYS_MCP_HTTP" = "true" ] || [ "$KEYS_MCP_TRANSPORT" = "mcpo" ]; then
+    echo "INFO: starting keys with mcpo (OpenAI-compatible HTTP)" >&2
+    exec mcpo --port 8001 -- keys
+elif [ "$KEYS_MCP_TRANSPORT" = "mcp-proxy" ]; then
+    echo "INFO: starting keys with mcp-proxy (native MCP/SSE)" >&2
+    exec mcp-proxy --pass-environment --host 0.0.0.0 --port 8001 -- keys
+else
+    echo "INFO: starting keys in stdio mode" >&2
+    exec keys
+fi

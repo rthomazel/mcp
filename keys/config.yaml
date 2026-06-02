@@ -1,0 +1,61 @@
+# keys — sample config
+#
+# Copy this file to your Docker secret mount location or local path,
+# fill in real docker_secret names, and pass --config <path> on startup.
+# Default: config.yaml in the working directory (resolves to /config/config.yaml in the Docker image).
+
+# Global limits (these are the defaults — you can omit them)
+timeout_seconds: 30
+max_response_bytes: 1048576  # 1 MB
+max_request_bytes: 102400    # 100 KB
+
+secrets:
+  # Each secret maps a name to a Docker Secret file under /run/secrets/.
+  # The file is read once at startup; the value is trimmed of whitespace.
+  # An empty value after trimming is a fatal startup error.
+  github_token:
+    docker_secret: github_token   # reads /run/secrets/github_token
+  datadog_api_key:
+    docker_secret: datadog_api_key
+  datadog_app_key:
+    docker_secret: datadog_app_key
+
+mcp_tools:
+  # Each tool becomes an MCP tool with the name used as the key here.
+  # The agent calls it with: path, method, body (optional), headers (optional).
+  # Injected headers are added server-side — the agent never sees secret values.
+
+  github:
+    description: >
+      Make authenticated requests to the GitHub REST and GraphQL API.
+      Base URL: https://api.github.com
+    docs:
+      - https://docs.github.com/en/rest
+      - https://docs.github.com/en/graphql
+    base_url: https://api.github.com
+    inject:
+      Authorization:
+        secret: github_token
+        format: "Bearer {value}"  # optional; omit to use the raw secret value
+
+  datadog:
+    description: >
+      Make authenticated requests to the Datadog API.
+      Base URL: https://api.datadoghq.com
+    docs:
+      - https://docs.datadoghq.com/api/latest/
+    base_url: https://api.datadoghq.com
+    inject:
+      DD-API-KEY:
+        secret: datadog_api_key
+      DD-APPLICATION-KEY:
+        secret: datadog_app_key
+
+  # Example: local/dev service with plain HTTP
+  # local_api:
+  #   description: Local development API. Base URL: http://localhost:8080
+  #   base_url: http://localhost:8080
+  #   http: true   # required for non-https base_url
+  #   inject:
+  #     Authorization:
+  #       secret: local_token
