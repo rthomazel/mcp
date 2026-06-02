@@ -32,7 +32,7 @@ lint)
   ;;
 # -- start the server
 dev)
-  go tool godotenv -f .env go run main.go --config "${KEYS_CONFIG:-_local/config.yaml}"
+  go tool godotenv -f .env go run main.go --config "${KEYS_CONFIG:-config.yaml}"
   ;;
 # -- run tests
 test)
