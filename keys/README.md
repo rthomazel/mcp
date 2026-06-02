@@ -17,7 +17,7 @@ secrets:
   github_token:
     docker_secret: github_token   # reads /run/secrets/github_token
 
-tools:
+mcp_tools:
   github:
     description: >
       Make authenticated requests to the GitHub REST and GraphQL API.
@@ -58,7 +58,7 @@ The default config file is `config.yaml` in the working directory. In the Docker
 ## Development
 
 ```bash
-# start server (requires .env with KEYS_CONFIG pointing to a local config)
+# start server (reads _local/config.yaml by default; override with KEYS_CONFIG=<path>)
 ./run dev
 
 # run tests
