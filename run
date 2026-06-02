@@ -16,6 +16,7 @@ bench:*)
   ;;
 keys:*)
   exec keys/run "${cmd#keys:}"
+  ;;
 postgres:*)
   exec postgres/run "${cmd#postgres:}"
   ;;
