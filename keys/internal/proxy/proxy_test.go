@@ -31,6 +31,9 @@ func TestValidateAndJoinURL(t *testing.T) {
 		{"empty path becomes root", "https://api.github.com", "", "https://api.github.com/", false},
 		{"absolute url rejected", "https://api.github.com", "https://evil.com/path", "", true},
 		{"scheme-relative rejected", "https://api.github.com", "//evil.com/path", "", true},
+		{"base with path component joined", "https://api.example.com/v1", "/users", "https://api.example.com/v1/users", false},
+		{"base with path component and query", "https://api.example.com/API", "/submissions?limit=10", "https://api.example.com/API/submissions?limit=10", false},
+		{"base trailing slash stripped before join", "https://api.example.com/v1/", "/users", "https://api.example.com/v1/users", false},
 	}
 
 	for _, tt := range tests {
@@ -67,27 +70,45 @@ func TestRedactBody(t *testing.T) {
 }
 
 func TestResponseHeaders(t *testing.T) {
+	allHeaders := http.Header{
+		"Content-Type":  {"application/json"},
+		"X-Request-Id":  {"abc123"},
+		"X-Rate-Limit":  {"100"},
+	}
+
 	tests := []struct {
 		name    string
 		headers http.Header
 		secrets []string
+		filter  string
 		want    map[string]string
 	}{
-		{"content-type passed through", http.Header{"Content-Type": {"application/json"}}, nil, map[string]string{"Content-Type": "application/json"}},
-		{"x-request-id passed through", http.Header{"X-Request-Id": {"abc123"}}, nil, map[string]string{"X-Request-Id": "abc123"}},
-		{"arbitrary header passed through", http.Header{"X-Custom-Thing": {"val"}}, nil, map[string]string{"X-Custom-Thing": "val"}},
-		{"header value containing secret redacted", http.Header{"Authorization": {"Bearer mysecret"}}, []string{"mysecret"}, map[string]string{"Authorization": "[redacted]"}},
-		{"hop-by-hop Connection stripped", http.Header{"Connection": {"keep-alive"}}, nil, map[string]string{}},
-		{"hop-by-hop Transfer-Encoding stripped", http.Header{"Transfer-Encoding": {"chunked"}}, nil, map[string]string{}},
-		{"hop-by-hop Keep-Alive stripped", http.Header{"Keep-Alive": {"timeout=5"}}, nil, map[string]string{}},
-		{"hop-by-hop Upgrade stripped", http.Header{"Upgrade": {"websocket"}}, nil, map[string]string{}},
-		{"no headers", http.Header{}, nil, map[string]string{}},
+		// ALL filter — existing behaviour
+		{"ALL: content-type passed through", http.Header{"Content-Type": {"application/json"}}, nil, "ALL", map[string]string{"Content-Type": "application/json"}},
+		{"ALL: x-request-id passed through", http.Header{"X-Request-Id": {"abc123"}}, nil, "ALL", map[string]string{"X-Request-Id": "abc123"}},
+		{"ALL: arbitrary header passed through", http.Header{"X-Custom-Thing": {"val"}}, nil, "ALL", map[string]string{"X-Custom-Thing": "val"}},
+		{"ALL: header value containing secret redacted", http.Header{"Authorization": {"Bearer mysecret"}}, []string{"mysecret"}, "ALL", map[string]string{"Authorization": "[redacted]"}},
+		{"ALL: hop-by-hop Connection stripped", http.Header{"Connection": {"keep-alive"}}, nil, "ALL", nil},
+		{"ALL: hop-by-hop Transfer-Encoding stripped", http.Header{"Transfer-Encoding": {"chunked"}}, nil, "ALL", nil},
+		{"ALL: hop-by-hop Keep-Alive stripped", http.Header{"Keep-Alive": {"timeout=5"}}, nil, "ALL", nil},
+		{"ALL: hop-by-hop Upgrade stripped", http.Header{"Upgrade": {"websocket"}}, nil, "ALL", nil},
+		{"ALL: no headers", http.Header{}, nil, "ALL", nil},
+		// NONE filter (default)
+		{"NONE: returns nil", allHeaders, nil, "NONE", nil},
+		{"empty string: returns nil", allHeaders, nil, "", nil},
+		{"lowercase none: returns nil", allHeaders, nil, "none", nil},
+		// String filter
+		{"string: single header included", allHeaders, nil, "Content-Type", map[string]string{"Content-Type": "application/json"}},
+		{"string: comma-separated subset", allHeaders, nil, "Content-Type,X-Request-Id", map[string]string{"Content-Type": "application/json", "X-Request-Id": "abc123"}},
+		{"string: canonical normalisation", allHeaders, nil, "content-type", map[string]string{"Content-Type": "application/json"}},
+		{"string: spaces around names trimmed", allHeaders, nil, "Content-Type , X-Request-Id", map[string]string{"Content-Type": "application/json", "X-Request-Id": "abc123"}},
+		{"string: non-matching header excluded", allHeaders, nil, "X-Unknown", nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp := &http.Response{StatusCode: 200, Header: tt.headers}
-			assert.Equal(t, tt.want, responseHeaders(resp, tt.secrets))
+			assert.Equal(t, tt.want, responseHeaders(resp, tt.secrets, tt.filter))
 		})
 	}
 }
@@ -114,7 +135,7 @@ func TestDo(t *testing.T) {
 			Inject:  map[string]config.InjectConfig{"Authorization": {Secret: "api_key", Format: "Bearer {value}"}},
 		}
 
-		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil)
+		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil, "")
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.Status)
 		assert.Equal(t, "Bearer mysecret", receivedAuth)
@@ -136,7 +157,7 @@ func TestDo(t *testing.T) {
 			Inject:  map[string]config.InjectConfig{"Authorization": {Secret: "api_key", Format: "Bearer {value}"}},
 		}
 
-		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", map[string]string{"Authorization": "agent-value"})
+		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", map[string]string{"Authorization": "agent-value"}, "")
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.Status)
 		assert.Equal(t, "Bearer injected", receivedAuth)
@@ -155,7 +176,7 @@ func TestDo(t *testing.T) {
 		p := newProxy(t, store)
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
-		_, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", map[string]string{"Connection": "keep-alive"})
+		_, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", map[string]string{"Connection": "keep-alive"}, "")
 		require.NoError(t, err)
 		assert.Equal(t, "", received)
 	})
@@ -170,7 +191,7 @@ func TestDo(t *testing.T) {
 		p := newProxy(t, store)
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
-		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil)
+		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil, "")
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusMovedPermanently, resp.Status)
 	})
@@ -185,7 +206,7 @@ func TestDo(t *testing.T) {
 		p := New(5*time.Second, 1024*1024, 100, store)
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
-		_, err := p.Do(context.Background(), "tool", tcfg, "/", "POST", strings.Repeat("x", 101), nil)
+		_, err := p.Do(context.Background(), "tool", tcfg, "/", "POST", strings.Repeat("x", 101), nil, "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "request body exceeds limit")
 	})
@@ -203,7 +224,7 @@ func TestDo(t *testing.T) {
 		p := newProxy(t, store)
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
-		_, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil)
+		_, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil, "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "response body exceeds limit")
 	})
@@ -219,7 +240,7 @@ func TestDo(t *testing.T) {
 		p := newProxy(t, store)
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
-		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil)
+		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil, "")
 		require.NoError(t, err)
 		assert.Equal(t, "[redacted: response contained secret values]", resp.Body)
 	})
@@ -235,7 +256,7 @@ func TestDo(t *testing.T) {
 		p := newProxy(t, store)
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
-		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil)
+		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil, "")
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
@@ -254,7 +275,7 @@ func TestDo(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err := p.Do(ctx, "tool", tcfg, "/", "GET", "", nil)
+		_, err := p.Do(ctx, "tool", tcfg, "/", "GET", "", nil, "")
 		require.Error(t, err)
 	})
 }
