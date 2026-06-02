@@ -16,6 +16,8 @@ bench:*)
   ;;
 keys:*)
   exec keys/run "${cmd#keys:}"
+postgres:*)
+  exec postgres/run "${cmd#postgres:}"
   ;;
 help | *)
   echo "Usage: ./run <prefix>:<command>"
@@ -25,5 +27,7 @@ help | *)
   echo
   echo "keys:"
   keys/run help | tail -n +4
+  echo "postgres:"
+  postgres/run help | tail -n +4
   ;;
 esac

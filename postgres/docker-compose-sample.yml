@@ -1,0 +1,39 @@
+# Serves postgres-mcp over mcp-proxy (SSE) or mcpo (OpenAI REST).
+# Copy to your working directory and run:
+#   docker compose up
+
+services:
+  postgres-mcp:
+    container_name: postgres-mcp
+    image: ghcr.io/rthomazel/mcp/postgres:latest
+    stdin_open: true
+    tty: false
+    ports:
+      - "8001:8001"
+    environment:
+      # mcp-proxy: native MCP/SSE (for LibreChat, Claude Desktop, MCP-native clients)
+      POSTGRES_MCP_TRANSPORT: mcp-proxy
+      # mcpo: OpenAI-compatible REST API (for Open WebUI and similar)
+      # POSTGRES_MCP_TRANSPORT: mcpo
+
+      # Required: PostgreSQL connection string
+      POSTGRES_MCP_DSN: postgres://user:password@host:5432/dbname
+
+      # Optional overrides (defaults shown)
+      # POSTGRES_MCP_QUERY_TIMEOUT: 30s
+      # POSTGRES_MCP_MAX_ROWS: 100
+      # POSTGRES_MCP_DEFAULT_SCHEMA: public
+
+      # Mutation gates — all off by default
+      # POSTGRES_MCP_ALLOW_MUTATE: "true"
+      # POSTGRES_MCP_ALLOW_MUTATE_SCHEMA: "true"
+      # POSTGRES_MCP_ALLOW_MUTATE_PERMISSIONS: "true"
+      # POSTGRES_MCP_ALLOW_TRANSACTIONS: "true"
+
+      # Diagnostics gates — off by default (expose query text, usernames, client IPs)
+      # POSTGRES_MCP_ALLOW_DIAGNOSTICS: "true"
+      # POSTGRES_MCP_ALLOW_EXPLAIN_ANALYZE: "true"
+
+      # Schema filtering for introspection tools (comma-separated)
+      # POSTGRES_MCP_ALLOWED_SCHEMAS: public,myschema
+      # POSTGRES_MCP_DENIED_SCHEMAS: pg_toast,pg_catalog,information_schema

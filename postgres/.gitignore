@@ -1,0 +1,7 @@
+# build output
+bin/postgres-mcp
+
+# docker-compose override
+docker-compose.yml
+
+_local/*
