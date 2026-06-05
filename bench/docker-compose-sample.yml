@@ -5,11 +5,17 @@ volumes:
 
 services:
   bench-mcp:
-    container_name: bench-mcp-stdio
+    container_name: bench-mcp-http
     image: ghcr.io/rthomazel/mcp/bench:latest
     stdin_open: true
     tty: false
+    ports:
+      - "8001:8001"
     environment:
+      # mcpo: OpenAI-compatible REST API (for Open WebUI and similar)
+      # BENCH_MCP_TRANSPORT: mcpo
+      # mcp-proxy: native MCP/SSE (for LibreChat, Claude Desktop, MCP-native clients)
+      BENCH_MCP_TRANSPORT: mcp-proxy
       # timeout for shell commands
       BENCH_MCP_TIMEOUT: 15s
       # timeout for shell background
