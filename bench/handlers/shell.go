@@ -99,13 +99,13 @@ func expandCommands(commands []string, cwd string) []expandedCmd {
 			if parsed, remainder := parseCWD(cmd); parsed != "" {
 				effectiveCWD = parsed
 				cmd = remainder
-				hints = append(hints, "cwd parsed from 'cd' prefix; pass cwd= directly instead")
+				hints = append(hints, internal.HintCWDParsed)
 			}
 		}
 
 		parts := splitOnAndAnd(cmd)
 		if len(parts) > 1 {
-			hints = append(hints, "auto-split from && chain; commands run independently (no short-circuit on failure)")
+			hints = append(hints, internal.HintAndAndSplit)
 		}
 
 		hint := strings.Join(hints, "; ")
