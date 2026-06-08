@@ -24,7 +24,14 @@ type commandResult struct {
 	Duration   string
 	DurationMS int64
 	TimedOut   bool
+	Hint       string
 	err        string
+}
+
+type expandedCmd struct {
+	cmd  string
+	cwd  string
+	hint string
 }
 
 func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -38,11 +45,14 @@ func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mc
 		cwd = "/"
 	}
 
-	results := make([]*commandResult, len(commands))
-	for i, cmd := range commands {
+	expanded := expandCommands(commands, cwd)
+	results := make([]*commandResult, len(expanded))
+
+	for i, ec := range expanded {
 		start := time.Now()
-		r := runCommand(ctx, h.cfg, cmd, cwd)
-		r.Command = cmd
+		r := runCommand(ctx, h.cfg, ec.cmd, ec.cwd)
+		r.Command = ec.cmd
+		r.Hint = ec.hint
 		results[i] = r
 
 		errorKind := ""
@@ -58,10 +68,10 @@ func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mc
 			StartedAt: start,
 			Duration:  time.Duration(r.DurationMS) * time.Millisecond,
 			ErrorKind: errorKind,
-			Command:   cmd,
+			Command:   ec.cmd,
 			ExitCode:  &exitCode,
 			TimedOut:  r.TimedOut,
-			CWD:       cwd,
+			CWD:       ec.cwd,
 		})
 
 		if r.err != "" {
@@ -71,6 +81,129 @@ func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mc
 
 	multi := len(results) > 1
 	return mcp.NewToolResultText(formatCommandResults(results, multi)), nil
+}
+
+// expandCommands pre-processes commands before execution. This is a behavioral change:
+// && chains are executed as independent commands rather than short-circuiting on failure.
+// 1. Parses a leading "cd PATH &&" prefix and applies it as the effective cwd when no explicit cwd was given.
+// 2. Splits unquoted " && " chains into independent commands, each with its own result entry.
+func expandCommands(commands []string, cwd string) []expandedCmd {
+	defaultCWD := cwd == "/"
+	var out []expandedCmd
+
+	for _, cmd := range commands {
+		effectiveCWD := cwd
+		var hints []string
+
+		if defaultCWD {
+			if parsed, remainder := parseCWD(cmd); parsed != "" {
+				effectiveCWD = parsed
+				cmd = remainder
+				hints = append(hints, internal.HintCWDParsed)
+			}
+		}
+
+		parts := splitOnAndAnd(cmd)
+		if len(parts) > 1 {
+			hints = append(hints, internal.HintAndAndSplit)
+		}
+
+		hint := strings.Join(hints, "; ")
+		for _, part := range parts {
+			out = append(out, expandedCmd{cmd: part, cwd: effectiveCWD, hint: hint})
+		}
+	}
+
+	return out
+}
+
+// parseCWD extracts a leading "cd PATH &&" prefix, returning the path and the
+// remaining command. Returns "", cmd unchanged when the pattern is absent or the path is
+// complex (contains quotes or whitespace).
+func parseCWD(cmd string) (path, remainder string) {
+	rest, ok := strings.CutPrefix(cmd, "cd ")
+	if !ok {
+		return "", cmd
+	}
+
+	idx := strings.Index(rest, " && ")
+	if idx < 0 {
+		return "", cmd
+	}
+
+	path = rest[:idx]
+	if path == "" || strings.ContainsAny(path, "\"' \t") {
+		return "", cmd
+	}
+
+	return path, rest[idx+4:]
+}
+
+// splitOnAndAnd splits a shell command on unquoted " && " sequences.
+// Single-quoted and double-quoted regions are respected; backslash escapes inside
+// double-quoted regions are honoured. $(...) subshells and backtick subshells are
+// treated as opaque — && inside them is never a split point.
+// Returns the original string as a single-element slice when no unquoted " && " is found.
+func splitOnAndAnd(cmd string) []string {
+	var parts []string
+	var cur strings.Builder
+	inSingle := false
+	inDouble := false
+	subshellDepth := 0
+	inBacktick := false
+
+	for i := 0; i < len(cmd); i++ {
+		c := cmd[i]
+		switch {
+		case inSingle:
+			cur.WriteByte(c)
+			if c == '\'' {
+				inSingle = false
+			}
+		case inDouble && c == '\\' && i+1 < len(cmd):
+			cur.WriteByte(c)
+			i++
+			cur.WriteByte(cmd[i])
+		case inDouble:
+			cur.WriteByte(c)
+			if c == '"' {
+				inDouble = false
+			}
+		case c == '\'':
+			inSingle = true
+			cur.WriteByte(c)
+		case c == '"':
+			inDouble = true
+			cur.WriteByte(c)
+		case c == '`':
+			inBacktick = !inBacktick
+			cur.WriteByte(c)
+		case c == '$' && i+1 < len(cmd) && cmd[i+1] == '(':
+			subshellDepth++
+			cur.WriteByte(c)
+			i++
+			cur.WriteByte(cmd[i])
+		case c == ')' && subshellDepth > 0:
+			subshellDepth--
+			cur.WriteByte(c)
+		case subshellDepth == 0 && !inBacktick && strings.HasPrefix(cmd[i:], " && "):
+			parts = append(parts, strings.TrimSpace(cur.String()))
+			cur.Reset()
+			i += 3 // skip " && "; loop i++ lands on char after trailing space
+		default:
+			cur.WriteByte(c)
+		}
+	}
+
+	if s := strings.TrimSpace(cur.String()); s != "" {
+		parts = append(parts, s)
+	}
+
+	if len(parts) == 0 {
+		return []string{cmd}
+	}
+
+	return parts
 }
 
 func formatCommandResults(results []*commandResult, multi bool) string {
@@ -88,6 +221,9 @@ func formatCommandResults(results []*commandResult, multi bool) string {
 
 		b.WriteString("exit: " + strconv.Itoa(r.ExitCode) + "\n")
 		b.WriteString("duration: " + r.Duration + "\n")
+		if r.Hint != "" {
+			b.WriteString("hint: " + r.Hint + "\n")
+		}
 		b.CloseTag("metadata", true)
 		b.Tag("stdout", r.Stdout, true)
 		b.Tag("stderr", r.Stderr, false)

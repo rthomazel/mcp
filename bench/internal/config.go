@@ -114,3 +114,11 @@ const StatsP95MinSamples = 20
 
 // StatsTopLines is the maximum number of commands shown in the stats top-commands table.
 const StatsTopLines = 20
+
+// HintCWDParsed is appended to the shell metadata block when a leading "cd PATH &&" prefix
+// is parsed and applied as the effective working directory.
+const HintCWDParsed = "cwd parsed from 'cd' prefix; pass cwd= directly instead"
+
+// HintAndAndSplit is appended to the shell metadata block when a " && " chain is split
+// into independent commands.
+const HintAndAndSplit = "auto-split from && chain; commands run independently (no short-circuit on failure)"

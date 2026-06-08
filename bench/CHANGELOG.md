@@ -19,6 +19,22 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.6.1](https://github.com/rthomazel/mcp/pull/29) fix: shell command expansion — cd-prefix parsing, && chain splitting
+
+### fix
+
+- [`f5dd701`](https://github.com/rthomazel/mcp/commit/f5dd701) **(handlers/shell)** `expandCommands` pipeline — new pre-execution pass applied to every `shell` call. Two transformations compose in order: (1) `parseCWD` strips a leading `cd PATH &&` prefix and uses the path as `cmd.Dir` when no explicit `cwd` was given; (2) `splitOnAndAnd` breaks unquoted ` && ` chains into independent commands, each producing its own `<command index="N">` block with a separate exit code, stdout, and stderr. Both are behavioral changes: chains previously short-circuited on failure now always run to completion.
+- [`e563e44`](https://github.com/rthomazel/mcp/commit/e563e44) **(handlers/shell)** subshell and backtick safety in `splitOnAndAnd` — `$( ... )` subshells (tracked by depth counter) and backtick regions are treated as opaque; `&&` inside them is never a split point.
+- [`f5dd701`](https://github.com/rthomazel/mcp/commit/f5dd701) **(handlers/shell)** `hint` field in metadata — when either transformation fires, a `hint:` line is appended to the `<metadata>` block nudging the agent toward using `cwd=` and array items on subsequent calls.
+
+### docs
+
+- [`f5dd701`](https://github.com/rthomazel/mcp/commit/f5dd701) **(main)** tool description updates — `shell` description and both parameter descriptions are now prescriptive: prefer separate array items over `&&` chains; use `cwd=` instead of embedding `cd /path &&`; notes that `&&` chains are auto-split.
+
+### test
+
+- [`f5dd701`](https://github.com/rthomazel/mcp/commit/f5dd701) **(handlers/shell)** `shell_test.go` — 15 table-driven cases covering `parseCWD` (plain prefix, multi-segment chain, no-op, quoted and spaced paths) and `splitOnAndAnd` (two- and three-part chains, `2>&1` redirects, single/double-quoted protection, escaped quotes, subshell and backtick passthrough, empty input, single `&`).
+
 ## [0.6.0](https://github.com/rthomazel/bench-mcp/pull/21) feat: tool-call statistics
 
 ### feat
