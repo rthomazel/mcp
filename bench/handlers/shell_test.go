@@ -4,12 +4,12 @@ import (
 	"testing"
 )
 
-func TestPromoteCWD(t *testing.T) {
+func TestParseCWD(t *testing.T) {
 	useCases := []struct {
-		name      string
-		cmd       string
-		wantPath  string
-		wantRem   string
+		name     string
+		cmd      string
+		wantPath string
+		wantRem  string
 	}{
 		{
 			name:     "plain cd prefix",
@@ -51,7 +51,7 @@ func TestPromoteCWD(t *testing.T) {
 
 	for _, u := range useCases {
 		t.Run(u.name, func(t *testing.T) {
-			gotPath, gotRem := promoteCWD(u.cmd)
+			gotPath, gotRem := parseCWD(u.cmd)
 			if gotPath != u.wantPath {
 				t.Errorf("path: got %q, want %q", gotPath, u.wantPath)
 			}
@@ -112,6 +112,21 @@ func TestSplitOnAndAnd(t *testing.T) {
 			name: "single ampersand not split",
 			cmd:  "cmd1 & cmd2",
 			want: []string{"cmd1 & cmd2"},
+		},
+		{
+			name: "&& inside $() subshell not split",
+			cmd:  "echo $(grep 'a && b' file) && ls",
+			want: []string{"echo $(grep 'a && b' file)", "ls"},
+		},
+		{
+			name: "nested $() subshells not split",
+			cmd:  "echo $(outer $(inner && x) && y) && ls",
+			want: []string{"echo $(outer $(inner && x) && y)", "ls"},
+		},
+		{
+			name: "&& inside backtick subshell not split",
+			cmd:  "echo `grep 'x && y' file` && ls",
+			want: []string{"echo `grep 'x && y' file`", "ls"},
 		},
 	}
 

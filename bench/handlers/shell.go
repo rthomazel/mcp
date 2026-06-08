@@ -83,8 +83,9 @@ func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mc
 	return mcp.NewToolResultText(formatCommandResults(results, multi)), nil
 }
 
-// expandCommands pre-processes commands before execution:
-// 1. Promotes a leading "cd PATH &&" prefix to the effective cwd when no explicit cwd was given.
+// expandCommands pre-processes commands before execution. This is a behavioral change:
+// && chains are executed as independent commands rather than short-circuiting on failure.
+// 1. Parses a leading "cd PATH &&" prefix and applies it as the effective cwd when no explicit cwd was given.
 // 2. Splits unquoted " && " chains into independent commands, each with its own result entry.
 func expandCommands(commands []string, cwd string) []expandedCmd {
 	defaultCWD := cwd == "/"
@@ -95,10 +96,10 @@ func expandCommands(commands []string, cwd string) []expandedCmd {
 		var hints []string
 
 		if defaultCWD {
-			if promoted, remainder := promoteCWD(cmd); promoted != "" {
-				effectiveCWD = promoted
+			if parsed, remainder := parseCWD(cmd); parsed != "" {
+				effectiveCWD = parsed
 				cmd = remainder
-				hints = append(hints, "cwd auto-promoted from 'cd' prefix; pass cwd= directly instead")
+				hints = append(hints, "cwd parsed from 'cd' prefix; pass cwd= directly instead")
 			}
 		}
 
@@ -116,10 +117,10 @@ func expandCommands(commands []string, cwd string) []expandedCmd {
 	return out
 }
 
-// promoteCWD extracts a leading "cd PATH &&" prefix, returning the promoted path and the
+// parseCWD extracts a leading "cd PATH &&" prefix, returning the path and the
 // remaining command. Returns "", cmd unchanged when the pattern is absent or the path is
 // complex (contains quotes or whitespace).
-func promoteCWD(cmd string) (path, remainder string) {
+func parseCWD(cmd string) (path, remainder string) {
 	rest, ok := strings.CutPrefix(cmd, "cd ")
 	if !ok {
 		return "", cmd
@@ -140,13 +141,16 @@ func promoteCWD(cmd string) (path, remainder string) {
 
 // splitOnAndAnd splits a shell command on unquoted " && " sequences.
 // Single-quoted and double-quoted regions are respected; backslash escapes inside
-// double-quoted regions are honoured. Returns the original string as a single-element
-// slice when no unquoted " && " is found.
+// double-quoted regions are honoured. $(...) subshells and backtick subshells are
+// treated as opaque — && inside them is never a split point.
+// Returns the original string as a single-element slice when no unquoted " && " is found.
 func splitOnAndAnd(cmd string) []string {
 	var parts []string
 	var cur strings.Builder
 	inSingle := false
 	inDouble := false
+	subshellDepth := 0
+	inBacktick := false
 
 	for i := 0; i < len(cmd); i++ {
 		c := cmd[i]
@@ -171,7 +175,18 @@ func splitOnAndAnd(cmd string) []string {
 		case c == '"':
 			inDouble = true
 			cur.WriteByte(c)
-		case strings.HasPrefix(cmd[i:], " && "):
+		case c == '`':
+			inBacktick = !inBacktick
+			cur.WriteByte(c)
+		case c == '$' && i+1 < len(cmd) && cmd[i+1] == '(':
+			subshellDepth++
+			cur.WriteByte(c)
+			i++
+			cur.WriteByte(cmd[i])
+		case c == ')' && subshellDepth > 0:
+			subshellDepth--
+			cur.WriteByte(c)
+		case subshellDepth == 0 && !inBacktick && strings.HasPrefix(cmd[i:], " && "):
 			parts = append(parts, strings.TrimSpace(cur.String()))
 			cur.Reset()
 			i += 3 // skip " && "; loop i++ lands on char after trailing space

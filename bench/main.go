@@ -77,7 +77,7 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("shell",
-			mcp.WithDescription("Execute one or more shell commands. Returns stdout, stderr, exit code, and duration per command. Times out after "+cfg.Timeout.String()+". Pass commands as separate array items rather than && chains — each item gets its own exit code and output block, making failures unambiguous. Use the cwd parameter instead of leading 'cd /path &&' prefixes. Most agents should call this now and defer shell_background."),
+			mcp.WithDescription("Execute one or more shell commands. Returns stdout, stderr, exit code, and duration per command. Times out after "+cfg.Timeout.String()+". Pass commands as separate array items rather than && chains — each item gets its own exit code and output block, making failures unambiguous. Use the cwd parameter instead of leading 'cd /path &&' prefixes."),
 			mcp.WithArray("commands", mcp.Required(), mcp.Description("Shell commands to execute. Prefer separate array items over && chains — each runs independently with its own exit code, stdout, and stderr. && chains are auto-split when detected."), mcp.Items(map[string]any{"type": "string"})),
 			mcp.WithString("cwd", mcp.Description("Working directory for all commands. Does not persist across tool calls — pass it on every call. Preferred over embedding 'cd /path &&' in each command string.")),
 		),
