@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -139,10 +140,76 @@ func parseCWD(cmd string) (path, remainder string) {
 	return path, rest[idx+4:]
 }
 
+// reHeredocIntro matches a heredoc introducer "<<" or "<<-" followed by an optional
+// quoted or backslash-escaped delimiter. Capture groups: 1=dash flag, 2=single-quoted
+// delimiter, 3=double-quoted delimiter, 4=bare (optionally backslash-escaped) delimiter.
+var reHeredocIntro = regexp.MustCompile(`^<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|\\?([A-Za-z_][A-Za-z0-9_]*))`)
+
+// consumeHeredoc attempts to parse a heredoc introducer starting at cmd[start:].
+// On success it returns the entire heredoc — introducer line remainder, body, and
+// terminator line — as a single opaque string, plus the index immediately following it.
+// The body is copied verbatim without further quote or && interpretation: heredoc
+// content is literal text as far as && splitting is concerned, and body lines may
+// legitimately contain unquoted " && " (e.g. embedded shell scripts). An unterminated
+// heredoc consumes the remainder of the command rather than risk a bad split.
+func consumeHeredoc(cmd string, start int) (consumed string, end int, ok bool) {
+	m := reHeredocIntro.FindStringSubmatchIndex(cmd[start:])
+	if m == nil {
+		return "", 0, false
+	}
+
+	dash := cmd[start+m[2]:start+m[3]] == "-"
+	var delim string
+	switch {
+	case m[4] != -1:
+		delim = cmd[start+m[4] : start+m[5]]
+	case m[6] != -1:
+		delim = cmd[start+m[6] : start+m[7]]
+	case m[8] != -1:
+		delim = cmd[start+m[8] : start+m[9]]
+	}
+
+	lineEnd := strings.IndexByte(cmd[start:], '\n')
+	if lineEnd < 0 {
+		return cmd[start:], len(cmd), true
+	}
+
+	for pos := start + lineEnd + 1; pos <= len(cmd); {
+		nl := strings.IndexByte(cmd[pos:], '\n')
+		line := cmd[pos:]
+		lineEndAbs := len(cmd)
+		if nl >= 0 {
+			line = cmd[pos : pos+nl]
+			lineEndAbs = pos + nl
+		}
+
+		candidate := line
+		if dash {
+			candidate = strings.TrimLeft(candidate, "\t")
+		}
+		if candidate == delim {
+			if nl >= 0 {
+				return cmd[start : lineEndAbs+1], lineEndAbs + 1, true
+			}
+			return cmd[start:], len(cmd), true
+		}
+
+		if nl < 0 {
+			break
+		}
+		pos = lineEndAbs + 1
+	}
+
+	// unterminated heredoc: consume the rest as opaque
+	return cmd[start:], len(cmd), true
+}
+
 // splitOnAndAnd splits a shell command on unquoted " && " sequences.
 // Single-quoted and double-quoted regions are respected; backslash escapes inside
 // double-quoted regions are honoured. $(...) subshells and backtick subshells are
-// treated as opaque — && inside them is never a split point.
+// treated as opaque — && inside them is never a split point. Heredoc bodies
+// ("<<EOF" ... "EOF") are also treated as opaque, since they commonly embed literal
+// " && " (e.g. shell scripts, test fixtures) that must not be treated as a split point.
 // Returns the original string as a single-element slice when no unquoted " && " is found.
 func splitOnAndAnd(cmd string) []string {
 	var parts []string
@@ -186,6 +253,13 @@ func splitOnAndAnd(cmd string) []string {
 		case c == ')' && subshellDepth > 0:
 			subshellDepth--
 			cur.WriteByte(c)
+		case subshellDepth == 0 && !inBacktick && c == '<' && i+1 < len(cmd) && cmd[i+1] == '<':
+			if consumed, end, ok := consumeHeredoc(cmd, i); ok {
+				cur.WriteString(consumed)
+				i = end - 1 // loop i++ lands on first char after the heredoc
+			} else {
+				cur.WriteByte(c)
+			}
 		case subshellDepth == 0 && !inBacktick && strings.HasPrefix(cmd[i:], " && "):
 			parts = append(parts, strings.TrimSpace(cur.String()))
 			cur.Reset()
