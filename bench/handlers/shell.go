@@ -141,41 +141,51 @@ func parseCWD(cmd string) (path, remainder string) {
 }
 
 // reHeredocIntro matches a heredoc introducer "<<" or "<<-" followed by an optional
-// quoted or backslash-escaped delimiter. Capture groups: 1=dash flag, 2=single-quoted
-// delimiter, 3=double-quoted delimiter, 4=bare (optionally backslash-escaped) delimiter.
+// quoted or backslash-escaped delimiter.
 var reHeredocIntro = regexp.MustCompile(`^<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|\\?([A-Za-z_][A-Za-z0-9_]*))`)
 
-// consumeHeredoc attempts to parse a heredoc introducer starting at cmd[start:].
+// extractHeredoc attempts to parse a heredoc introducer starting at cmd[start:].
 // On success it returns the entire heredoc — introducer line remainder, body, and
 // terminator line — as a single opaque string, plus the index immediately following it.
 // The body is copied verbatim without further quote or && interpretation: heredoc
 // content is literal text as far as && splitting is concerned, and body lines may
 // legitimately contain unquoted " && " (e.g. embedded shell scripts). An unterminated
 // heredoc consumes the remainder of the command rather than risk a bad split.
-func consumeHeredoc(cmd string, start int) (consumed string, end int, ok bool) {
+func extractHeredoc(cmd string, start int) (consumed string, end int, ok bool) {
+	// m[0] m[1] -> whole match
+	// m[2] m[3] -> group 1 dash flag
+	// m[4] m[5] -> group 2 single-quoted delimiter
+	// m[6] m[7] -> group 3 double-quoted delimiter
+	// m[8] m[9] -> group 4 bare (optionally backslash-escaped) delimiter
 	m := reHeredocIntro.FindStringSubmatchIndex(cmd[start:])
 	if m == nil {
 		return "", 0, false
 	}
 
+	// <<- allows the terminating delimiter to be indented with tabs.
 	dash := cmd[start+m[2]:start+m[3]] == "-"
+
 	var delim string
 	switch {
 	case m[4] != -1:
 		delim = cmd[start+m[4] : start+m[5]]
+
 	case m[6] != -1:
 		delim = cmd[start+m[6] : start+m[7]]
-	case m[8] != -1:
+
+	default:
 		delim = cmd[start+m[8] : start+m[9]]
 	}
 
 	lineEnd := strings.IndexByte(cmd[start:], '\n')
 	if lineEnd < 0 {
+		// malformed heredoc introducer: consume the remainder as opaque text.
 		return cmd[start:], len(cmd), true
 	}
 
 	for pos := start + lineEnd + 1; pos <= len(cmd); {
 		nl := strings.IndexByte(cmd[pos:], '\n')
+
 		line := cmd[pos:]
 		lineEndAbs := len(cmd)
 		if nl >= 0 {
@@ -183,24 +193,28 @@ func consumeHeredoc(cmd string, start int) (consumed string, end int, ok bool) {
 			lineEndAbs = pos + nl
 		}
 
-		candidate := line
 		if dash {
-			candidate = strings.TrimLeft(candidate, "\t")
+			line = strings.TrimLeft(line, "\t")
 		}
-		if candidate == delim {
+
+		if line == delim {
 			if nl >= 0 {
+				// Return the complete heredoc, including the terminating line.
 				return cmd[start : lineEndAbs+1], lineEndAbs + 1, true
 			}
+
+			// Return the complete heredoc ending at EOF.
 			return cmd[start:], len(cmd), true
 		}
 
 		if nl < 0 {
 			break
 		}
+
 		pos = lineEndAbs + 1
 	}
 
-	// unterminated heredoc: consume the rest as opaque
+	// malformed heredoc ending: consume the remainder as opaque text.
 	return cmd[start:], len(cmd), true
 }
 
@@ -254,8 +268,8 @@ func splitOnAndAnd(cmd string) []string {
 			subshellDepth--
 			cur.WriteByte(c)
 		case subshellDepth == 0 && !inBacktick && c == '<' && i+1 < len(cmd) && cmd[i+1] == '<':
-			if consumed, end, ok := consumeHeredoc(cmd, i); ok {
-				cur.WriteString(consumed)
+			if heredoc, end, ok := extractHeredoc(cmd, i); ok {
+				cur.WriteString(heredoc)
 				i = end - 1 // loop i++ lands on first char after the heredoc
 			} else {
 				cur.WriteByte(c)
