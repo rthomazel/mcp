@@ -22,7 +22,7 @@ type replacement struct {
 // HandleFileReplace replaces each find exactly once per item in a file.
 // All items are validated against the original content before any write.
 func (h *Handler) HandleFileReplace(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := req.Params.Arguments
+	args := req.GetArguments()
 
 	path, _ := args["path"].(string)
 	dryRun, _ := args["dry_run"].(bool)

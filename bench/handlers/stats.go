@@ -16,7 +16,7 @@ func (h *Handler) HandleStats(_ context.Context, req mcp.CallToolRequest) (*mcp.
 	}
 
 	days := 30
-	if v, ok := req.Params.Arguments["days"]; ok && v != nil {
+	if v, ok := req.GetArguments()["days"]; ok && v != nil {
 		if f, ok2 := v.(float64); ok2 {
 			days = int(f)
 		}

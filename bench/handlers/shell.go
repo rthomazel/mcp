@@ -36,12 +36,14 @@ type expandedCmd struct {
 }
 
 func (h *Handler) HandleShell(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	commands, ok := internal.ParseStringSlice(req.Params.Arguments["commands"])
+	args := req.GetArguments()
+
+	commands, ok := internal.ParseStringSlice(args["commands"])
 	if !ok || len(commands) == 0 {
 		return mcp.NewToolResultError("missing required parameter: commands"), nil
 	}
 
-	cwd, _ := req.Params.Arguments["cwd"].(string)
+	cwd, _ := args["cwd"].(string)
 	if cwd == "" {
 		cwd = "/"
 	}
