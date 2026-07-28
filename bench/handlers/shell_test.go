@@ -128,6 +128,36 @@ func TestSplitOnAndAnd(t *testing.T) {
 			cmd:  "echo `grep 'x && y' file` && ls",
 			want: []string{"echo `grep 'x && y' file`", "ls"},
 		},
+		{
+			name: "&& inside single-quoted heredoc delimiter body not split",
+			cmd:  "cat > /tmp/x <<'WRAPPER'\n#!/usr/bin/env bash\nif [[ -z \"$X\" && -f /tmp/y ]]; then\n  echo hi\nfi\nWRAPPER",
+			want: []string{"cat > /tmp/x <<'WRAPPER'\n#!/usr/bin/env bash\nif [[ -z \"$X\" && -f /tmp/y ]]; then\n  echo hi\nfi\nWRAPPER"},
+		},
+		{
+			name: "&& inside double-quoted heredoc delimiter body not split",
+			cmd:  "cat > /tmp/x <<\"EOF\"\na && b\nEOF",
+			want: []string{"cat > /tmp/x <<\"EOF\"\na && b\nEOF"},
+		},
+		{
+			name: "&& inside bare-delimiter heredoc body not split",
+			cmd:  "cat > /tmp/x <<EOF\na && b\nEOF",
+			want: []string{"cat > /tmp/x <<EOF\na && b\nEOF"},
+		},
+		{
+			name: "<<- heredoc with tab-indented terminator not split",
+			cmd:  "cat <<-EOF\n\ta && b\n\tEOF",
+			want: []string{"cat <<-EOF\n\ta && b\n\tEOF"},
+		},
+		{
+			name: "top-level && after heredoc closes still splits",
+			cmd:  "cat > /tmp/x <<'EOF'\nbody with && inside\nEOF\n && ls",
+			want: []string{"cat > /tmp/x <<'EOF'\nbody with && inside\nEOF", "ls"},
+		},
+		{
+			name: "unterminated heredoc consumes remainder without splitting",
+			cmd:  "cat > /tmp/x <<'EOF'\na && b\nno terminator here",
+			want: []string{"cat > /tmp/x <<'EOF'\na && b\nno terminator here"},
+		},
 	}
 
 	for _, u := range useCases {
