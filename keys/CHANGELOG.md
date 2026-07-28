@@ -19,6 +19,13 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.1.1](https://github.com/rthomazel/mcp/pull/34) build: weekly Go dependency update
+
+### build
+
+- [`dfbaf99`](https://github.com/rthomazel/mcp/commit/dfbaf99) **(go.mod)** `github.com/mark3labs/mcp-go` v0.54.1 -> v0.57.0 — no source changes required. `CallToolParams.Arguments` widened from `map[string]any` to `any` in this range, but `main.go` already reads it via a type assertion rather than direct indexing.
+- [`dfbaf99`](https://github.com/rthomazel/mcp/commit/dfbaf99) **(go.mod)** `go.yaml.in/yaml/v3` v3.0.4 -> v3.0.5 — patch bump, config parsing unaffected.
+
 ## [0.1.0](https://github.com/rthomazel/mcp/pull/23) feat: keys server
 
 ### feat
