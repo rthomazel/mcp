@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.1.1](https://github.com/rthomazel/mcp/pull/33) build: weekly Go dependency update
+
+### build
+
+- [`9a364d2`](https://github.com/rthomazel/mcp/commit/9a364d2) **(go.mod)** `github.com/mark3labs/mcp-go` v0.54.1 -> v0.57.0 — no source changes required. `CallToolParams.Arguments` widened from `map[string]any` to `any` in this range, but `handlers/transaction.go` already reads it via `req.GetArguments()`.
+- [`9a364d2`](https://github.com/rthomazel/mcp/commit/9a364d2) **(go.mod)** `github.com/jackc/pgx/v5` v5.9.2 -> v5.10.0 — minor bump of the Postgres driver, no query or connection API changes on our call sites.
+
 ## [0.1.0](https://github.com/rthomazel/mcp/pull/24) feat: initial release
 
 ### feat
