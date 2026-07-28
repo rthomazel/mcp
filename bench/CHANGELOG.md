@@ -19,11 +19,21 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.6.2](https://github.com/rthomazel/mcp/pull/32) fix: migrate to mcp-go v0.57.0 argument accessor
+
+### fix
+
+- **(handlers)** `req.GetArguments()` replaces `req.Params.Arguments` at every tool call site — `mcp-go` changed `CallToolParams.Arguments` from `map[string]any` to `any` (to support `RawArguments` and avoid integer precision loss above 2^53), so the field is no longer directly indexable. `GetArguments()` type-asserts back to `map[string]any` and returns nil when the payload is not a map. Affects `file_replace`, `file_replace_all`, `setup`, `shell`, `shell_background`, `stats`, and `status`. Behavior is unchanged: every read already used the comma-ok form, which degrades identically against a nil map.
+
+### build
+
+- **(go.mod)** `github.com/mark3labs/mcp-go` v0.18.0 -> v0.57.0, `modernc.org/sqlite` v1.50.1 -> v1.54.0, plus transitive bumps — via the weekly `update-dependencies-go` workflow.
+
 ## [0.6.1](https://github.com/rthomazel/mcp/pull/29) fix: shell command expansion — cd-prefix parsing, && chain splitting
 
 ### fix
 
-- [`f5dd701`](https://github.com/rthomazel/mcp/commit/f5dd701) **(handlers/shell)** `expandCommands` pipeline — new pre-execution pass applied to every `shell` call. Two transformations compose in order: (1) `parseCWD` strips a leading `cd PATH &&` prefix and uses the path as `cmd.Dir` when no explicit `cwd` was given; (2) `splitOnAndAnd` breaks unquoted ` && ` chains into independent commands, each producing its own `<command index="N">` block with a separate exit code, stdout, and stderr. Both are behavioral changes: chains previously short-circuited on failure now always run to completion.
+- [`f5dd701`](https://github.com/rthomazel/mcp/commit/f5dd701) **(handlers/shell)** `expandCommands` pipeline — new pre-execution pass applied to every `shell` call. Two transformations compose in order: (1) `parseCWD` strips a leading `cd PATH &&` prefix and uses the path as `cmd.Dir` when no explicit `cwd` was given; (2) `splitOnAndAnd` breaks unquoted `&&` chains into independent commands, each producing its own `<command index="N">` block with a separate exit code, stdout, and stderr. Both are behavioral changes: chains previously short-circuited on failure now always run to completion.
 - [`e563e44`](https://github.com/rthomazel/mcp/commit/e563e44) **(handlers/shell)** subshell and backtick safety in `splitOnAndAnd` — `$( ... )` subshells (tracked by depth counter) and backtick regions are treated as opaque; `&&` inside them is never a split point.
 - [`f5dd701`](https://github.com/rthomazel/mcp/commit/f5dd701) **(handlers/shell)** `hint` field in metadata — when either transformation fires, a `hint:` line is appended to the `<metadata>` block nudging the agent toward using `cwd=` and array items on subsequent calls.
 

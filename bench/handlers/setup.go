@@ -37,7 +37,7 @@ var setupScriptCandidates = []string{
 }
 
 func (h *Handler) HandleSetup(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	raw, _ := req.Params.Arguments["paths"].([]any)
+	raw, _ := req.GetArguments()["paths"].([]any)
 	if len(raw) == 0 {
 		return mcp.NewToolResultError("missing required parameter: paths"), nil
 	}

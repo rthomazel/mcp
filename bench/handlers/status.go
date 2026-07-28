@@ -18,7 +18,7 @@ func (h *Handler) HandleStatus(_ context.Context, req mcp.CallToolRequest) (*mcp
 		h.record(stats.ToolCall{Tool: "status", StartedAt: start, Duration: time.Since(start)})
 	}()
 
-	ids, ok := internal.ParseStringSlice(req.Params.Arguments["job_ids"])
+	ids, ok := internal.ParseStringSlice(req.GetArguments()["job_ids"])
 	if !ok || len(ids) == 0 {
 		return mcp.NewToolResultError("missing required parameter: job_ids"), nil
 	}
