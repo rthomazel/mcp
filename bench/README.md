@@ -136,7 +136,7 @@ For programming languages and other tools create a mise file in the project root
 It will become the source for versioning your tooling.
 
 ```toml
-golang 1.26.4
+golang 1.26.5
 oxfmt latest
 gh latest
 ```
