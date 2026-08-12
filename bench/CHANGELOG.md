@@ -19,6 +19,12 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.6.4](https://github.com/rthomazel/mcp/pull/39) fix: pin mcp SDK below 2.0 in Docker image
+
+### fix
+
+- **(Dockerfile)** `pip install mcpo mcp-proxy` had no upper bound on the transitive `mcp` (Model Context Protocol Python SDK) dependency. `mcp-proxy`/`mcpo` both declare `mcp>=1.17.0`; `mcp` published a breaking `2.0.0` release (2026-07-28) that removed/renamed lowlevel server internals (`mcp.server.lowlevel.server.request_ctx`) that the pinned `mcp-proxy==0.12.0` still imports directly. The 0.6.2 image had resolved `mcp==1.28.1` at build time and worked; rebuilding for 0.6.3 with the exact same Dockerfile silently resolved `mcp==2.0.0` and crashed on startup with `ImportError: cannot import name 'request_ctx' from 'mcp.server.lowlevel.server'` — a floating pip dependency changing under an unrelated release, not a regression in bench's own code. Fixed by pinning `"mcp<2.0.0"` explicitly in the `pip install` line. This pin is temporary: `mcp-proxy` itself is not version-capped by us, it's just that upstream (`sparfenyuk/mcp-proxy`) hasn't released a version compatible with `mcp` 2.x yet. TODO left in the Dockerfile to drop the pin once that happens.
+
 ## [0.6.3](https://github.com/rthomazel/mcp/pull/38) fix: serialize stdio tool call dispatch to preserve submission order
 
 ### fix

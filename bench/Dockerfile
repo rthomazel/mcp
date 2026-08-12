@@ -52,7 +52,14 @@ ENV MISE_DATA_DIR=/mise
 ENV MISE_CONFIG_DIR=/mise
 ENV PATH="/mise/shims:$PATH"
 
-RUN pip install mcpo mcp-proxy --break-system-packages
+# pin mcp: mcpo/mcp-proxy declare mcp>=1.17.0 with no upper bound, and mcp 2.0.0 (released
+# 2026-07-28) removed/renamed lowlevel server internals (e.g. request_ctx) that mcp-proxy 0.12.0
+# still imports directly, so an unpinned install silently resolves a broken combo.
+# TODO: mcp-proxy 0.12.0 (latest as of 2026-08-12, https://pypi.org/project/mcp-proxy/) has not
+# been updated for mcp>=2.0 yet -- this pin is temporary, not us capping mcp-proxy itself. Once
+# upstream (https://github.com/sparfenyuk/mcp-proxy) ships a release compatible with mcp 2.x,
+# drop this pin and let both float again.
+RUN pip install mcpo mcp-proxy "mcp<2.0.0" --break-system-packages
 
 COPY --from=builder /build/bench-mcp /usr/local/bin/bench-mcp
 COPY ./bin/benchmcphttp /usr/local/bin/benchmcphttp
