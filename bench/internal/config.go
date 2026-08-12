@@ -17,6 +17,7 @@ type Config struct {
 	MiseDir             string
 	EditMaxLines        int
 	MaxCandidates       int
+	ToolCallWorkers     int
 	StatsRedactPatterns []*regexp.Regexp
 }
 
@@ -25,6 +26,15 @@ var defaults = Config{
 	BackgroundTimeout: 5 * time.Minute,
 	EditMaxLines:      50,
 	MaxCandidates:     5,
+	// ToolCallWorkers defaults to 1: mcp-go's stdio transport dequeues tool calls in
+	// arrival order but, with more than one worker, processes and writes responses
+	// independently -- so completion order (and any side effects an agent depends on
+	// ordering, e.g. a commit followed by a push issued in the same turn) can race and
+	// finish out of order. A single worker drains the queue strictly FIFO, which
+	// restores deterministic ordering matching submission order. See
+	// BENCH_MCP_TOOL_CALL_WORKERS to opt into concurrent (out-of-order) processing for
+	// throughput on workloads with no cross-call ordering dependency.
+	ToolCallWorkers: 1,
 }
 
 func LoadConfig() (*Config, error) {
@@ -49,6 +59,7 @@ func LoadConfig() (*Config, error) {
 		MiseDir:           miseDir,
 		EditMaxLines:      defaults.EditMaxLines,
 		MaxCandidates:     defaults.MaxCandidates,
+		ToolCallWorkers:   defaults.ToolCallWorkers,
 	}
 
 	if raw := os.Getenv("BENCH_MCP_TIMEOUT"); raw != "" {
@@ -81,6 +92,14 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("BENCH_MCP_MAX_CANDIDATES invalid: must be a positive integer")
 		}
 		cfg.MaxCandidates = n
+	}
+
+	if raw := os.Getenv("BENCH_MCP_TOOL_CALL_WORKERS"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return nil, fmt.Errorf("BENCH_MCP_TOOL_CALL_WORKERS invalid: must be a positive integer")
+		}
+		cfg.ToolCallWorkers = n
 	}
 
 	if raw := os.Getenv("BENCH_MCP_STATS_REDACT_PATTERNS"); raw != "" {

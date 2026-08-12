@@ -20,6 +20,9 @@ services:
       BENCH_MCP_TIMEOUT: 15s
       # timeout for shell background
       BENCH_MCP_BACKGROUND_TIMEOUT: 5m
+      # number of concurrent workers processing queued tool calls; 1 (default) keeps
+      # responses in strict FIFO order, matching the order calls were submitted
+      BENCH_MCP_TOOL_CALL_WORKERS: 1
     volumes:
       # persistent state: mise installs and shims, Go cache, path snapshot
       - bench-mcp-mise:/mise
