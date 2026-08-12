@@ -19,6 +19,16 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.6.3](https://github.com/rthomazel/mcp/pull/38) fix: serialize stdio tool call dispatch to preserve submission order
+
+### fix
+
+- **(config, main)** `BENCH_MCP_TOOL_CALL_WORKERS` (default `1`), wired to `mcp-go`'s `server.WithWorkerPoolSize` — `mcp-go`'s `StdioServer` dispatches `tools/call` requests onto a worker pool that defaults to 5 concurrent workers; workers dequeue in arrival order but execute and write responses independently, so completion order was not guaranteed to match submission order once more than one call was in flight (e.g. a `shell` call running `git push` could complete before a preceding `shell` call running `git commit` had finished, silently pushing stale state). Defaulting the pool to a single worker restores strict FIFO ordering; the var is left configurable for workloads that want concurrent throughput and have no cross-call ordering dependency. No sampling/elicitation usage exists anywhere in `bench`'s handlers, so serializing carries no deadlock risk.
+
+### test
+
+- **(ordering_test.go)** end-to-end regression test driving the real `server.StdioServer` over an in-memory pipe with hand-rolled JSON-RPC (bypassing the `mcp-go` client SDK to get a true happens-before guarantee on submission order) — asserts strict FIFO completion with a single worker and reproduces the out-of-order hazard with the previous default pool size of 5.
+
 ## [0.6.2](https://github.com/rthomazel/mcp/pull/32) fix: migrate to mcp-go v0.57.0 argument accessor
 
 ### fix
