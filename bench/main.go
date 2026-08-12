@@ -152,8 +152,15 @@ func run() error {
 		h.HandleStats,
 	)
 
-	slog.Info("serving on stdio")
-	if err := server.ServeStdio(s); err != nil {
+	slog.Info("serving on stdio", "tool_call_workers", cfg.ToolCallWorkers)
+	// WithWorkerPoolSize(1) (the default, see internal/config.go) makes mcp-go's stdio
+	// transport drain queued tool calls strictly FIFO, so responses are written back in
+	// the same order requests arrived. With a larger pool, workers process and write
+	// responses independently, so completion order is not guaranteed to match submission
+	// order -- a real hazard when a client issues ordered-dependent calls (e.g. a commit
+	// followed by a push) in the same batch. Only raise BENCH_MCP_TOOL_CALL_WORKERS above 1
+	// for workloads where every batched call is truly independent.
+	if err := server.ServeStdio(s, server.WithWorkerPoolSize(cfg.ToolCallWorkers)); err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
 
