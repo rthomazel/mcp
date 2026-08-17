@@ -6,7 +6,7 @@ tool mvdan.cc/gofumpt
 
 require (
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/mark3labs/mcp-go v0.57.0
+	github.com/mark3labs/mcp-go v0.58.0
 	github.com/samber/lo v1.53.0
 )
 
