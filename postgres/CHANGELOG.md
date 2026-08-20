@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased](https://github.com/rthomazel/mcp/pull/44) fix: pin mcp SDK below 2.0
+
+### fix
+
+- **(Dockerfile)** pin `"mcp<2.0.0"` alongside `mcpo`/`mcp-proxy` in the `pip install` line — mirrors the fix already applied to `bench/Dockerfile` in #39, which this Dockerfile was missed by. `mcp` 2.0.0 (published 2026-07-28) removed/renamed lowlevel server internals (`request_ctx`) that `mcp-proxy` still imports directly, so any fresh image build without the pin crashes on startup under `mcp-proxy` transport with `ImportError: cannot import name 'request_ctx' from 'mcp.server.lowlevel.server'`.
+
 ## [0.1.1](https://github.com/rthomazel/mcp/pull/33) build: weekly Go dependency update
 
 ### build
