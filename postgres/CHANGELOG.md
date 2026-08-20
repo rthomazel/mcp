@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [Unreleased](https://github.com/rthomazel/mcp/pull/44) fix: pin mcp SDK below 2.0
+## [0.1.2](https://github.com/rthomazel/mcp/pull/44) fix: pin mcp SDK below 2.0
 
 ### fix
 
