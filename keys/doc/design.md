@@ -135,9 +135,13 @@ checks returns an error to the agent before any network request is made.
 
 ### redirects
 
-Redirects are disabled. The HTTP client does not follow redirects (`CheckRedirect`
-returns `http.ErrUseLastResponse`). The agent receives the redirect response as-is
-and may follow it with a second call.
+Same-origin redirects (identical scheme and host to the original request, e.g. an
+API's own trailing-slash or path-canonicalization 301) are followed automatically,
+up to 5 hops. Cross-origin redirects are never followed — Go's HTTP client copies
+the request headers, including injected credentials, onto any redirect it follows,
+so following a redirect to a different host would leak secrets outside the tool's
+configured `base_url`. For those (and once the hop cap is hit), the agent receives
+the redirect response as-is and may follow it with a second call.
 
 ### agent-supplied headers
 

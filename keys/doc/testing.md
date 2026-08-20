@@ -86,7 +86,9 @@ security-critical and purely functional — table-driven tests, no server needed
 
 | scenario                               | what it checks                                      |
 | -------------------------------------- | --------------------------------------------------- |
-| redirect response (301)                | returned as-is, not followed                        |
+| redirect response (301), same origin   | followed automatically, final response returned     |
+| redirect response (301), cross origin  | returned as-is, not followed                        |
+| redirect chain exceeding hop cap       | last redirect response returned as-is               |
 | request body over limit                | error before network call                           |
 | response body over limit               | error after reading                                 |
 | injected header arrives at server      | server receives correct `Authorization`             |

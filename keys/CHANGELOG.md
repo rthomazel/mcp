@@ -19,6 +19,12 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [Unreleased](https://github.com/rthomazel/mcp/pull/43) fix: follow same-origin redirects
+
+### fix
+
+- **(proxy)** follow same-origin redirects automatically (up to 5 hops) — previously every redirect (`CheckRedirect` returning `http.ErrUseLastResponse`) was returned to the agent as-is, so a trailing-slash 301 like vast.ai's `/bundles` → `/bundles/` required the agent to reissue the call itself, without credentials, defeating the point of the proxy. Cross-origin redirects are still never followed, since Go's client copies injected secret headers onto any request it follows and a cross-host hop would leak credentials outside the tool's configured `base_url`.
+
 ## [0.1.1](https://github.com/rthomazel/mcp/pull/34) build: weekly Go dependency update
 
 ### build

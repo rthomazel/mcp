@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -71,9 +72,9 @@ func TestRedactBody(t *testing.T) {
 
 func TestResponseHeaders(t *testing.T) {
 	allHeaders := http.Header{
-		"Content-Type":  {"application/json"},
-		"X-Request-Id":  {"abc123"},
-		"X-Rate-Limit":  {"100"},
+		"Content-Type": {"application/json"},
+		"X-Request-Id": {"abc123"},
+		"X-Rate-Limit": {"100"},
 	}
 
 	tests := []struct {
@@ -181,7 +182,7 @@ func TestDo(t *testing.T) {
 		assert.Equal(t, "", received)
 	})
 
-	t.Run("redirect not followed", func(t *testing.T) {
+	t.Run("cross-origin redirect not followed", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "https://example.com", http.StatusMovedPermanently)
 		}))
@@ -192,6 +193,51 @@ func TestDo(t *testing.T) {
 		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
 
 		resp, err := p.Do(context.Background(), "tool", tcfg, "/", "GET", "", nil, "")
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusMovedPermanently, resp.Status)
+	})
+
+	t.Run("same-origin redirect followed automatically", func(t *testing.T) {
+		var receivedAuth string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/bundles" {
+				http.Redirect(w, r, "/bundles/", http.StatusMovedPermanently)
+				return
+			}
+			receivedAuth = r.Header.Get("Authorization")
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"ok":true}`)
+		}))
+		defer srv.Close()
+
+		store := secrets.NewStoreForTest(map[string]string{"tok": "secret-value"})
+		p := newProxy(t, store)
+		tcfg := config.ToolConfig{
+			BaseURL: srv.URL,
+			Inject:  map[string]config.InjectConfig{"Authorization": {Secret: "tok", Format: "Bearer {value}"}},
+		}
+
+		resp, err := p.Do(context.Background(), "tool", tcfg, "/bundles", "GET", "", nil, "")
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.Status)
+		assert.Equal(t, `{"ok":true}`, resp.Body)
+		assert.Equal(t, "Bearer secret-value", receivedAuth)
+	})
+
+	t.Run("redirect chain exceeding hop cap returns last redirect", func(t *testing.T) {
+		mux := func(w http.ResponseWriter, r *http.Request) {
+			n := 0
+			_, _ = fmt.Sscanf(strings.TrimPrefix(r.URL.Path, "/hop"), "%d", &n)
+			http.Redirect(w, r, fmt.Sprintf("/hop%d", n+1), http.StatusMovedPermanently)
+		}
+		srv := httptest.NewServer(http.HandlerFunc(mux))
+		defer srv.Close()
+
+		store := secrets.NewStoreForTest(map[string]string{})
+		p := newProxy(t, store)
+		tcfg := config.ToolConfig{BaseURL: srv.URL, Inject: map[string]config.InjectConfig{}}
+
+		resp, err := p.Do(context.Background(), "tool", tcfg, "/hop0", "GET", "", nil, "")
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusMovedPermanently, resp.Status)
 	})
