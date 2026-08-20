@@ -19,17 +19,12 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
-## [Unreleased](https://github.com/rthomazel/mcp/pull/44) fix: pin mcp SDK below 2.0
+## [0.1.2](https://github.com/rthomazel/mcp/pull/44) fix: pin mcp SDK below 2.0; follow same-origin redirects
 
 ### fix
 
 - **(Dockerfile)** pin `"mcp<2.0.0"` alongside `mcpo`/`mcp-proxy` in the `pip3 install` line — mirrors the fix already applied to `bench/Dockerfile` in #39, which this Dockerfile was missed by. `mcp` 2.0.0 (published 2026-07-28) removed/renamed lowlevel server internals (`request_ctx`) that `mcp-proxy` still imports directly, so any fresh image build without the pin crashes on startup under `mcp-proxy` transport with `ImportError: cannot import name 'request_ctx' from 'mcp.server.lowlevel.server'`. Reported by operator after merging #43 and rebuilding the `keys` image.
-
-## [Unreleased](https://github.com/rthomazel/mcp/pull/43) fix: follow same-origin redirects
-
-### fix
-
-- **(proxy)** follow same-origin redirects automatically (up to 5 hops) — previously every redirect (`CheckRedirect` returning `http.ErrUseLastResponse`) was returned to the agent as-is, so a trailing-slash 301 like vast.ai's `/bundles` → `/bundles/` required the agent to reissue the call itself, without credentials, defeating the point of the proxy. Cross-origin redirects are still never followed, since Go's client copies injected secret headers onto any request it follows and a cross-host hop would leak credentials outside the tool's configured `base_url`.
+- [#43](https://github.com/rthomazel/mcp/pull/43) **(proxy)** follow same-origin redirects automatically (up to 5 hops) — previously every redirect (`CheckRedirect` returning `http.ErrUseLastResponse`) was returned to the agent as-is, so a trailing-slash 301 like vast.ai's `/bundles` → `/bundles/` required the agent to reissue the call itself, without credentials, defeating the point of the proxy. Cross-origin redirects are still never followed, since Go's client copies injected secret headers onto any request it follows and a cross-host hop would leak credentials outside the tool's configured `base_url`.
 
 ## [0.1.1](https://github.com/rthomazel/mcp/pull/34) build: weekly Go dependency update
 
