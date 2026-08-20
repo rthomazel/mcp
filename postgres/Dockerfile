@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install mcpo mcp-proxy --break-system-packages
+RUN pip install mcpo mcp-proxy "mcp<2.0.0" --break-system-packages
 
 COPY --from=builder /build/postgres-mcp /usr/local/bin/postgres-mcp
 COPY ./bin/postgresmcphttp /usr/local/bin/postgresmcphttp

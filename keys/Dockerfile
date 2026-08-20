@@ -19,7 +19,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # have access to Docker Secret files depending on the host uid-mapping config.
 # Verify secret file permissions match the effective uid in your environment.
 RUN apt-get update -qq && apt-get install -y -qq python3-pip --no-install-recommends \
-    && pip3 install mcpo mcp-proxy --break-system-packages \
+    && pip3 install mcpo mcp-proxy "mcp<2.0.0" --break-system-packages \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 9999 keys && useradd -u 9999 -g 9999 -s /sbin/nologin -r keys
