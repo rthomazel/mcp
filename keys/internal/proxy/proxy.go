@@ -42,13 +42,18 @@ var blocked = map[string]bool{
 	"Trailer":             true,
 }
 
-// New creates a Proxy with redirects disabled and the given timeout.
+// maxRedirectHops caps same-origin auto-following before giving up and
+// returning the last redirect response as-is.
+const maxRedirectHops = 5
+
+// New creates a Proxy with the given timeout. Same-origin redirects (same
+// scheme and host as the original request) are followed automatically, up
+// to maxRedirectHops; cross-origin redirects are never followed — the agent
+// receives the 3xx response as-is and may follow it with a second call.
 func New(timeout time.Duration, maxResponseBytes, maxRequestBytes int64, store *secrets.Store) *Proxy {
 	client := &http.Client{
-		Timeout: timeout,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+		Timeout:       timeout,
+		CheckRedirect: checkRedirect,
 	}
 	return &Proxy{
 		client:           client,
@@ -56,6 +61,26 @@ func New(timeout time.Duration, maxResponseBytes, maxRequestBytes int64, store *
 		maxResponseBytes: maxResponseBytes,
 		maxRequestBytes:  maxRequestBytes,
 	}
+}
+
+// checkRedirect allows same-origin redirects (identical scheme and host to
+// the original request) up to maxRedirectHops, and rejects everything else
+// with http.ErrUseLastResponse so the client returns the redirect response
+// as-is. Go's client always copies the injected secret headers onto
+// redirected requests it follows, so cross-origin hops must never be
+// followed — that would send credentials to a host outside the tool's
+// configured base_url.
+func checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxRedirectHops {
+		return http.ErrUseLastResponse
+	}
+
+	orig := via[0].URL
+	if req.URL.Scheme != orig.Scheme || req.URL.Host != orig.Host {
+		return http.ErrUseLastResponse
+	}
+
+	return nil
 }
 
 // Do executes an authenticated HTTP request for the given tool.
