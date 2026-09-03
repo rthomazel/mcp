@@ -9,6 +9,14 @@ import (
 	"github.com/rthomazel/mcp/bench/internal"
 )
 
+// mustSucceed wraps an os setup call, failing the test if it returns an error.
+func mustSucceed(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+}
+
 func TestResolveTarget(t *testing.T) {
 	for _, uc := range []struct {
 		name     string
@@ -21,22 +29,22 @@ func TestResolveTarget(t *testing.T) {
 		{
 			name: "existing file", rel: "src/main.go", wantRel: "src/main.go",
 			setup: func(t *testing.T, dir string) {
-				os.MkdirAll(filepath.Join(dir, "src"), 0o755)
-				os.WriteFile(filepath.Join(dir, "src/main.go"), []byte("x"), 0o644)
+				mustSucceed(t, os.MkdirAll(filepath.Join(dir, "src"), 0o755))
+				mustSucceed(t, os.WriteFile(filepath.Join(dir, "src/main.go"), []byte("x"), 0o644))
 			},
 		},
 		{
 			name: "missing file resolves parent", rel: "src/new.go", wantRel: "src/new.go",
 			setup: func(t *testing.T, dir string) {
-				os.MkdirAll(filepath.Join(dir, "src"), 0o755)
+				mustSucceed(t, os.MkdirAll(filepath.Join(dir, "src"), 0o755))
 			},
 		},
 		{name: "missing parent is an error", rel: "nope/new.go", wantErr: true, contains: "parent directory"},
 		{
 			name: "symlink parent resolved", rel: "link/new.go", wantRel: "real/new.go",
 			setup: func(t *testing.T, dir string) {
-				os.MkdirAll(filepath.Join(dir, "real"), 0o755)
-				os.Symlink(filepath.Join(dir, "real"), filepath.Join(dir, "link"))
+				mustSucceed(t, os.MkdirAll(filepath.Join(dir, "real"), 0o755))
+				mustSucceed(t, os.Symlink(filepath.Join(dir, "real"), filepath.Join(dir, "link")))
 			},
 		},
 	} {
@@ -97,7 +105,7 @@ func TestCreateMode_EmptyFile(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "empty.txt")
-	os.WriteFile(path, nil, 0o600)
+	mustSucceed(t, os.WriteFile(path, nil, 0o600))
 
 	result, toolErr := h.handleFileReplace(path, []replacement{{find: "x", replace: "content"}}, false)
 	if toolErr != "" {
@@ -182,8 +190,8 @@ func TestCreateMode_NoLineLimit(t *testing.T) {
 func TestCreateMode_SymlinkParent(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, "real"), 0o755)
-	os.Symlink(filepath.Join(dir, "real"), filepath.Join(dir, "link"))
+	mustSucceed(t, os.MkdirAll(filepath.Join(dir, "real"), 0o755))
+	mustSucceed(t, os.Symlink(filepath.Join(dir, "real"), filepath.Join(dir, "link")))
 	path := filepath.Join(dir, "link", "new.txt")
 
 	_, toolErr := h.handleFileReplace(path, []replacement{{find: "a", replace: "x"}}, false)
@@ -199,7 +207,7 @@ func TestCreateMode_ExistingNonEmptyFileUsesEditMode(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "existing.txt")
-	os.WriteFile(path, []byte("alpha beta gamma"), 0o644)
+	mustSucceed(t, os.WriteFile(path, []byte("alpha beta gamma"), 0o644))
 
 	result, toolErr := h.handleFileReplace(path, []replacement{{find: "beta", replace: "BETA"}}, false)
 	if toolErr != "" {
