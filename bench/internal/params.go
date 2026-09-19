@@ -1,6 +1,10 @@
 package internal
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 // ParseStringSlice coerces a []any (as returned by mcp-go for array params)
 // into a []string. Returns false if v is not a slice or contains non-string elements.
@@ -25,11 +29,12 @@ func ParseStringSlice(v any) ([]string, bool) {
 // ParseCommands returns the non-empty command array supplied through exactly one
 // of the supported command parameter names.
 func ParseCommands(args map[string]any) ([]string, error) {
-	const missing = "missing required parameter: exactly one of commands, command, or command_paths must be a non-empty array of strings"
+	commandNames := []string{"commands", "command", "command_paths"}
+	missing := "missing required parameter: exactly one of " + strings.Join(commandNames, ", ") + " must be a non-empty array of strings"
 
 	var commands []string
 	provided := 0
-	for _, name := range []string{"commands", "command", "command_paths"} {
+	for _, name := range commandNames {
 		value, exists := args[name]
 		if !exists {
 			continue
@@ -44,10 +49,10 @@ func ParseCommands(args map[string]any) ([]string, error) {
 	}
 
 	if provided == 0 {
-		return nil, fmt.Errorf("%s", missing)
+		return nil, errors.New(missing)
 	}
 	if provided > 1 {
-		return nil, fmt.Errorf("only one of commands, command, or command_paths may be provided")
+		return nil, errors.New("only one of commands, command, or command_paths may be provided")
 	}
 
 	return commands, nil
