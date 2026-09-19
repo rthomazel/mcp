@@ -1,8 +1,29 @@
 package internal
 
 import (
+	"reflect"
 	"testing"
 )
+
+func TestParseShellCommandAliases(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  string
+		want []string
+	}{
+		{name: "empty", raw: "", want: nil},
+		{name: "trim and deduplicate", raw: " command , command , command-path ", want: []string{"command", "command-path"}},
+		{name: "reserved names ignored", raw: "commands,cwd,command", want: []string{"command"}},
+		{name: "invalid names ignored", raw: "bad.name, command path, -bad, good", want: []string{"good"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := parseShellCommandAliases(test.raw)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("aliases = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
 
 func TestLoadConfig_ShellExpandCommands(t *testing.T) {
 	for _, uc := range []struct {

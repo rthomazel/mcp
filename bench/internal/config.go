@@ -11,16 +11,19 @@ import (
 )
 
 type Config struct {
-	Timeout             time.Duration
-	BackgroundTimeout   time.Duration
-	Home                string
-	MiseDir             string
-	EditMaxLines        int
-	MaxCandidates       int
-	ToolCallWorkers     int
-	ShellExpandCommands bool
-	StatsRedactPatterns []*regexp.Regexp
+	Timeout              time.Duration
+	BackgroundTimeout    time.Duration
+	Home                 string
+	MiseDir              string
+	EditMaxLines         int
+	MaxCandidates        int
+	ToolCallWorkers      int
+	ShellExpandCommands  bool
+	ShellCommandsAliases []string
+	StatsRedactPatterns  []*regexp.Regexp
 }
+
+var shellCommandAliasPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 
 var defaults = Config{
 	Timeout:           15 * time.Second,
@@ -35,8 +38,34 @@ var defaults = Config{
 	// restores deterministic ordering matching submission order. See
 	// BENCH_MCP_TOOL_CALL_WORKERS to opt into concurrent (out-of-order) processing for
 	// throughput on workloads with no cross-call ordering dependency.
-	ToolCallWorkers:     1,
-	ShellExpandCommands: true,
+	ToolCallWorkers:      1,
+	ShellExpandCommands:  true,
+	ShellCommandsAliases: nil,
+}
+
+func parseShellCommandAliases(raw string) []string {
+	seen := make(map[string]struct{})
+	var aliases []string
+	for _, value := range strings.Split(raw, ",") {
+		alias := strings.TrimSpace(value)
+		if alias == "" {
+			continue
+		}
+		if alias == "commands" || alias == "cwd" {
+			slog.Warn("ignoring reserved shell command alias", "alias", alias)
+			continue
+		}
+		if !shellCommandAliasPattern.MatchString(alias) {
+			slog.Warn("ignoring invalid shell command alias", "alias", alias, "reason", "must start with a letter or underscore and contain only letters, digits, underscores, or hyphens")
+			continue
+		}
+		if _, ok := seen[alias]; ok {
+			continue
+		}
+		seen[alias] = struct{}{}
+		aliases = append(aliases, alias)
+	}
+	return aliases
 }
 
 func LoadConfig() (*Config, error) {
@@ -55,14 +84,19 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Timeout:             defaults.Timeout,
-		BackgroundTimeout:   defaults.BackgroundTimeout,
-		Home:                home,
-		MiseDir:             miseDir,
-		EditMaxLines:        defaults.EditMaxLines,
-		MaxCandidates:       defaults.MaxCandidates,
-		ToolCallWorkers:     defaults.ToolCallWorkers,
-		ShellExpandCommands: defaults.ShellExpandCommands,
+		Timeout:              defaults.Timeout,
+		BackgroundTimeout:    defaults.BackgroundTimeout,
+		Home:                 home,
+		MiseDir:              miseDir,
+		EditMaxLines:         defaults.EditMaxLines,
+		MaxCandidates:        defaults.MaxCandidates,
+		ToolCallWorkers:      defaults.ToolCallWorkers,
+		ShellExpandCommands:  defaults.ShellExpandCommands,
+		ShellCommandsAliases: defaults.ShellCommandsAliases,
+	}
+
+	if raw, ok := os.LookupEnv("BENCH_MCP_SHELL_COMMANDS_ALIASES"); ok {
+		cfg.ShellCommandsAliases = parseShellCommandAliases(raw)
 	}
 
 	if raw := os.Getenv("BENCH_MCP_TIMEOUT"); raw != "" {
