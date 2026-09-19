@@ -19,7 +19,7 @@ All tools go through `mcp-go` → handler method → plain text response.
 
 Responses are formatted as human-readable plain text. Metadata fields are wrapped in `<metadata>` tags, one field per line. Command output is wrapped in `<stdout>` and `<stderr>` tags, raw and unindented.
 
-`shell` and `context` run commands synchronously via `runCommand`, which wraps `bash -c` with a context timeout.
+`shell` and `context` run commands synchronously via `runCommand`, which wraps `bash -c` with a context timeout. `shell` accepts exactly one non-empty command array through the canonical `commands` parameter or its compatibility aliases `command` and `command_paths`.
 
 `shell_background` calls `startJob`, which spawns a goroutine, assigns a random 4-digit ID, and returns immediately. The caller polls with `status`.
 

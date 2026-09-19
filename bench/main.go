@@ -77,8 +77,10 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("shell",
-			mcp.WithDescription("Execute one or more shell commands. Returns stdout, stderr, exit code, and duration per command. Times out after "+cfg.Timeout.String()+". Pass commands as separate array items for independent commands, and use cwd instead of embedding a leading cd prefix. && expansion is controlled by BENCH_MCP_SHELL_EXPAND_COMMANDS."),
-			mcp.WithArray("commands", mcp.Required(), mcp.Description("Shell commands to execute. Separate array items run independently. When BENCH_MCP_SHELL_EXPAND_COMMANDS is true, unquoted && chains are auto-split."), mcp.Items(map[string]any{"type": "string"})),
+			mcp.WithDescription("Execute one or more shell commands. Provide exactly one of commands, command, or command_paths. Returns stdout, stderr, exit code, and duration per command. Times out after "+cfg.Timeout.String()+". Pass commands as separate array items for independent commands, and use cwd instead of embedding a leading cd prefix. && expansion is controlled by BENCH_MCP_SHELL_EXPAND_COMMANDS."),
+			mcp.WithArray("commands", mcp.Description("Canonical parameter. Shell commands to execute. Provide exactly one of commands, command, or command_paths. Separate array items run independently. When BENCH_MCP_SHELL_EXPAND_COMMANDS is true, unquoted && chains are auto-split."), mcp.Items(map[string]any{"type": "string"})),
+			mcp.WithArray("command", mcp.Description("Alias to commands. Shell commands to execute. Provide exactly one of commands, command, or command_paths."), mcp.Items(map[string]any{"type": "string"})),
+			mcp.WithArray("command_paths", mcp.Description("Alias to commands. Shell commands to execute; the name is retained for compatibility. Provide exactly one of commands, command, or command_paths."), mcp.Items(map[string]any{"type": "string"})),
 			mcp.WithString("cwd", mcp.Description("Working directory for all commands. Does not persist across tool calls — pass it on every call. Preferred over embedding 'cd /path &&' in each command string.")),
 		),
 		h.HandleShell,
@@ -86,8 +88,10 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("shell_background",
-			mcp.WithDescription("Execute one or more shell commands in the background. Returns a job_id per command immediately. Use status to poll for results. Times out after "+cfg.BackgroundTimeout.String()+"."),
-			mcp.WithArray("commands", mcp.Required(), mcp.Description("Shell commands to execute."), mcp.Items(map[string]any{"type": "string"})),
+			mcp.WithDescription("Execute one or more shell commands in the background. Provide exactly one of commands, command, or command_paths. Returns a job_id per command immediately. Use status to poll for results. Times out after "+cfg.BackgroundTimeout.String()+". Jobs are deprioritized (nice) so they do not starve foreground shell commands, but memory is still shared — a very large job can exhaust container memory."),
+			mcp.WithArray("commands", mcp.Description("Canonical parameter. Shell commands to execute. Provide exactly one of commands, command, or command_paths."), mcp.Items(map[string]any{"type": "string"})),
+			mcp.WithArray("command", mcp.Description("Alias to commands. Shell commands to execute. Provide exactly one of commands, command, or command_paths."), mcp.Items(map[string]any{"type": "string"})),
+			mcp.WithArray("command_paths", mcp.Description("Alias to commands. Shell commands to execute; the name is retained for compatibility. Provide exactly one of commands, command, or command_paths."), mcp.Items(map[string]any{"type": "string"})),
 			mcp.WithString("cwd", mcp.Description("Working directory. Defaults to /")),
 		),
 		h.HandleShellBackground,
@@ -124,7 +128,7 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("file_replace",
-			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff."),
+			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff. If the file does not exist (or is empty) and exactly one replacement is given, the file is created with the contents of replace — find is ignored."),
 			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
 			mcp.WithArray("replacements",
 				mcp.Required(),

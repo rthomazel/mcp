@@ -13,9 +13,9 @@ import (
 func (h *Handler) HandleShellBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
 
-	commands, ok := internal.ParseStringSlice(args["commands"])
-	if !ok || len(commands) == 0 {
-		return mcp.NewToolResultError("missing required parameter: commands"), nil
+	commands, err := internal.ParseCommands(args)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	cwd, _ := args["cwd"].(string)
