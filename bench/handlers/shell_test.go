@@ -18,12 +18,13 @@ func TestParseCommands(t *testing.T) {
 		{name: "canonical", args: map[string]any{"commands": []any{"echo one"}}, want: []string{"echo one"}},
 		{name: "command alias", args: map[string]any{"command": []any{"echo two"}}, want: []string{"echo two"}},
 		{name: "command paths alias", args: map[string]any{"command_paths": []any{"echo three"}}, want: []string{"echo three"}},
+		{name: "empty canonical with alias", args: map[string]any{"commands": []any{}, "command": []any{"echo two"}}, want: []string{"echo two"}},
 		{name: "missing", args: map[string]any{}, err: "missing required parameter"},
-		{name: "empty", args: map[string]any{"commands": []any{}}, err: "invalid parameter"},
+		{name: "empty", args: map[string]any{"commands": []any{}}, err: "missing required parameter"},
 		{name: "multiple", args: map[string]any{"commands": []any{"echo one"}, "command": []any{"echo two"}}, err: "only one"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := internal.ParseCommands(test.args)
+			got, err := internal.ParseCommands(test.args, []string{"command", "command_paths"})
 			if test.err != "" {
 				if err == nil || !strings.Contains(err.Error(), test.err) {
 					t.Fatalf("error = %v, want substring %q", err, test.err)

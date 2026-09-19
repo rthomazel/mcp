@@ -13,7 +13,7 @@ import (
 func (h *Handler) HandleShellBackground(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
 
-	commands, err := internal.ParseCommands(args)
+	commands, err := internal.ParseCommands(args, h.cfg.ShellCommandsAliases)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}

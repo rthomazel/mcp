@@ -27,9 +27,9 @@ func ParseStringSlice(v any) ([]string, bool) {
 }
 
 // ParseCommands returns the non-empty command array supplied through exactly one
-// of the supported command parameter names.
-func ParseCommands(args map[string]any) ([]string, error) {
-	commandNames := []string{"commands", "command", "command_paths"}
+// of commands or the configured aliases.
+func ParseCommands(args map[string]any, aliases []string) ([]string, error) {
+	commandNames := append([]string{"commands"}, aliases...)
 	missing := "missing required parameter: exactly one of " + strings.Join(commandNames, ", ") + " must be a non-empty array of strings"
 
 	var commands []string
@@ -41,8 +41,11 @@ func ParseCommands(args map[string]any) ([]string, error) {
 		}
 
 		parsed, ok := ParseStringSlice(value)
-		if !ok || len(parsed) == 0 {
-			return nil, fmt.Errorf("invalid parameter: %s must be a non-empty array of strings", name)
+		if !ok {
+			return nil, fmt.Errorf("invalid parameter: %s must be an array of strings", name)
+		}
+		if len(parsed) == 0 {
+			continue
 		}
 		provided++
 		commands = parsed
@@ -52,7 +55,7 @@ func ParseCommands(args map[string]any) ([]string, error) {
 		return nil, errors.New(missing)
 	}
 	if provided > 1 {
-		return nil, errors.New("only one of commands, command, or command_paths may be provided")
+		return nil, errors.New("only one of " + strings.Join(commandNames, ", ") + " may be provided")
 	}
 
 	return commands, nil
