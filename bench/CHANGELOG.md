@@ -6,6 +6,16 @@
 
 - **(main)** shell and shell background descriptions now clarify that command values are JSON strings and backslashes must be JSON-escaped before sending shell commands.
 
+## [0.7.1](https://github.com/rthomazel/mcp/pull/48) feat: accept shell command parameter aliases
+
+### feat
+
+- [`8ace7aa`](https://github.com/rthomazel/mcp/commit/8ace7aa) **(shell, shell_background, config)** `shell` and `shell_background` now accept configured aliases for the `commands` parameter, while preserving the canonical parameter and rejecting conflicting non-empty parameters.
+
+### docs
+
+- [`8ace7aa`](https://github.com/rthomazel/mcp/commit/8ace7aa) **(main, doc/config)** documents shell command aliases and their configuration.
+
 ## [0.8.0](https://github.com/rthomazel/mcp/pull/47) feat: file_replace create mode, deprioritized background jobs
 
 ### feat
