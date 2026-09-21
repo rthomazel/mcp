@@ -155,10 +155,24 @@ def handle_file_replace(path, replacements, dry_run=False):
         if count_newlines(r.replace) > MAX_LINES:
             return Error(f"{label}: replace exceeds the {MAX_LINES}-newline limit.")
 
-    # 2. Resolve symlinks — lock and operate on the real path
+    # 2. Create mode: missing or empty target + exactly one replacement
+    if len(replacements) == 1:
+        creation = open_create_file(path, replacements[0].replace)
+        if creation is not None:            # owns the per-file lock
+            try:
+                if dry_run:
+                    return diff("", creation.content)
+                atomic_write(creation.target, creation.content, mode=0o644)
+                return create_message(creation)
+            finally:
+                release(creation.lock)
+        if creation_error:
+            return Error(creation_error)    # e.g. missing parent directory
+
+    # 3. Resolve symlinks — lock and operate on the real path
     path = resolve_symlinks(path)
 
-    # 3. Verify resolved path is a regular file
+    # 4. Verify resolved path is a regular file
     if not is_regular_file(path):
         return Error(f"path must point to a regular file.")
 

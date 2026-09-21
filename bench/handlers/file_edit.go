@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -27,13 +26,16 @@ type editedFile struct {
 // acquires an exclusive per-file lock, reads the file, and rejects binary
 // content. On success the caller owns the lock and must release it.
 func openFileForEdit(path string) (*editedFile, string) {
-	realPath, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return nil, fmt.Sprintf("resolve path: %v", err)
+	realPath, errStr := resolveTarget(path)
+	if errStr != "" {
+		return nil, errStr
 	}
-	info, err := os.Stat(realPath)
-	if err != nil {
-		return nil, fmt.Sprintf("stat: %v", err)
+	info, statErr := os.Stat(realPath)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return nil, "find not found in file (file does not exist)."
+		}
+		return nil, fmt.Sprintf("stat: %v", statErr)
 	}
 	if !info.Mode().IsRegular() {
 		return nil, "path must point to a regular file."

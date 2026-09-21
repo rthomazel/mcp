@@ -114,7 +114,7 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("file_replace",
-			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff."),
+			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff. If the file does not exist (or is empty) and exactly one replacement is given, the file is created with the contents of replace — find is ignored."),
 			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
 			mcp.WithArray("replacements",
 				mcp.Required(),
