@@ -159,7 +159,7 @@ func run() error {
 
 func shellCommandToolOptions(cfg *internal.Config, description string) []mcp.ToolOption {
 	options := []mcp.ToolOption{
-		mcp.WithDescription(description),
+		mcp.WithDescription(description + " **Shell command escaping:** command values are JSON strings. Escape the command for JSON before sending it—especially backslashes. A shell backslash such as `\\|`, `\\*`, `\\$`, or `\\(` must be written as `\\\\` in JSON. Do not send invalid JSON escapes such as `\\|` or `\\*`."),
 		mcp.WithArray("commands", mcp.Description("Canonical parameter. Shell commands to execute. Provide exactly one: commands or one alias. Separate array items run independently."), mcp.Items(map[string]any{"type": "string"})),
 	}
 	for _, alias := range cfg.ShellCommandsAliases {
