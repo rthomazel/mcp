@@ -97,7 +97,7 @@ Specification and implementation guide for `file_replace`, `file_replace_all`, a
 ```json
 {
   "name": "file_create",
-  "description": "Create a new file, or overwrite an empty one. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff. Replaces the old 'file_replace creates a missing file' behavior.",
+  "description": "Create a new file, or overwrite an empty one. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff.",
   "inputSchema": {
     "type": "object",
     "properties": {
