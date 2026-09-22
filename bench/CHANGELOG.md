@@ -1,37 +1,21 @@
 # CHANGELOG
 
-## [0.7.1](https://github.com/rthomazel/mcp/pull/49) docs: clarify shell command JSON escaping and shell command aliases
-
-### docs
-
-- **(main)** shell and shell background descriptions now clarify that command values are JSON strings and backslashes must be JSON-escaped before sending shell commands.
-
-## [0.7.1](https://github.com/rthomazel/mcp/pull/48) feat: accept shell command parameter aliases
+## [0.8.0](https://github.com/rthomazel/mcp/pull/47) feat: file_create tool, deprioritized background jobs
 
 ### feat
 
-- [`8ace7aa`](https://github.com/rthomazel/mcp/commit/8ace7aa) **(shell, shell_background, config)** `shell` and `shell_background` now accept configured aliases for the `commands` parameter, while preserving the canonical parameter and rejecting conflicting non-empty parameters.
+- [`5a2d674`](https://github.com/rthomazel/mcp/commit/5a2d674) **(handlers/file_create, handlers/file_edit, main)** new standalone `file_create` tool — writes `content` to `path`, creating any missing parent directories, overwriting only an empty file (a non-empty file is refused), and returns a short one-line message on success or a unified diff on `dry_run`. Symlink resolution, per-file locking, and atomic writes are shared with `file_replace` via the moved `resolveTarget` helper (now defined in `file_edit.go`).
+- [`d85148a`](https://github.com/rthomazel/mcp/commit/d85148a) **(handlers/shell_background, handlers/handler, config)** `shell_background` jobs are now deprioritized via `nice -n <level> bash -c <cmd>` (level from `BENCH_MCP_BACKGROUND_NICE`, default 10, range 0–20, `0` disables the wrapper) so a heavy background job cannot starve foreground `shell` commands. `setup` jobs are intentionally left at default priority.
 
 ### docs
 
-- [`8ace7aa`](https://github.com/rthomazel/mcp/commit/8ace7aa) **(main, doc/config)** documents shell command aliases and their configuration.
-
-## [0.8.0](https://github.com/rthomazel/mcp/pull/47) feat: file_replace create mode, deprioritized background jobs
-
-### feat
-
-- [`7ec7286`](https://github.com/rthomazel/mcp/commit/7ec7286) **(handlers/file_replace, handlers/file_create)** `file_replace` now creates the target file when it is missing or empty and exactly one replacement is given: `find` is ignored, the file is written with the contents of `replace` at mode `0644`, and a short one-line message is returned instead of a diff. `replace` is exempt from the `BENCH_MCP_EDIT_MAX_LINES` limit in this mode. Multiple replacements on a missing file fall through to edit mode and error with `find not found in file (file does not exist).`
-- [`ad935d3`](https://github.com/rthomazel/mcp/commit/ad935d3) **(handlers/handler, handlers/shell_background, config)** `shell_background` jobs are now deprioritized via `nice -n <level> bash -c <cmd>` (level from `BENCH_MCP_BACKGROUND_NICE`, default 10, range 0–20, `0` disables the wrapper) so a heavy background job cannot starve foreground `shell` commands. `setup` jobs are intentionally left at default priority.
-
-### docs
-
-- [`7ec7286`](https://github.com/rthomazel/mcp/commit/7ec7286) **(doc/file_tools_design, main)** documents create mode and adds it to the `file_replace` tool description.
-- [`ad935d3`](https://github.com/rthomazel/mcp/commit/ad935d3) **(doc/config, doc/tools, main)** documents `BENCH_MCP_BACKGROUND_NICE` and the deprioritization of `shell_background` jobs, including the known gap: nice does not bound memory or the aggregate CPU of several simultaneous jobs.
+- [`5a2d674`](https://github.com/rthomazel/mcp/commit/5a2d674) **(doc/file_tools_design, README, main)** documents the `file_create` tool schema, updates the `file_replace` description to note the file must already exist, and adds `file_create` to the tool table and editing instructions.
 
 ### test
 
-- [`7ec7286`](https://github.com/rthomazel/mcp/commit/7ec7286) **(handlers/file_create_test)** covers create mode (missing, empty, multi-replacement fall-through, missing parent, dry-run, no line limit, symlink parent, non-empty file edit path, directory rejection, invalid UTF-8) and `resolveTarget` resolution.
-- [`ad935d3`](https://github.com/rthomazel/mcp/commit/ad935d3) **(handlers/handler_test, internal/config_test)** covers `buildJobCommand` nice wrapping and `BENCH_MCP_BACKGROUND_NICE` parsing.
+- [`5a2d674`](https://github.com/rthomazel/mcp/commit/5a2d674) **(handlers/file_create_test)** covers the new `file_create` path (missing, empty, dry-run, non-empty refusal, directory rejection, invalid UTF-8, null bytes, non-absolute path, deep parent creation, symlink parent, handler-level content-arg guard) plus `resolveTarget`.
+- [`14f7e88`](https://github.com/rthomazel/mcp/commit/14f7e88) **(handlers/file_create_test)** adds `os.MkdirAll`/`WriteFile`/`Symlink` error checks to the test setup.
+- [`d85148a`](https://github.com/rthomazel/mcp/commit/d85148a) **(handlers/handler_test, internal/config_test)** covers `buildJobCommand` nice wrapping and `BENCH_MCP_BACKGROUND_NICE` parsing.
 
 <!--
   FORMAT GUIDE (for agents and humans)
@@ -51,6 +35,22 @@
     - scope is the file, package, or area changed e.g. (config), (bin/setup), (workflows).
     - Em dash (—) separates the short label from the explanation.
 -->
+
+## [0.7.1](https://github.com/rthomazel/mcp/pull/49) docs: clarify shell command JSON escaping and shell command aliases
+
+### docs
+
+- **(main)** shell and shell background descriptions now clarify that command values are JSON strings and backslashes must be JSON-escaped before sending shell commands.
+
+## [0.7.1](https://github.com/rthomazel/mcp/pull/48) feat: accept shell command parameter aliases
+
+### feat
+
+- [`8ace7aa`](https://github.com/rthomazel/mcp/commit/8ace7aa) **(shell, shell_background, config)** `shell` and `shell_background` now accept configured aliases for the `commands` parameter, while preserving the canonical parameter and rejecting conflicting non-empty parameters.
+
+### docs
+
+- [`8ace7aa`](https://github.com/rthomazel/mcp/commit/8ace7aa) **(main, doc/config)** documents shell command aliases and their configuration.
 
 ## [0.7.0](https://github.com/rthomazel/mcp/pull/46) feat: make shell command expansion configurable
 

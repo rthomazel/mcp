@@ -11,6 +11,28 @@ import (
 	"github.com/rthomazel/mcp/bench/internal/file"
 )
 
+// resolveTarget resolves symlinks in path, returning the real absolute path.
+// For a path whose final element does not exist yet, the parent directory is
+// resolved instead — a missing final element makes EvalSymlinks fail outright.
+func resolveTarget(path string) (string, string) {
+	if _, err := os.Lstat(path); os.IsNotExist(err) {
+		parent, err := filepath.EvalSymlinks(filepath.Dir(path))
+		if err != nil {
+			if os.IsNotExist(err) {
+				return "", fmt.Sprintf("parent directory %s does not exist.", filepath.Dir(path))
+			}
+			return "", fmt.Sprintf("resolve path: %v", err)
+		}
+		return filepath.Join(parent, filepath.Base(path)), ""
+	}
+
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", fmt.Sprintf("resolve path: %v", err)
+	}
+	return realPath, ""
+}
+
 // editedFile holds the resolved state of a file opened for in-place editing.
 // The caller must defer file.ReleaseLock(theFile.realPath, theFile.lock) after
 // a successful openFileForEdit call.
@@ -27,13 +49,16 @@ type editedFile struct {
 // acquires an exclusive per-file lock, reads the file, and rejects binary
 // content. On success the caller owns the lock and must release it.
 func openFileForEdit(path string) (*editedFile, string) {
-	realPath, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return nil, fmt.Sprintf("resolve path: %v", err)
+	realPath, errStr := resolveTarget(path)
+	if errStr != "" {
+		return nil, errStr
 	}
-	info, err := os.Stat(realPath)
-	if err != nil {
-		return nil, fmt.Sprintf("stat: %v", err)
+	info, statErr := os.Stat(realPath)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return nil, "find not found in file (file does not exist)."
+		}
+		return nil, fmt.Sprintf("stat: %v", statErr)
 	}
 	if !info.Mode().IsRegular() {
 		return nil, "path must point to a regular file."

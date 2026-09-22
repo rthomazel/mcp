@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"time"
@@ -21,6 +22,7 @@ type replacement struct {
 
 // HandleFileReplace replaces each find exactly once per item in a file.
 // All items are validated against the original content before any write.
+// The file must already exist.
 func (h *Handler) HandleFileReplace(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
 
@@ -88,34 +90,47 @@ type locatedReplacement struct {
 
 //nolint:cyclop
 func (h *Handler) handleFileReplace(path string, replacements []replacement, dryRun bool) (result, toolErr string) {
-	maxCandidates := h.cfg.MaxCandidates
 	maxLines := h.cfg.EditMaxLines
+	maxCandidates := h.cfg.MaxCandidates
 
-	// 1. Input guards (no lock needed — pure validation).
+	// 1. Path-level input guards (no lock needed — pure validation).
 	if !filepath.IsAbs(path) {
 		return "", "path must be absolute."
 	}
 	if len(replacements) == 0 {
 		return "", "replacements must not be empty."
 	}
+
+	// 2. Validate the target exists before validating replacement contents, so a
+	// missing file produces a direct "file does not exist" error rather than
+	// "find not found in file (file does not exist)".
+	if _, err := os.Lstat(path); err != nil {
+		if os.IsNotExist(err) {
+			return "", "file does not exist."
+		}
+		return "", fmt.Sprintf("stat: %v", err)
+	}
+
+	// 3. Open the file for editing: resolves symlinks, acquires the per-file
+	// lock, reads, and rejects binary content.
+	theFile, errStr := openFileForEdit(path)
+	if errStr != "" {
+		return "", errStr
+	}
+	defer file.ReleaseLock(theFile.realPath, theFile.lock)
+
+	// 4. Validate each replacement against the shared input guards.
 	for i, r := range replacements {
 		label := fmt.Sprintf("Replacement %d", i+1)
 		if msg := validateFindReplace(r.find, r.replace, maxLines); msg != "" {
 			return "", fmt.Sprintf("%s: %s", label, msg)
 		}
 		if r.lineNumber != 0 && r.lineNumber < 1 {
-			return "", fmt.Sprintf("%s: line_number must be ≥ 1.", label)
+			return "", fmt.Sprintf("%s: line_number must be \u2265 1.", label)
 		}
 	}
 
-	// 2–5. Resolve symlinks, stat, lock, read, validate binary.
-	theFile, err := openFileForEdit(path)
-	if err != "" {
-		return "", err
-	}
-	defer file.ReleaseLock(theFile.realPath, theFile.lock)
-
-	// 6. Validate line_number ranges against actual file length.
+	// 5. Validate line_number ranges against actual file length.
 	for i, r := range replacements {
 		if r.lineNumber != 0 && r.lineNumber > theFile.lines {
 			return "", fmt.Sprintf(
@@ -125,7 +140,7 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 		}
 	}
 
-	// 7. Pre-pass: locate each replacement’s unique candidate in original content.
+	// 6. Pre-pass: locate each replacement's unique candidate in original content.
 	located := make([]locatedReplacement, 0, len(replacements))
 	for i, r := range replacements {
 		label := fmt.Sprintf("Replacement %d of %d", i+1, len(replacements))
@@ -152,7 +167,7 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 		}
 	}
 
-	// 8. Sort by start byte; reject overlapping candidates.
+	// 7. Sort by start byte; reject overlapping candidates.
 	sort.Slice(located, func(a, b int) bool {
 		return located[a].m.StartByte < located[b].m.StartByte
 	})
@@ -166,13 +181,13 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 		}
 	}
 
-	// 9. Apply in descending byte order.
+	// 8. Apply in descending byte order.
 	working := theFile.content
 	for i := len(located) - 1; i >= 0; i-- {
 		l := located[i]
 		working = working[:l.m.StartByte] + l.r.replace + working[l.m.EndByte:]
 	}
 
-	// 10–13. Dry-run, external-mod check, atomic write, return diff.
+	// 9. Dry-run, external-mod check, atomic write, return diff.
 	return theFile.commit(working, dryRun)
 }

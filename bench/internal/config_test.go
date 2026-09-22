@@ -25,6 +25,44 @@ func TestParseShellCommandAliases(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_BackgroundNice(t *testing.T) {
+	useCases := []struct {
+		name    string
+		raw     string
+		want    int
+		wantErr bool
+	}{
+		{name: "unset defaults to 10", raw: "", want: 10},
+		{name: "explicit 0", raw: "0", want: 0},
+		{name: "explicit 5", raw: "5", want: 5},
+		{name: "max 20", raw: "20", want: 20},
+		{name: "too high", raw: "21", wantErr: true},
+		{name: "negative", raw: "-1", wantErr: true},
+		{name: "non-numeric", raw: "ten", wantErr: true},
+	}
+
+	for _, uc := range useCases {
+		t.Run(uc.name, func(t *testing.T) {
+			if uc.raw != "" {
+				t.Setenv("BENCH_MCP_BACKGROUND_NICE", uc.raw)
+			}
+			cfg, err := LoadConfig()
+			if uc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("LoadConfig() unexpected error: %v", err)
+			}
+			if cfg.BackgroundNice != uc.want {
+				t.Errorf("BackgroundNice = %d, want %d", cfg.BackgroundNice, uc.want)
+			}
+		})
+	}
+}
+
 func TestLoadConfig_ShellExpandCommands(t *testing.T) {
 	for _, uc := range []struct {
 		name string

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ type job struct {
 type jobOpts struct {
 	tool       string
 	setupPaths []string
+	nice       bool // deprioritize the job's process tree (shell_background only)
 }
 
 type Handler struct {
@@ -123,6 +125,18 @@ func (h *Handler) addJob(j *job) {
 	}
 }
 
+// buildJobCommand builds the job process. Deprioritized jobs spawn as
+// "nice -n <level> bash -c <command>" so their whole process tree runs at a
+// lower CPU scheduling priority; exit codes propagate through nice. This keeps
+// a heavy background job from starving foreground shell commands, but does not
+// bound memory or the aggregate CPU of several simultaneous jobs.
+func buildJobCommand(ctx context.Context, cfg *internal.Config, command string, nice bool) *exec.Cmd {
+	if nice && cfg.BackgroundNice > 0 {
+		return exec.CommandContext(ctx, "nice", "-n", strconv.Itoa(cfg.BackgroundNice), "bash", "-c", command)
+	}
+	return exec.CommandContext(ctx, "bash", "-c", command)
+}
+
 func (h *Handler) startJob(command, cwd string, opts jobOpts) *job {
 	job := &job{
 		cmd:        command,
@@ -139,7 +153,7 @@ func (h *Handler) startJob(command, cwd string, opts jobOpts) *job {
 
 		slog.Info("job start", "job", job.id, "cmd", command, "cwd", cwd)
 
-		cmd := exec.CommandContext(ctx, "bash", "-c", command)
+		cmd := buildJobCommand(ctx, h.cfg, command, opts.nice)
 		cmd.Dir = cwd
 
 		job.mu.Lock()

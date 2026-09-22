@@ -1,9 +1,10 @@
 # File Tools Design
 
-Specification and implementation guide for `file_replace` and `file_replace_all`.
+Specification and implementation guide for `file_replace`, `file_replace_all`, and `file_create`.
 
-- **`file_replace`** — replaces each `find` exactly once per item (unique match required); accepts a batch
+- **`file_replace`** — replaces each `find` exactly once per item (unique match required); accepts a batch. The target file must already exist (missing files error out).
 - **`file_replace_all`** — replaces every occurrence of a single `find`
+- **`file_create`** — creates a new file (or overwrites an empty one) with `content`, creating any missing parent directories. This is the successor to the old `file_replace` create-mode.
 
 ## Tool schemas
 
@@ -91,6 +92,33 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
 }
 ```
 
+### file_create
+
+```json
+{
+  "name": "file_create",
+  "description": "Create a new file, or overwrite an empty one. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Absolute path to the file."
+      },
+      "content": {
+        "type": "string",
+        "description": "Full contents of the new file."
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Optional. If true, validate and compute the diff without writing to disk."
+      }
+    },
+    "required": ["path", "content"]
+  }
+}
+```
+
 ## Limits
 
 | Constraint                            | Value                                    | Rationale                                                                                                                                                               |
@@ -155,10 +183,24 @@ def handle_file_replace(path, replacements, dry_run=False):
         if count_newlines(r.replace) > MAX_LINES:
             return Error(f"{label}: replace exceeds the {MAX_LINES}-newline limit.")
 
-    # 2. Resolve symlinks — lock and operate on the real path
+    # 2. Create mode: missing or empty target + exactly one replacement
+    if len(replacements) == 1:
+        creation = open_create_file(path, replacements[0].replace)
+        if creation is not None:            # owns the per-file lock
+            try:
+                if dry_run:
+                    return diff("", creation.content)
+                atomic_write(creation.target, creation.content, mode=0o644)
+                return create_message(creation)
+            finally:
+                release(creation.lock)
+        if creation_error:
+            return Error(creation_error)    # e.g. missing parent directory
+
+    # 3. Resolve symlinks — lock and operate on the real path
     path = resolve_symlinks(path)
 
-    # 3. Verify resolved path is a regular file
+    # 4. Verify resolved path is a regular file
     if not is_regular_file(path):
         return Error(f"path must point to a regular file.")
 

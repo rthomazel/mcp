@@ -20,6 +20,7 @@ type Config struct {
 	ToolCallWorkers      int
 	ShellExpandCommands  bool
 	ShellCommandsAliases []string
+	BackgroundNice       int
 	StatsRedactPatterns  []*regexp.Regexp
 }
 
@@ -41,6 +42,7 @@ var defaults = Config{
 	ToolCallWorkers:      1,
 	ShellExpandCommands:  true,
 	ShellCommandsAliases: nil,
+	BackgroundNice:       10,
 }
 
 func parseShellCommandAliases(raw string) []string {
@@ -93,6 +95,7 @@ func LoadConfig() (*Config, error) {
 		ToolCallWorkers:      defaults.ToolCallWorkers,
 		ShellExpandCommands:  defaults.ShellExpandCommands,
 		ShellCommandsAliases: defaults.ShellCommandsAliases,
+		BackgroundNice:       defaults.BackgroundNice,
 	}
 
 	if raw, ok := os.LookupEnv("BENCH_MCP_SHELL_COMMANDS_ALIASES"); ok {
@@ -145,6 +148,14 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("BENCH_MCP_TOOL_CALL_WORKERS invalid: must be a positive integer")
 		}
 		cfg.ToolCallWorkers = n
+	}
+
+	if raw := os.Getenv("BENCH_MCP_BACKGROUND_NICE"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > 20 {
+			return nil, fmt.Errorf("BENCH_MCP_BACKGROUND_NICE invalid: must be an integer between 0 and 20")
+		}
+		cfg.BackgroundNice = n
 	}
 
 	if raw := os.Getenv("BENCH_MCP_STATS_REDACT_PATTERNS"); raw != "" {
