@@ -21,8 +21,9 @@ No custom sandboxing layer. No trust required. Just Docker doing what Docker doe
 | `shell_background` | Kick off a slow command without blocking                                 |
 | `status`           | Poll a background job for results                                        |
 | `setup`            | Install a project\'s language runtime and dependencies                   |
-| `file_replace`     | Find and replace unique substrings in a file. Returns a unified diff     |
-| `file_replace_all` | Replace all occurrences of a substring in a file. Returns a unified diff |
+| `file_replace`     | Find and replace unique substrings in a file. Returns a unified diff      |
+| `file_replace_all` | Replace all occurrences of a substring in a file. Returns a unified diff  |
+| `file_create`      | Create a new file (or overwrite an empty one). Creates missing parents    |
 
 Agents can read and edit files, run tests, run linters, call CLIs, manage git — anything a developer can do in a terminal.
 
@@ -204,8 +205,9 @@ You can do other work while waiting.
 
 Editing files:
 
-- Use `file_replace` for targeted edits — finds a unique substring and replaces it. Returns a unified diff.
+- Use `file_replace` for targeted edits — finds a unique substring and replaces it. Returns a unified diff. The file must already exist.
 - Use `file_replace_all` to replace every occurrence of a substring (e.g. renaming a symbol).
+- Use `file_create` to create a new file, or overwrite an empty one. Creates any missing parent directories. Replaces the old 'file_replace creates a missing file' behavior.
 ```
 
 ---

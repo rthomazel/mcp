@@ -114,7 +114,7 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("file_replace",
-			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff. If the file does not exist (or is empty) and exactly one replacement is given, the file is created with the contents of replace — find is ignored."),
+			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff. The file must already exist."),
 			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
 			mcp.WithArray("replacements",
 				mcp.Required(),
@@ -132,6 +132,16 @@ func run() error {
 			mcp.WithBoolean("dry_run", mcp.Description("Optional. If true, validate and compute the diff without writing to disk.")),
 		),
 		h.HandleFileReplace,
+	)
+
+	s.AddTool(
+		mcp.NewTool("file_create",
+			mcp.WithDescription("Create a new file, or overwrite an empty one. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff. Replaces the old 'file_replace creates a missing file' behavior."),
+			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
+			mcp.WithString("content", mcp.Required(), mcp.Description("Full contents of the new file.")),
+			mcp.WithBoolean("dry_run", mcp.Description("Optional. If true, validate and compute the diff without writing to disk.")),
+		),
+		h.HandleFileCreate,
 	)
 
 	s.AddTool(

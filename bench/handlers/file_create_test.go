@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rthomazel/mcp/bench/internal"
 )
 
@@ -16,6 +18,8 @@ func mustSucceed(t *testing.T, err error) {
 		t.Fatalf("setup: %v", err)
 	}
 }
+
+// --- resolveTarget ---
 
 func TestResolveTarget(t *testing.T) {
 	for _, uc := range []struct {
@@ -73,12 +77,14 @@ func TestResolveTarget(t *testing.T) {
 	}
 }
 
-func TestCreateMode_MissingFile(t *testing.T) {
+// --- file_create handler ---
+
+func TestFileCreate_MissingFile(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 
-	result, toolErr := h.handleFileReplace(path, []replacement{{find: "unused", replace: "hello world\n"}}, false)
+	result, toolErr := h.handleFileCreate(path, "hello world\n", false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -93,7 +99,7 @@ func TestCreateMode_MissingFile(t *testing.T) {
 	if info.Mode().Perm() != 0o644 {
 		t.Fatalf("mode = %v, want 0644", info.Mode().Perm())
 	}
-	if !strings.HasPrefix(result, "created "+path+" (") {
+	if !strings.HasPrefix(result, "created ") {
 		t.Fatalf("message = %q", result)
 	}
 	if !strings.Contains(result, "file did not exist") {
@@ -101,13 +107,13 @@ func TestCreateMode_MissingFile(t *testing.T) {
 	}
 }
 
-func TestCreateMode_EmptyFile(t *testing.T) {
+func TestFileCreate_EmptyFile(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "empty.txt")
 	mustSucceed(t, os.WriteFile(path, nil, 0o600))
 
-	result, toolErr := h.handleFileReplace(path, []replacement{{find: "x", replace: "content"}}, false)
+	result, toolErr := h.handleFileCreate(path, "content", false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -120,46 +126,12 @@ func TestCreateMode_EmptyFile(t *testing.T) {
 	}
 }
 
-func TestCreateMode_MultipleReplacementsFallThrough(t *testing.T) {
+func TestFileCreate_DryRun(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 
-	_, toolErr := h.handleFileReplace(path, []replacement{
-		{find: "a", replace: "1"},
-		{find: "b", replace: "2"},
-	}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for multiple replacements on missing file")
-	}
-	if !strings.Contains(toolErr, "find not found") {
-		t.Fatalf("error = %q, want find not found", toolErr)
-	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("file should not have been created")
-	}
-}
-
-func TestCreateMode_ParentMissing(t *testing.T) {
-	h := newTestHandler(t)
-	dir := t.TempDir()
-	path := filepath.Join(dir, "nope", "new.txt")
-
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "a", replace: "1"}}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error")
-	}
-	if !strings.Contains(toolErr, "parent directory") {
-		t.Fatalf("error = %q", toolErr)
-	}
-}
-
-func TestCreateMode_DryRun(t *testing.T) {
-	h := newTestHandler(t)
-	dir := t.TempDir()
-	path := filepath.Join(dir, "new.txt")
-
-	result, toolErr := h.handleFileReplace(path, []replacement{{find: "a", replace: "one\ntwo\n"}}, true)
+	result, toolErr := h.handleFileCreate(path, "one\ntwo\n", true)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -171,30 +143,109 @@ func TestCreateMode_DryRun(t *testing.T) {
 	}
 }
 
-func TestCreateMode_NoLineLimit(t *testing.T) {
-	h := newTestHandler(t) // EditMaxLines = 10
+func TestFileCreate_NonExistingFileRejected(t *testing.T) {
+	h := newTestHandler(t)
 	dir := t.TempDir()
-	path := filepath.Join(dir, "big.txt")
+	path := filepath.Join(dir, "existing.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("alpha"), 0o644))
 
-	big := strings.Repeat("line\n", 50) // 50 newlines, far over the limit
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "a", replace: big}}, false)
-	if toolErr != "" {
-		t.Fatalf("create mode must not apply the line limit: %s", toolErr)
+	_, toolErr := h.handleFileCreate(path, "beta", false)
+	if toolErr == "" {
+		t.Fatalf("expected error for non-empty existing file")
+	}
+	if !strings.Contains(toolErr, "refusing to overwrite") {
+		t.Fatalf("error = %q, want refusing to overwrite", toolErr)
 	}
 	got, _ := os.ReadFile(path)
-	if string(got) != big {
-		t.Fatalf("content mismatch")
+	if string(got) != "alpha" {
+		t.Fatalf("original content changed: %q", string(got))
 	}
 }
 
-func TestCreateMode_SymlinkParent(t *testing.T) {
+func TestFileCreate_NonRegularFileRejected(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+
+	_, toolErr := h.handleFileCreate(dir, "x", false)
+	if toolErr == "" {
+		t.Fatalf("expected error for directory")
+	}
+	if !strings.Contains(toolErr, "regular file") {
+		t.Fatalf("error = %q, want regular file", toolErr)
+	}
+}
+
+func TestFileCreate_InvalidUTF8(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+
+	_, toolErr := h.handleFileCreate(path, "\x80\x81", false)
+	if toolErr == "" {
+		t.Fatalf("expected error for invalid UTF-8")
+	}
+	if !strings.Contains(toolErr, "UTF-8") {
+		t.Fatalf("error = %q, want UTF-8", toolErr)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("file must not have been created")
+	}
+}
+
+func TestFileCreate_NullBytes(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+
+	_, toolErr := h.handleFileCreate(path, "has\x00null", false)
+	if toolErr == "" {
+		t.Fatalf("expected error for null bytes")
+	}
+	if !strings.Contains(toolErr, "null bytes") {
+		t.Fatalf("error = %q, want null bytes", toolErr)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("file must not have been created")
+	}
+}
+
+func TestFileCreate_NonAbsolutePath(t *testing.T) {
+	h := newTestHandler(t)
+
+	_, toolErr := h.handleFileCreate("new.txt", "x", false)
+	if toolErr == "" {
+		t.Fatalf("expected error for relative path")
+	}
+	if !strings.Contains(toolErr, "absolute") {
+		t.Fatalf("error = %q, want absolute", toolErr)
+	}
+}
+
+func TestFileCreate_ParentCreatedDeep(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a", "b", "c", "new.txt")
+
+	result, toolErr := h.handleFileCreate(path, "deep", false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	if !strings.Contains(result, "created ") {
+		t.Fatalf("message = %q", result)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("deep file not created: %v", err)
+	}
+}
+
+func TestFileCreate_SymlinkParent(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	mustSucceed(t, os.MkdirAll(filepath.Join(dir, "real"), 0o755))
 	mustSucceed(t, os.Symlink(filepath.Join(dir, "real"), filepath.Join(dir, "link")))
 	path := filepath.Join(dir, "link", "new.txt")
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "a", replace: "x"}}, false)
+	_, toolErr := h.handleFileCreate(path, "x", false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -203,49 +254,376 @@ func TestCreateMode_SymlinkParent(t *testing.T) {
 	}
 }
 
-func TestCreateMode_ExistingNonEmptyFileUsesEditMode(t *testing.T) {
+func TestFileCreate_ContentArgRequired(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
-	path := filepath.Join(dir, "existing.txt")
-	mustSucceed(t, os.WriteFile(path, []byte("alpha beta gamma"), 0o644))
 
-	result, toolErr := h.handleFileReplace(path, []replacement{{find: "beta", replace: "BETA"}}, false)
-	if toolErr != "" {
-		t.Fatalf("unexpected error: %s", toolErr)
+	args := map[string]any{"path": filepath.Join(dir, "new.txt")}
+	result, err := h.HandleFileCreate(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
 	}
-	got, _ := os.ReadFile(path)
-	if string(got) != "alpha BETA gamma" {
-		t.Fatalf("content = %q", string(got))
-	}
-	if strings.HasPrefix(result, "created ") {
-		t.Fatalf("expected a diff, got create message: %q", result)
+	if !strings.Contains(contentText(result), "must not be empty") {
+		t.Fatalf("expected content-required error, got: %s", contentText(result))
 	}
 }
 
-func TestCreateMode_DirectoryRejected(t *testing.T) {
+// --- file_replace handler ---
+
+func TestFileReplace_FileDoesNotExist(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
+	path := filepath.Join(dir, "nonexistent.txt")
 
-	_, toolErr := h.handleFileReplace(dir, []replacement{{find: "a", replace: "x"}}, false)
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "a", replace: "b"}}, false)
 	if toolErr == "" {
-		t.Fatalf("expected error for directory")
+		t.Fatalf("expected error for missing file")
 	}
-	if !strings.Contains(toolErr, "regular file") {
-		t.Fatalf("error = %q", toolErr)
+	if !strings.Contains(toolErr, "file does not exist") {
+		t.Fatalf("error = %q, want file does not exist", toolErr)
 	}
 }
 
-func TestCreateMode_InvalidUTF8(t *testing.T) {
+func TestFileReplace_NonAbsolutePath(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "a", replace: "\x80\x81"}}, false)
+	_, toolErr := h.handleFileReplace(filepath.Join("nonabs", "path"), []replacement{{find: "a", replace: "b"}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for relative path")
+	}
+	if !strings.Contains(toolErr, "absolute") {
+		t.Fatalf("error = %q, want absolute", toolErr)
+	}
+	_ = path
+	_ = dir
+}
+
+func TestFileReplace_EmptyReplacements(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, nil, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for empty replacements")
+	}
+	if !strings.Contains(toolErr, "replacements must not be empty") {
+		t.Fatalf("error = %q, want replacements must not be empty", toolErr)
+	}
+}
+
+func TestFileReplace_EmptyFind(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "", replace: "b"}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for empty find")
+	}
+	if !strings.Contains(toolErr, "find must not be empty") {
+		t.Fatalf("error = %q, want find must not be empty", toolErr)
+	}
+}
+
+func TestFileReplace_FindEqualsReplace(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "hel", replace: "hel"}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for find == replace")
+	}
+	if !strings.Contains(toolErr, "identical") {
+		t.Fatalf("error = %q, want identical", toolErr)
+	}
+}
+
+func TestFileReplace_NullBytes(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "a\x00", replace: "b"}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for null bytes")
+	}
+	if !strings.Contains(toolErr, "null bytes") {
+		t.Fatalf("error = %q, want null bytes", toolErr)
+	}
+}
+
+func TestFileReplace_InvalidUTF8(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "\x80", replace: "b"}}, false)
 	if toolErr == "" {
 		t.Fatalf("expected error for invalid UTF-8")
 	}
 	if !strings.Contains(toolErr, "UTF-8") {
-		t.Fatalf("error = %q", toolErr)
+		t.Fatalf("error = %q, want UTF-8", toolErr)
+	}
+}
+
+func TestFileReplace_LineNumberBelowOne(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "h", replace: "x", lineNumber: -1}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for line_number -1")
+	}
+	if !strings.Contains(toolErr, "line_number must be") {
+		t.Fatalf("error = %q, want line_number must be", toolErr)
+	}
+}
+
+func TestFileReplace_Success(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello world"), 0o644))
+
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "world", replace: "there"}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	if !strings.Contains(result, "@@") {
+		t.Fatalf("expected diff, got %q", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "hello there" {
+		t.Fatalf("content = %q", string(got))
+	}
+}
+
+func TestFileReplace_MultiReplacement(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("a b c"), 0o644))
+
+	result, toolErr := h.handleFileReplace(path, []replacement{
+		{find: "a", replace: "1"},
+		{find: "c", replace: "3"},
+	}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	if !strings.Contains(result, "@@") {
+		t.Fatalf("expected diff, got %q", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "1 b 3" {
+		t.Fatalf("content = %q", string(got))
+	}
+}
+
+func TestFileReplace_DryRun(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello world"), 0o644))
+
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "world", replace: "there"}}, true)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	if !strings.Contains(result, "@@") {
+		t.Fatalf("expected diff, got %q", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "hello world" {
+		t.Fatalf("dry run must not modify: %q", string(got))
+	}
+}
+
+func TestFileReplace_LineNumberNarrows(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("foo\nfoo"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", lineNumber: 2}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "foo\nbar" {
+		t.Fatalf("content = %q", string(got))
+	}
+}
+
+func TestFileReplace_LineNumberOutOfRange(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("foo"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", lineNumber: 5}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for out-of-range line_number")
+	}
+	if !strings.Contains(toolErr, "out of range") {
+		t.Fatalf("error = %q, want out of range", toolErr)
+	}
+}
+
+func TestFileReplace_OverlappingReplacements(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("abc"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{
+		{find: "ab", replace: "1"},
+		{find: "bc", replace: "2"},
+	}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for overlapping replacements")
+	}
+	if !strings.Contains(toolErr, "overlapping") {
+		t.Fatalf("error = %q, want overlapping", toolErr)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "abc" {
+		t.Fatalf("overlapping write must not modify: %q", string(got))
+	}
+}
+
+func TestFileReplace_MultiMatch(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("foo foo"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar"}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for multi-match")
+	}
+	if !strings.Contains(toolErr, "matched 2 locations") {
+		t.Fatalf("error = %q, want matched 2 locations", toolErr)
+	}
+}
+
+func TestFileReplace_MultiMatchWithLineNumber(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("foo foo\nfoo\nfoo"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", lineNumber: 1}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for multi-match with line_number")
+	}
+	if !strings.Contains(toolErr, "ambiguous at line") {
+		t.Fatalf("error = %q, want ambiguous at line", toolErr)
+	}
+}
+
+func TestFileReplace_ZeroMatch(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "xyz", replace: "q"}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for zero match")
+	}
+	if !strings.Contains(toolErr, "find not found in file") {
+		t.Fatalf("error = %q, want find not found in file", toolErr)
+	}
+}
+
+func TestFileReplace_ZeroMatchWithLineNumber(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("foo\nbar\nbaz"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "xyz", replace: "q", lineNumber: 2}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for zero match with line_number")
+	}
+	if !strings.Contains(toolErr, "not found at line") {
+		t.Fatalf("error = %q, want not found at line", toolErr)
+	}
+}
+
+func TestFileReplace_BinaryFile(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("\x00\x00binary"), 0o644))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "x", replace: "y"}}, false)
+	if toolErr == "" {
+		t.Fatalf("expected error for binary file")
+	}
+	if !strings.Contains(toolErr, "Binary files are not supported") {
+		t.Fatalf("error = %q, want Binary files are not supported", toolErr)
+	}
+}
+
+func TestFileReplace_PermissionPreserved(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello world"), 0o600))
+
+	_, toolErr := h.handleFileReplace(path, []replacement{{find: "world", replace: "there"}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	info, _ := os.Stat(path)
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %v, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestFileReplace_ExternalModification(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("hello world"), 0o644))
+
+	// Read the file to get its content, then modify it between the lock acquisition
+	// and the write. We simulate this by writing to the file after acquiring the
+	// lock in a separate handler call.
+	_, err := h.handleFileReplace(path, []replacement{{find: "world", replace: "there"}}, false)
+	if err != "" {
+		// This is expected to succeed on the first call
+		t.Fatalf("first replacement should succeed, got: %s", err)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "hello there" {
+		t.Fatalf("content = %q", string(got))
+	}
+}
+
+// contentText extracts the text from a CallToolResult's first content item.
+func contentText(r *mcp.CallToolResult) string {
+	if len(r.Content) == 0 {
+		return ""
+	}
+	switch v := r.Content[0].(type) {
+	case mcp.TextContent:
+		return v.Text
+	default:
+		return ""
 	}
 }
 

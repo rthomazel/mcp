@@ -1,9 +1,10 @@
 # File Tools Design
 
-Specification and implementation guide for `file_replace` and `file_replace_all`.
+Specification and implementation guide for `file_replace`, `file_replace_all`, and `file_create`.
 
-- **`file_replace`** — replaces each `find` exactly once per item (unique match required); accepts a batch
+- **`file_replace`** — replaces each `find` exactly once per item (unique match required); accepts a batch. The target file must already exist (missing files error out).
 - **`file_replace_all`** — replaces every occurrence of a single `find`
+- **`file_create`** — creates a new file (or overwrites an empty one) with `content`, creating any missing parent directories. This is the successor to the old `file_replace` create-mode.
 
 ## Tool schemas
 
@@ -87,6 +88,33 @@ Specification and implementation guide for `file_replace` and `file_replace_all`
       }
     },
     "required": ["path", "find", "replace"]
+  }
+}
+```
+
+### file_create
+
+```json
+{
+  "name": "file_create",
+  "description": "Create a new file, or overwrite an empty one. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff. Replaces the old 'file_replace creates a missing file' behavior.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Absolute path to the file."
+      },
+      "content": {
+        "type": "string",
+        "description": "Full contents of the new file."
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Optional. If true, validate and compute the diff without writing to disk."
+      }
+    },
+    "required": ["path", "content"]
   }
 }
 ```

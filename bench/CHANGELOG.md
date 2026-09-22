@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.9.0](https://github.com/rthomazel/mcp/pull/50) feat: file_create tool, file_replace edit-only
+
+### feat
+
+- `file_replace` is now edit-only: the target file must already exist, and a missing file errors out directly with `file does not exist.` (previously `file_replace` created a missing file when exactly one replacement was given and `find` was ignored). This removes the create-mode fast path and its single-replacement validation exemptions, so every item now enforces the full guard set (non-empty `find`, `find != replace`, no null bytes, valid UTF-8, `replace` line limit, valid `line_number`).
+- New `file_create` tool takes over the old create-mode job: it writes `content` to `path`, creating any missing parent directories, overwriting only an empty file (a non-empty file is refused), and returns a short one-line message on success or a unified diff on `dry_run`.
+
+### docs
+
+- **(doc/file_tools_design, README, main)** documents the `file_create` tool schema, updates the `file_replace` description to note the file must exist, and adds `file_create` to the tool table and editing instructions.
+
+### test
+
+- **(handlers/file_create_test)** covers the new `file_create` path (missing, empty, dry-run, non-empty refusal, directory rejection, invalid UTF-8, null bytes, non-absolute path, deep parent creation, symlink parent, handler-level content-arg guard) plus `resolveTarget`, and rewrites the `file_replace` coverage around the new edit-only contract.
+
 ## [0.8.0](https://github.com/rthomazel/mcp/pull/47) feat: file_replace create mode, deprioritized background jobs
 
 ### feat
