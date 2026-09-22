@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [0.8.0](https://github.com/rthomazel/mcp/pull/50) feat: file_create tool, deprioritized background jobs
+## [0.8.0](https://github.com/rthomazel/mcp/pull/47) feat: file_create tool, deprioritized background jobs
 
 ### feat
 
