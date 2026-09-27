@@ -5,6 +5,33 @@ import (
 	"testing"
 )
 
+// clearConfigEnv forces every BENCH_MCP_* key that LoadConfig honors to the
+// empty string for the duration of the test. Each reader guards on
+// os.Getenv(...) != "" and LookupEnv truthiness, so an empty value is
+// observationally identical to the variable being unset. This isolates the
+// config tests from ambient pollution (e.g. CI exporting
+// BENCH_MCP_TOOL_CALL_WORKERS=3) so a default assertion cannot be foiled by the
+// environment. t.Setenv restores the prior value when the test ends, so nothing
+// leaks between tests.
+func clearConfigEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"BENCH_MCP_HOME",
+		"BENCH_MCP_MISE_DIR",
+		"BENCH_MCP_TIMEOUT",
+		"BENCH_MCP_BACKGROUND_TIMEOUT",
+		"BENCH_MCP_EDIT_MAX_LINES",
+		"BENCH_MCP_MAX_CANDIDATES",
+		"BENCH_MCP_TOOL_CALL_WORKERS",
+		"BENCH_MCP_SHELL_EXPAND_COMMANDS",
+		"BENCH_MCP_BACKGROUND_NICE",
+		"BENCH_MCP_STATS_REDACT_PATTERNS",
+		"BENCH_MCP_SHELL_COMMANDS_ALIASES",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
 func TestParseShellCommandAliases(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -43,6 +70,7 @@ func TestLoadConfig_BackgroundNice(t *testing.T) {
 
 	for _, uc := range useCases {
 		t.Run(uc.name, func(t *testing.T) {
+			clearConfigEnv(t)
 			if uc.raw != "" {
 				t.Setenv("BENCH_MCP_BACKGROUND_NICE", uc.raw)
 			}
@@ -74,6 +102,7 @@ func TestLoadConfig_ShellExpandCommands(t *testing.T) {
 		{name: "explicit false", raw: "false", want: false},
 	} {
 		t.Run(uc.name, func(t *testing.T) {
+			clearConfigEnv(t)
 			if uc.raw != "" {
 				t.Setenv("BENCH_MCP_SHELL_EXPAND_COMMANDS", uc.raw)
 			}
@@ -105,6 +134,7 @@ func TestLoadConfig_ToolCallWorkers(t *testing.T) {
 
 	for _, uc := range useCases {
 		t.Run(uc.name, func(t *testing.T) {
+			clearConfigEnv(t)
 			if uc.raw != "" {
 				t.Setenv("BENCH_MCP_TOOL_CALL_WORKERS", uc.raw)
 			}
