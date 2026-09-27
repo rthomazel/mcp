@@ -84,7 +84,7 @@ func TestFileCreate_MissingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 
-	result, toolErr := h.handleFileCreate(path, "hello world\n", false)
+	result, toolErr := h.handleFileCreate(path, "hello world\n", false, false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -113,7 +113,7 @@ func TestFileCreate_EmptyFile(t *testing.T) {
 	path := filepath.Join(dir, "empty.txt")
 	mustSucceed(t, os.WriteFile(path, nil, 0o600))
 
-	result, toolErr := h.handleFileCreate(path, "content", false)
+	result, toolErr := h.handleFileCreate(path, "content", false, false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -131,7 +131,7 @@ func TestFileCreate_DryRun(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 
-	result, toolErr := h.handleFileCreate(path, "one\ntwo\n", true)
+	result, toolErr := h.handleFileCreate(path, "one\ntwo\n", true, false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -143,18 +143,18 @@ func TestFileCreate_DryRun(t *testing.T) {
 	}
 }
 
-func TestFileCreate_NonExistingFileRejected(t *testing.T) {
+func TestFileCreate_NonEmptyFileRejectedWithoutOverwrite(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "existing.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("alpha"), 0o644))
 
-	_, toolErr := h.handleFileCreate(path, "beta", false)
+	_, toolErr := h.handleFileCreate(path, "beta", false, false)
 	if toolErr == "" {
 		t.Fatalf("expected error for non-empty existing file")
 	}
-	if !strings.Contains(toolErr, "refusing to overwrite") {
-		t.Fatalf("error = %q, want refusing to overwrite", toolErr)
+	if !strings.Contains(toolErr, "refusing to overwrite") || !strings.Contains(toolErr, "overwrite=true") {
+		t.Fatalf("error = %q, want overwrite guidance", toolErr)
 	}
 	got, _ := os.ReadFile(path)
 	if string(got) != "alpha" {
@@ -162,11 +162,33 @@ func TestFileCreate_NonExistingFileRejected(t *testing.T) {
 	}
 }
 
+func TestFileCreate_Overwrite(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("alpha"), 0o644))
+
+	result, toolErr := h.handleFileCreate(path, "beta", false, true)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	if !strings.Contains(result, "file was overwritten") {
+		t.Fatalf("message = %q", result)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read overwritten file: %v", err)
+	}
+	if string(got) != "beta" {
+		t.Fatalf("content = %q, want beta", string(got))
+	}
+}
+
 func TestFileCreate_NonRegularFileRejected(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 
-	_, toolErr := h.handleFileCreate(dir, "x", false)
+	_, toolErr := h.handleFileCreate(dir, "x", false, false)
 	if toolErr == "" {
 		t.Fatalf("expected error for directory")
 	}
@@ -180,7 +202,7 @@ func TestFileCreate_InvalidUTF8(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 
-	_, toolErr := h.handleFileCreate(path, "\x80\x81", false)
+	_, toolErr := h.handleFileCreate(path, "\x80\x81", false, false)
 	if toolErr == "" {
 		t.Fatalf("expected error for invalid UTF-8")
 	}
@@ -197,7 +219,7 @@ func TestFileCreate_NullBytes(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 
-	_, toolErr := h.handleFileCreate(path, "has\x00null", false)
+	_, toolErr := h.handleFileCreate(path, "has\x00null", false, false)
 	if toolErr == "" {
 		t.Fatalf("expected error for null bytes")
 	}
@@ -212,7 +234,7 @@ func TestFileCreate_NullBytes(t *testing.T) {
 func TestFileCreate_NonAbsolutePath(t *testing.T) {
 	h := newTestHandler(t)
 
-	_, toolErr := h.handleFileCreate("new.txt", "x", false)
+	_, toolErr := h.handleFileCreate("new.txt", "x", false, false)
 	if toolErr == "" {
 		t.Fatalf("expected error for relative path")
 	}
@@ -226,7 +248,7 @@ func TestFileCreate_ParentCreatedDeep(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "a", "b", "c", "new.txt")
 
-	result, toolErr := h.handleFileCreate(path, "deep", false)
+	result, toolErr := h.handleFileCreate(path, "deep", false, false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
@@ -245,12 +267,33 @@ func TestFileCreate_SymlinkParent(t *testing.T) {
 	mustSucceed(t, os.Symlink(filepath.Join(dir, "real"), filepath.Join(dir, "link")))
 	path := filepath.Join(dir, "link", "new.txt")
 
-	_, toolErr := h.handleFileCreate(path, "x", false)
+	_, toolErr := h.handleFileCreate(path, "x", false, false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "real", "new.txt")); err != nil {
 		t.Fatalf("file should be created in the real dir: %v", err)
+	}
+}
+
+func TestFileCreate_HandlerOptions(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("alpha"), 0o644))
+
+	result, err := h.HandleFileCreate(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
+		"path": path, "content": "beta", "overwrite": true,
+	}}})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if !strings.Contains(contentText(result), "file was overwritten") {
+		t.Fatalf("expected overwrite result, got: %s", contentText(result))
+	}
+	got, readErr := os.ReadFile(path)
+	if readErr != nil || string(got) != "beta" {
+		t.Fatalf("content = %q, read error = %v", string(got), readErr)
 	}
 }
 

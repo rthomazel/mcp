@@ -4,7 +4,7 @@ Specification and implementation guide for `file_replace`, `file_replace_all`, a
 
 - **`file_replace`** — replaces each `find` exactly once per item (unique match required); accepts a batch. The target file must already exist (missing files error out).
 - **`file_replace_all`** — replaces every occurrence of a single `find`
-- **`file_create`** — creates a new file (or overwrites an empty one) with `content`, creating any missing parent directories. This is the successor to the old `file_replace` create-mode.
+- **`file_create`** — creates a new file with `content`, or overwrites an existing regular file when `overwrite` is true, creating any missing parent directories. This is the successor to the old `file_replace` create-mode.
 
 ## Tool schemas
 
@@ -97,7 +97,7 @@ Specification and implementation guide for `file_replace`, `file_replace_all`, a
 ```json
 {
   "name": "file_create",
-  "description": "Create a new file, or overwrite an empty one. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff.",
+  "description": "Create a new file, or overwrite an existing regular file when overwrite is true. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -112,6 +112,10 @@ Specification and implementation guide for `file_replace`, `file_replace_all`, a
       "dry_run": {
         "type": "boolean",
         "description": "Optional. If true, validate and compute the diff without writing to disk."
+      },
+      "overwrite": {
+        "type": "boolean",
+        "description": "Optional. If true, replace an existing non-empty regular file. Defaults to false."
       }
     },
     "required": ["path", "content"]

@@ -136,10 +136,11 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("file_create",
-			mcp.WithDescription("Create a new file, or overwrite an empty one. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff. Replaces the old 'file_replace creates a missing file' behavior."),
+			mcp.WithDescription("Create a new file, or overwrite an existing file when overwrite=true. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff. Replaces the old 'file_replace creates a missing file' behavior."),
 			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
 			mcp.WithString("content", mcp.Required(), mcp.Description("Full contents of the new file.")),
 			mcp.WithBoolean("dry_run", mcp.Description("Optional. If true, validate and compute the diff without writing to disk.")),
+			mcp.WithBoolean("overwrite", mcp.Description("Optional. If true, replace an existing non-empty regular file. Defaults to false.")),
 		),
 		h.HandleFileCreate,
 	)

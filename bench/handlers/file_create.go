@@ -14,7 +14,7 @@ import (
 	"github.com/rthomazel/mcp/bench/internal/stats"
 )
 
-// HandleFileCreate writes a new file (or overwrites an existing empty one).
+// HandleFileCreate writes a new file, optionally overwriting an existing file.
 // It creates any missing parent directories and returns a short one-line
 // message on success, or a unified diff when dry_run is set.
 func (h *Handler) HandleFileCreate(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -23,13 +23,14 @@ func (h *Handler) HandleFileCreate(_ context.Context, req mcp.CallToolRequest) (
 	path, _ := args["path"].(string)
 	content, _ := args["content"].(string)
 	dryRun, _ := args["dry_run"].(bool)
+	overwrite, _ := args["overwrite"].(bool)
 
 	if _, ok := args["content"]; !ok {
 		return mcp.NewToolResultError("content must not be empty."), nil
 	}
 
 	start := time.Now()
-	result, toolErr := h.handleFileCreate(path, content, dryRun)
+	result, toolErr := h.handleFileCreate(path, content, dryRun, overwrite)
 
 	errorKind := ""
 	if toolErr != "" {
@@ -42,6 +43,7 @@ func (h *Handler) HandleFileCreate(_ context.Context, req mcp.CallToolRequest) (
 		ErrorKind: errorKind,
 		FilePath:  path,
 		DryRun:    &dryRun,
+		Overwrite: &overwrite,
 	})
 
 	if toolErr != "" {
@@ -51,7 +53,7 @@ func (h *Handler) HandleFileCreate(_ context.Context, req mcp.CallToolRequest) (
 }
 
 //nolint:cyclop
-func (h *Handler) handleFileCreate(path, content string, dryRun bool) (result, toolErr string) {
+func (h *Handler) handleFileCreate(path, content string, dryRun, overwrite bool) (result, toolErr string) {
 	// 1. Input guards (no lock needed — pure validation).
 	if !filepath.IsAbs(path) {
 		return "", "path must be absolute."
@@ -79,8 +81,8 @@ func (h *Handler) handleFileCreate(path, content string, dryRun bool) (result, t
 	lock := file.AcquireLock(realPath)
 	defer file.ReleaseLock(realPath, lock)
 
-	// 4. Stat the target. Missing is fine; an existing non-regular file or a
-	// non-empty file is rejected so create mode never clobbers anything.
+	// 4. Stat the target. Missing is fine; non-regular files are always rejected.
+	// Non-empty files require explicit overwrite permission.
 	info, statErr := os.Lstat(realPath)
 	if statErr != nil && !os.IsNotExist(statErr) {
 		return "", fmt.Sprintf("stat: %v", statErr)
@@ -89,24 +91,27 @@ func (h *Handler) handleFileCreate(path, content string, dryRun bool) (result, t
 		if !info.Mode().IsRegular() {
 			return "", "path must point to a regular file."
 		}
-		if info.Size() != 0 {
-			return "", fmt.Sprintf("refusing to overwrite existing non-empty file: %s", realPath)
+		if info.Size() != 0 && !overwrite {
+			return "", fmt.Sprintf("refusing to overwrite existing non-empty file: %s (set overwrite=true to replace it)", realPath)
 		}
 	}
 
 	// 5. Write the file. Parent directories were created in step 2.
-	return commitCreate(realPath, content, dryRun, info)
+	return commitCreate(realPath, content, dryRun, overwrite, info)
 }
 
 // commitCreate writes content to realPath on success, or reports the diff on
-// dry_run. info is non-nil when the target already existed (and was empty).
-func commitCreate(realPath, content string, dryRun bool, info os.FileInfo) (string, string) {
+// dry_run. info is non-nil when the target already existed.
+func commitCreate(realPath, content string, dryRun, overwrite bool, info os.FileInfo) (string, string) {
 	if dryRun {
 		return file.ComputeDiff(realPath, "", content), ""
 	}
 	reason := "file did not exist"
 	if info != nil {
 		reason = "file was empty"
+		if overwrite {
+			reason = "file was overwritten"
+		}
 	}
 	if err := file.AtomicWrite(realPath, content, 0o644); err != nil {
 		return "", fmt.Sprintf("write failed: %v", err)
