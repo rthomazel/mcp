@@ -22,6 +22,7 @@ CREATE TABLE tool_calls (
     replacement_count     INTEGER,
     replacement_bytes     TEXT,
     dry_run               INTEGER CHECK (dry_run IS NULL OR dry_run IN (0, 1)),
+    overwrite             INTEGER CHECK (overwrite IS NULL OR overwrite IN (0, 1)),
 
     setup_paths           TEXT
 );
