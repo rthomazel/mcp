@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [0.9.0](https://github.com/rthomazel/mcp/pull/51) feat: allow file_create to overwrite existing files
+
+### feat
+
+- [`f6f9136`](https://github.com/rthomazel/mcp/commit/f6f9136) **(handlers/file_create, main)** `file_create` gains an optional `overwrite` boolean. Creating over an existing non-empty regular file is refused unless `overwrite=true`, in which case the file is atomically replaced (a missing file, or an existing empty one, is unaffected); directories, devices, and other non-regular targets are always rejected.
+
+### misc
+
+- [`f6f9136`](https://github.com/rthomazel/mcp/commit/f6f9136) **(internal/stats, db/migrations)** stats now record the `overwrite` flag (`overwrite` column + `ToolCall.Overwrite`) so intentional overwrites can be separated from rejected attempts; also repairs the stats INSERT that emitted 22 placeholders for 21 columns and failed every insert.
+
+### docs
+
+- [`f6f9136`](https://github.com/rthomazel/mcp/commit/f6f9136) **(doc/file_tools_design, README, main)** documents the `overwrite` parameter on the `file_create` tool.
+
+### test
+
+- [`f6f9136`](https://github.com/rthomazel/mcp/commit/f6f9136) **(handlers/file_create_test)** covers overwriting an existing non-empty file, rejection without `overwrite`, and the handler-level argument path.
+
 ## [0.8.0](https://github.com/rthomazel/mcp/pull/47) feat: file_create tool, deprioritized background jobs
 
 ### feat

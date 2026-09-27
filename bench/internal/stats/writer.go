@@ -33,11 +33,12 @@ type ToolCall struct {
 	CWD      string
 	JobID    string
 
-	// file_replace / file_replace_all
+	// file_replace / file_replace_all / file_create
 	FilePath         string
 	ReplacementCount int
 	ReplacementBytes [][2]int // [[find_bytes, replace_bytes], ...]
 	DryRun           *bool
+	Overwrite        *bool
 
 	// setup
 	SetupPaths []string
@@ -194,9 +195,9 @@ func (w *Writer) insert(tc ToolCall) {
 		INSERT INTO tool_calls (
 			id, tool, called_at, duration_ms, server_version, error_kind,
 			base_cmd, cmd_hash, cmd_encrypted, normalizer_version, exit_code, timed_out, cwd, job_id, redacted_byte_counts,
-			file_path, replacement_count, replacement_bytes, dry_run,
+			file_path, replacement_count, replacement_bytes, dry_run, overwrite,
 			setup_paths
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		uuid.New().String(),
 		tc.Tool,
 		calledAt,
@@ -216,6 +217,7 @@ func (w *Writer) insert(tc ToolCall) {
 		nullInt(tc.ReplacementCount),
 		replacementBytesJSON,
 		dryRunInt,
+		boolInt(tc.Overwrite),
 		setupPathsJSON,
 	)
 	if err != nil {
@@ -225,6 +227,15 @@ func (w *Writer) insert(tc ToolCall) {
 
 func nullString(s string) any { return lo.Ternary[any](s == "", nil, s) }
 func nullInt(n int) any       { return lo.Ternary[any](n == 0, nil, n) }
+func boolInt(v *bool) any {
+	if v == nil {
+		return nil
+	}
+	if *v {
+		return 1
+	}
+	return 0
+}
 
 // QueryStats queries the stats DB for a summary over the given rolling window.
 // days=0 returns all time. bgHintThreshold is half the shell timeout for the hint.
