@@ -58,8 +58,8 @@ Forgiving, per-hunk file editing. Each replacement in a batch resolves independe
 ## resolveMismatchDiagnostics(label string, r replacement, content string, matches file.Match, maxCandidates int) string
 
 1. When the region is set, report the region span and append a file.ExcerptRange snippet over it.
-2. Take the first non-empty line of find, trimmed of leading and trailing whitespace, and search for it in content.
-3. If it does not match, retry once with the first non-empty line of find without trimming.
+2. Take the first non-empty line of find, without trimming, and search for it in content.
+3. If it does not match, retry once with the first non-empty line of find trimmed of leading and trailing whitespace.
 4. When a match is found, append the partial-match hint from partialMatchDiagnostic.
 5. Otherwise append a line stating find did not match, suggesting whitespace, indentation, or CRLF line endings.
 
