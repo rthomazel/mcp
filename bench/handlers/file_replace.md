@@ -17,7 +17,7 @@ Forgiving, per-hunk file editing. Each replacement in a batch resolves independe
 
 ## hunkStatus
 
-1. index int, the 1-based position of the replacement in the batch
+1. pos int, the 1-based position of the replacement in the batch
 2. outcome string, "applied" or "not_matched"
 3. located *locatedReplacement, present only when outcome is "applied"
 4. diagnostics string, the rendered preview present only when outcome is "not_matched"
