@@ -1,7 +1,7 @@
 ---
 id: 2026-09-29-file-replace
 type: spec
-summary: Makes file_replace easy to use for non-deterministic models through independent hunks, diff-on-failure, line/region targeting, and loose matching.
+summary: Makes file_replace easy to use for non-deterministic models through independent hunks, diff-on-failure, and line/region targeting.
 author: Thom
 created: 2026-09-29
 agents: merlin, rook2
@@ -13,7 +13,7 @@ agents: merlin, rook2
 
 `file_replace` should be easy to use for models that are not deterministic in nature. Today it demands that a model reproduce a unique substring exactly — byte-for-byte, including tabs and indentation — and if any single item in a batch fails, the whole batch is rejected. Models respond by reaching for the shell: writing a Python or heredoc script with its own assertions, or running `sed -i`. The telemetry shows these escape hatches are common and usually succeed, so the tool is the problem, not the models.
 
-The intent is to remove the reasons a model would choose the shell over `file_replace`, without sacrificing the surgical precision that makes the tool valuable. Four capabilities accomplish this. Each is optional on its own but they share one direction: stop requiring the model to guess the file's exact bytes, and let the tool resolve the model's intent.
+The intent is to remove the reasons a model would choose the shell over `file_replace`, without sacrificing the surgical precision that makes the tool valuable. Three capabilities accomplish this. Each is optional on its own but they share one direction: stop requiring the model to guess the file's exact bytes, and let the tool resolve the model's intent.
 
 ### 1. Independent hunk application
 
@@ -29,7 +29,7 @@ When a hunk does not match, the tool should still render a diff. The diff is ren
 
 Two ways to resolve a diff-on-failure exist, and the tool must support both:
 
-- **Confirmation model.** The tool renders the candidate diff but does not write. The model resends with a tighter `find` or a `line_number` to commit. Nothing is written to the wrong location.
+- **Confirmation model.** The tool renders the candidate diff but does not write. The model resends with a tighter `find` or a narrower region to commit. Nothing is written to the wrong location.
 - **Automatic model.** The tool applies to the nearest candidate and returns the real diff, flagged with which location it picked. The model can see the change and react.
 
 The confirmation model is the safe default; the automatic model is the more forgiving option that absorbs the model's "didn't know which to pick" noise entirely.
@@ -40,27 +40,19 @@ The confirmation model is the safe default; the automatic model is the more forg
 
 The tool should also resolve by location. A model may target a region — "the block in `buildSessionConfig`" — or narrow by line number, without supplying a matching substring at all. This kills ambiguity outright: if `MaxStreamWindowSize` appears three times, "the one in `buildSessionConfig`" resolves without the model quoting surrounding code. `file_replace_all` already supports `start_line`/`end_line` scoping; this extends the same axis to `file_replace`.
 
-### 4. Loose matching — NOT IMPLEMENTED (deferred)
+## Relationships between the three
 
-The current contract is byte-exact. Auto-formatters, import reordering, and generated-comment additions can invalidate a `find` block that was valid a moment before. For a non-deterministic writer, the probability of hitting those exact bytes on the first try is low.
-
-The tool should accept a looser `find` — a short unique prefix, or a match tolerant of leading-whitespace and indentation drift — and apply it. The model gets to supply intent ("change the constant near this comment") rather than reproduce a whole indented block. The tool resolves the narrowest interpretation and reports what it matched.
-
-> Not implemented. Deferred: loose matching overlaps with region targeting (#3) and adds a second resolution axis. Keep it out until the simpler capabilities land and telemetry confirms the need.
-
-## Relationships between the four
-
-The four capabilities each absorb one axis of model non-determinism. Loose matching and line targeting remove the pressure to reproduce exact bytes in the first place. Independent hunking ensures a bad guess on one hunk does not discard the good guesses in the same batch. Diff-on-failure gives the model verification when its guess was still wrong. Together they mean a model rarely needs to shell out to patch a file.
+The three capabilities each absorb one axis of model non-determinism. Line targeting removes the pressure to reproduce exact bytes in the first place. Independent hunking ensures a bad guess on one hunk does not discard the good guesses in the same batch. Diff-on-failure gives the model verification when its guess was still wrong. Together they mean a model rarely needs to shell out to patch a file.
 
 ## Use cases
 
 - **Patch several places in one call.** A model wants to add a constant and edit the config block that uses it. It sends both as one batch. If one is slightly wrong, the other still applies, and the response shows which.
-- **Target by region, not by exact text.** A model knows the intent ("add the accept-backlog field to this yamux config") but not the exact indentation. It targets the region or supplies a loose prefix and the tool resolves it.
+- **Target by region, not by exact text.** A model knows the intent ("add the accept-backlog field to this yamux config") but not the exact indentation. It targets the region and the tool resolves it.
 - **Correct-course in one shot.** A model's `find` does not match. Instead of a bare error and a follow-up `cat`, it receives a rendered diff against the nearest candidate and can resend narrowed, without leaving the tool.
 
 ## Constraints and non-goals
 
-- **Precision is preserved.** Loose matching and region targeting still apply a single, well-defined edit. The tool never guesses among wildly different interpretations silently; it reports what it matched and where, and the model reacts.
+- **Precision is preserved.** Region targeting still applies a single, well-defined edit. The tool never guesses among wildly different interpretations silently; it reports what it matched and where, and the model reacts.
 - **No shell involvement.** The operation stays in-process. The escape hatch that motivated this work — piping text through the shell — is not reintroduced.
 - **Overlap and atomicity semantics.** Overlapping hunks within one call remain a rejection, because applying one would invalidate the other's byte offsets. Independent application is per-hunk, not per-byte.
 - **file_replace_all is unchanged.** Its single-match-per-find contract and its existing line-range scoping are sufficient. This work targets `file_replace` only.
@@ -70,5 +62,4 @@ The four capabilities each absorb one axis of model non-determinism. Loose match
 
 - A batch where one hunk fails still writes the hunks that match, and the response reports each hunk's status.
 - A single-hunk call whose `find` does not match renders a unified diff against the nearest candidate and marks it not applied, rather than returning a bare text error.
-- A call may target a region or line range as the resolution basis, without requiring an exact-byte `find` to match.
-- A call may target a region by start/end line, narrowing a byte-exact `find` to the intended location without the model reproducing exact bytes.
+- A call may target a region by start/end line, narrowing a byte-exact `find` to the intended location as the resolution basis, without the model reproducing exact bytes.
