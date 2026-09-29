@@ -52,12 +52,16 @@ The package provides substring matching, line counting, diagnostic excerpts, dif
 2. Select the lines in range, capping the span to maxLines.
 3. Prefix each output line with its 1-based number.
 
-## PreferenceLine(s, prefix) string
+## RegionSpan(startLine, endLine, fileLines int) (start, end int, ok bool)
 
-1. Take the first non-empty line of s, stripped of its newline.
-2. Return the first line starting with prefix when one exists.
-3. Otherwise return the first non-empty line.
+1. Clamp startLine to 1 when it is below 1.
+2. Clamp endLine to fileLines when it exceeds fileLines, and to 1 when it is below 1.
+3. Return the clamped span and true when startLine is at or before endLine.
+4. Return zero and false when the region is empty after clamping.
 
+#### Rationale
+
+- RegionSpan is the anchor-based resolver for file_replace region targeting: the handler scopes a byte-exact find to [start, end] so a model can target "the block in buildSessionConfig" without reproducing exact bytes. It returns ok=false only when the clamped range is empty, letting the caller distinguish "no region" from "region is valid."
 ## ComputeDiff(path, before, after) string
 
 1. Compute the edits using the Myers algorithm.

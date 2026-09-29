@@ -40,11 +40,13 @@ The confirmation model is the safe default; the automatic model is the more forg
 
 The tool should also resolve by location. A model may target a region — "the block in `buildSessionConfig`" — or narrow by line number, without supplying a matching substring at all. This kills ambiguity outright: if `MaxStreamWindowSize` appears three times, "the one in `buildSessionConfig`" resolves without the model quoting surrounding code. `file_replace_all` already supports `start_line`/`end_line` scoping; this extends the same axis to `file_replace`.
 
-### 4. Loose matching
+### 4. Loose matching — NOT IMPLEMENTED (deferred)
 
 The current contract is byte-exact. Auto-formatters, import reordering, and generated-comment additions can invalidate a `find` block that was valid a moment before. For a non-deterministic writer, the probability of hitting those exact bytes on the first try is low.
 
 The tool should accept a looser `find` — a short unique prefix, or a match tolerant of leading-whitespace and indentation drift — and apply it. The model gets to supply intent ("change the constant near this comment") rather than reproduce a whole indented block. The tool resolves the narrowest interpretation and reports what it matched.
+
+> Not implemented. Deferred: loose matching overlaps with region targeting (#3) and adds a second resolution axis. Keep it out until the simpler capabilities land and telemetry confirms the need.
 
 ## Relationships between the four
 
@@ -69,4 +71,4 @@ The four capabilities each absorb one axis of model non-determinism. Loose match
 - A batch where one hunk fails still writes the hunks that match, and the response reports each hunk's status.
 - A single-hunk call whose `find` does not match renders a unified diff against the nearest candidate and marks it not applied, rather than returning a bare text error.
 - A call may target a region or line range as the resolution basis, without requiring an exact-byte `find` to match.
-- A loose `find` that tolerates whitespace indentation drift still resolves to the intended single location, and the response reports what it matched.
+- A call may target a region by start/end line, narrowing a byte-exact `find` to the intended location without the model reproducing exact bytes.
