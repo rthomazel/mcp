@@ -39,15 +39,11 @@ Forgiving, per-hunk file editing. Each replacement in a batch resolves independe
 4. For each replacement, resolve it independently with resolveReplacement, producing one hunkStatus indexed by position.
 5. Collect the located hunks into the applied set, preserving batch order.
 6. Sort the applied hunks by match start byte ascending.
-7. Walk the sorted applied hunks and reject any pair whose spans overlap.
+7. Walk the sorted applied hunks and drop any whose span overlaps a hunk already kept, keeping the first hunk in each overlapping group.
 8. Apply the applied hunks to the working content in descending byte order, later edits first so earlier byte offsets stay valid.
 9. Compute the diff over the real path with file.ComputeDiff; on a non-dry-run call, write atomically via commit, then recompute the diff.
 10. Assemble the result from the applied diff followed by renderStatus of every hunk.
-11. Return the assembled text, or an error when a guard, overlap, or commit fails.
-
-#### Errors
-
-- **7.** if any applied spans overlap, return an error naming the two replacement indices and explaining that overlapping hunks cannot both apply.
+11. Return the assembled text, or an error when a guard, or commit fails.
 
 ## resolveReplacement(r replacement, content string, fileLines int, maxCandidates int) hunkStatus
 
@@ -74,7 +70,7 @@ Forgiving, per-hunk file editing. Each replacement in a batch resolves independe
 
 - Resolving every replacement independently means a bad guess on one hunk never discards the good hunks in the same batch.
 - Region targeting narrows a byte-exact find to a single location without the model reproducing exact bytes, absorbing the indentation drift that would otherwise defeat a plain find.
-- The applied set is checked for overlap once, up front, because applying one span invalidates the byte offsets of any span that crosses it; independent application is per-hunk, not per-byte.
+- When applied hunks overlap, the first hunk in sorted byte order wins and every later hunk crossing its span is dropped, so one edit never invalidates the byte offsets of another; independent application is per-hunk, not per-byte.
 - A not_matched hunk is rendered as a preview rather than aborting the batch, giving the model the diff-shaped feedback it expects on failure.
 
 ## Shared helpers (existing, not added here)
