@@ -1,3 +1,10 @@
+---
+id: 2026-09-29-stats
+type: documentation
+summary: Documents how bench-mcp records and queries tool-call statistics.
+created: 2026-09-29
+updated: 2026-09-29
+---
 # stats design
 
 BenchMCP records statistics on every tool call into a local SQLite database.

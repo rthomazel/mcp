@@ -1,3 +1,10 @@
+---
+id: 2026-07-28-log-tools
+type: draft
+summary: Draft design plan for the logs / logsRaw build-test log tools. Not implemented.
+created: 2026-07-28
+updated: 2026-09-29
+---
 # MCP Log Tools — v1 Design Spec (final)
 
 ## Tools: `logs` and `logsRaw`

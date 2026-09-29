@@ -1,3 +1,10 @@
+---
+id: 2026-09-29-setup
+type: documentation
+summary: Documents how bench-mcp manages dev tool versions, setup, and background jobs.
+created: 2026-09-29
+updated: 2026-09-29
+---
 # tools
 
 Dev tools (languages, formatters, linters, etc.) should be versioned alongside the project that needs them, not installed globally in the container.
@@ -54,7 +61,7 @@ Poll with `status` using the returned `job_id`.
 
 `shell_background` jobs are deprioritized: they spawn as `nice -n <level> bash -c <cmd>` (level from `BENCH_MCP_BACKGROUND_NICE`, default 10), so their whole process tree runs at a lower CPU scheduling priority. A heavy background job therefore cannot starve foreground `shell` commands, which keep their default priority and preempt the deprioritized tree.
 
-**Known gap (documented, not enforced):** nice changes only CPU scheduling priority. It does **not** bound memory (a very large background job can still exhaust container memory), and it does **not** cap the *aggregate* CPU of several simultaneous background jobs — two or more heavy jobs can still collectively delay a new `shell` command's startup on a small box. `setup` jobs run at default priority (not deprioritized) by design. Hard isolation (per-job cgroup memory/CPU caps) is out of scope; see `doc/resource-management-design.md` for the future direction.
+**Known gap (documented, not enforced):** nice changes only CPU scheduling priority. It does **not** bound memory (a very large background job can still exhaust container memory), and it does **not** cap the *aggregate* CPU of several simultaneous background jobs — two or more heavy jobs can still collectively delay a new `shell` command's startup on a small box. `setup` jobs run at default priority (not deprioritized) by design. Hard isolation (per-job cgroup memory/CPU caps) is out of scope; see `doc/ideas/resource-management-design.md` for the future direction.
 
 ## dependencies
 

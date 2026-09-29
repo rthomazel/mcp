@@ -1,3 +1,10 @@
+---
+id: 2026-09-29-config
+type: documentation
+summary: Documents the configuration environment variables of bench-mcp.
+created: 2026-09-29
+updated: 2026-09-29
+---
 # configuration
 
 Config is loaded from environment variables only — no flags, no config files.
