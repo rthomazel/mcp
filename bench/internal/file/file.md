@@ -52,6 +52,12 @@ The package provides substring matching, line counting, diagnostic excerpts, dif
 2. Select the lines in range, capping the span to maxLines.
 3. Prefix each output line with its 1-based number.
 
+## PreferenceLine(s, prefix) string
+
+1. Take the first non-empty line of s, stripped of its newline.
+2. Return the first line starting with prefix when one exists.
+3. Otherwise return the first non-empty line.
+
 ## ComputeDiff(path, before, after) string
 
 1. Compute the edits using the Myers algorithm.
