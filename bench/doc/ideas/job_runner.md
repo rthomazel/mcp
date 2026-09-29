@@ -1,3 +1,10 @@
+---
+id: 2026-07-28-job-runner
+type: draft
+summary: Draft design plan for the remote job-runner MCP server. Not implemented.
+created: 2026-07-28
+updated: 2026-09-29
+---
 # Remote Job Runner MCP Design (v1)
 
 ## Problem

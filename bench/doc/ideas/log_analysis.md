@@ -1,3 +1,10 @@
+---
+id: 2026-07-28-log-analysis
+type: draft
+summary: Draft design plan for the log analysis tool. Not implemented.
+created: 2026-07-28
+updated: 2026-09-29
+---
 ### Design Plan — Log Analysis MCP Tool
 
 ## Precondition

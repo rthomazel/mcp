@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.9.1](https://github.com/rthomazel/mcp/pull/53) docs: convert docs to spec-driven development
+
+### docs
+
+- [`c627747`](https://github.com/rthomazel/mcp/commit/c627747) **(spc, doc)** promotes current-behavior docs under `spc/<feature>/doc.md` (config, setup, stats, architecture) and moves unimplemented design plans plus the open-ideas brainstorm into `doc/ideas/` with draft frontmatter, completing the repo's move to spec-driven development. The legacy `doc/file_tools_design.md` was consolidated under `spc/` and removed.
+- [`0da0533`](https://github.com/rthomazel/mcp/commit/0da0533) **(spc/file-replace)** adds the `FileReplace` spec describing forgiving edits for non-deterministic models.
+- [`b41612a`](https://github.com/rthomazel/mcp/commit/b41612a) **(spc)** consolidates the file-tool docs under `spc/` and deletes the legacy `doc/file_tools_design.md`.
+
+### models
+
+- [`db6cdcf`](https://github.com/rthomazel/mcp/commit/db6cdcf) **(handlers/file_replace)** adds the software model for the `file_replace` handler.
+
 ## [0.9.0](https://github.com/rthomazel/mcp/pull/51) feat: allow file_create to overwrite existing files
 
 ### feat

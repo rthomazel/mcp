@@ -1,3 +1,10 @@
+---
+id: 2026-09-29-architecture
+type: documentation
+summary: Documents the overall system layout, request flow, and design decisions of bench-mcp.
+created: 2026-09-29
+updated: 2026-09-29
+---
 # architecture
 
 ## layout

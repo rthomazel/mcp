@@ -1,3 +1,10 @@
+---
+id: 2026-07-28-ideas
+type: draft
+summary: Inkubation — open ideas, unimplemented features, and "what not to add" notes.
+created: 2026-07-28
+updated: 2026-09-29
+---
 # ideas
 
 - [ ] Go dependency update cron job workflow copy from other projects.
@@ -18,7 +25,7 @@ options worth exploring:
 - Moving to a purpose-built time-series store if query patterns outgrow SQLite
 
 For now the DB is unbounded; the `days` parameter on the `stats` tool limits query scope
-but not storage. See `doc/stats-design.md` § retention.
+but not storage. See `spc/stats/doc.md` § retention.
 
 ## per-command timeout
 
