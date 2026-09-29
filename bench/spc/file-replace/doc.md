@@ -95,12 +95,29 @@ match. Diagnostic output is capped at 5 matches; when more exist the error notes
 
 ## Constraints
 
+- **Target existence is validated before replacement contents.** A missing file yields
+  "file does not exist." rather than a misleading "find not found in file" error.
 - **Substring matching is byte-exact**, including indentation and whitespace. Auto-formatter
   runs, import reordering, or generated-comment additions can invalidate a `find` block that
-  was valid moments before.
+  was valid moments before. This is the intended behavior for a precise surgical tool;
+  indentation-aware, line-based, or AST-aware edits are different tools for a different
+  purpose.
+- **Substring matching is non-overlapping** and left-to-right, matching Go's
+  `strings.Index`/`strings.Count` behavior (e.g. "aa" in "aaa" yields one match at offset 0,
+  not two overlapping matches).
+- **Line-span semantics**: a match's end line is the line on which its last byte resides. A
+  trailing newline terminates its own line, so `"foo\n"` on line 3 has an end line of 3, not
+  4. This affects how `line_number` narrows a match.
+- **Editor-style line counting**: line counts are editor-style (`strings.Count(s, "\n")` plus 1
+  if the file is non-empty and does not end with `\n`; 0 for an empty file). Range validation
+  (`line_number`/`start_line`/`end_line` against file length) uses this count, distinct from
+  the `replace` newline-limit guard, which counts newlines directly.
 - **Line endings**: matching is byte-exact. The server assumes LF (`\n`). Files with CRLF line
   endings fail to match `find` supplied with LF — the not-found error surfaces this hint
   explicitly.
+- **External-modification detection is best-effort**: an SHA-256 check between read and write
+  guards against concurrent edits, but a modification occurring between the final read and the
+  atomic rename would not be detected.
 - **No shell involvement**: the entire operation is in-process. No `exec`, no escaping.
 
 ## Why not shell?

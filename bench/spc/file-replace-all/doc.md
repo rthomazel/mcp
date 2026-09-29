@@ -82,7 +82,12 @@ writes nothing.
 - **Non-recursive**: replacement text is not re-searched even if it contains `find`. This
   matches `strings.ReplaceAll` semantics and is consistent with the pre-pass approach used by
   `file_replace`.
-- **Substring matching is byte-exact**, including indentation and whitespace.
+- **Scope containment is strict**: a match is selected only if fully contained within the
+  range. A multi-line match crossing either boundary is not replaced.
+- **Substring matching is byte-exact**, including indentation and whitespace, and is
+  non-overlapping, left-to-right — matching Go's `strings.Index`/`strings.Count` behavior.
+- **Editor-style line counting** is used for range validation, distinct from the `replace`
+  newline-limit guard, which counts newlines directly.
 - **Line endings**: matching is byte-exact. The server assumes LF (`\n`); CRLF files fail to
   match `find` supplied with LF.
 - **No shell involvement**: the entire operation is in-process Go. No `exec`, no escaping.

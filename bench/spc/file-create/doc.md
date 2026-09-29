@@ -37,7 +37,10 @@ devices, and other non-regular targets are always rejected.
 ## Behavior
 
 - **Missing file**: content is written, any missing parent directories are created.
-- **Existing empty file**: content replaces the empty file (the empty-file guard does not fire).
+- **Existing empty file**: content replaces the empty file; the overwrite guard does not fire
+  for an empty target, only for a non-empty one.
+- **Missing-file precedence**: a missing target is reported as "file does not exist." rather
+  than a find/replace diagnostic, since the target is validated before the content is.
 - **Existing non-empty file, `overwrite=false`** (default): refused. A message is returned and
   the file is left untouched.
 - **Existing non-empty file, `overwrite=true`**: the file is atomically replaced.

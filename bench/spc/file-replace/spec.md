@@ -1,17 +1,17 @@
 ---
-id: 2026-09-29-forgiving-file-replace
+id: 2026-09-29-file-replace
 type: spec
-summary: Makes file_replace forgiving and easy to use for non-deterministic models through independent hunks, diff-on-failure, line/region targeting, and loose matching.
+summary: Makes file_replace easy to use for non-deterministic models through independent hunks, diff-on-failure, line/region targeting, and loose matching.
 author: Thom
 created: 2026-09-29
 agents: merlin, rook2
 ---
 
-# Forgiving file_replace
+# FileReplace
 
 ## Description
 
-`file_replace` should be forgiving and easy to use for models that are not deterministic in nature. Today it demands that a model reproduce a unique substring exactly — byte-for-byte, including tabs and indentation — and if any single item in a batch fails, the whole batch is rejected. Models respond by reaching for the shell: writing a Python or heredoc script with its own assertions, or running `sed -i`. The telemetry shows these escape hatches are common and usually succeed, so the tool is the problem, not the models.
+`file_replace` should be easy to use for models that are not deterministic in nature. Today it demands that a model reproduce a unique substring exactly — byte-for-byte, including tabs and indentation — and if any single item in a batch fails, the whole batch is rejected. Models respond by reaching for the shell: writing a Python or heredoc script with its own assertions, or running `sed -i`. The telemetry shows these escape hatches are common and usually succeed, so the tool is the problem, not the models.
 
 The intent is to remove the reasons a model would choose the shell over `file_replace`, without sacrificing the surgical precision that makes the tool valuable. Four capabilities accomplish this. Each is optional on its own but they share one direction: stop requiring the model to guess the file's exact bytes, and let the tool resolve the model's intent.
 
