@@ -1,6 +1,8 @@
 # file_replace
 
-Forgiving, per-hunk file editing. Each replacement in a batch resolves independently: a replacement whose `find` matches exactly once within its region applies; a replacement that matches zero or more than once within its region does not apply and is reported with a rendered preview. Region targeting narrows a byte-exact `find` to a single location via `start_line`/`end_line` instead of reproducing exact bytes, so indentation drift no longer defeats a plain find. A hunk that fails to match is rendered as a not-applied preview (diff-on-failure) instead of aborting the batch; unrelated hunks in the same batch still apply. Loose matching (a prefix/indent-drift tolerant `find`) is intentionally out of scope.
+Forgiving, per-hunk file editing. Each replacement resolves independently against original content. A unique byte-exact match is eligible for application, subject to overlap filtering. Failed matches receive not-applied candidate previews when candidates exist, otherwise a diagnostic excerpt. Region targeting disambiguates repeated text using start_line/end_line; it does not tolerate indentation drift. Loose matching and automatic candidate application are deferred.
+
+# Types
 
 ## replacement
 
@@ -18,11 +20,11 @@ Forgiving, per-hunk file editing. Each replacement in a batch resolves independe
 ## hunkStatus
 
 1. pos int, the 1-based position of the replacement in the batch
-2. outcome string, "applied" or "not_matched"
-3. located *locatedReplacement, present only when outcome is "applied"
-4. diagnostics string, the rendered preview present only when outcome is "not_matched"
+2. outcome string, resolved, applied, would_apply, not_matched, invalid_region, or overlap
+3. located *locatedReplacement, present for resolved, applied, and would_apply outcomes
+4. diagnostics string, rejection reason and any not-applied preview
 
-## Functions
+# Functions
 
 ## Handler.HandleFileReplace(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
@@ -36,46 +38,48 @@ Forgiving, per-hunk file editing. Each replacement in a batch resolves independe
 1. Guard the path is absolute, the replacements array is non-empty, and the file exists; return a file-does-not-exist error before validating replacement contents.
 2. Open the file via openFileForEdit, resolving symlinks, acquiring the per-file lock, and rejecting binary content, releasing the lock on return.
 3. Run validateFindReplace on each replacement and return on the first violation.
-4. For each replacement, resolve it independently with resolveReplacement, producing one hunkStatus indexed by position.
+4. For each replacement, call resolveReplacement() with the real path and original content. Assign the returned status its 1-based batch position and any located replacement its 0-based origIdx.
 5. Collect the located hunks into the applied set, preserving batch order.
-6. Sort the applied hunks by match start byte ascending.
-7. Walk the sorted applied hunks and drop any whose span overlaps a hunk already kept, keeping the first hunk in each overlapping group.
-8. Apply the applied hunks to the working content in descending byte order, later edits first so earlier byte offsets stay valid.
-9. Compute the diff over the real path with file.ComputeDiff; on a non-dry-run call, write atomically via commit, then recompute the diff.
+6. Sort the located hunks by match start byte ascending, breaking ties by original batch position.
+7. Keep each hunk only when its half-open byte span does not overlap a previously kept hunk. For each dropped hunk, set its status to overlap, clear located, and report the conflicting hunk position.
+8. Apply only the kept hunks to a working copy of original content in descending byte order, later edits first so earlier byte offsets stay valid.
+9. If any hunks remain, call commit(working, dryRun) for the diff and optional atomic write; return any error before reporting success. Otherwise skip commit and use an empty diff. Mark kept hunks would_apply for dry-run, otherwise applied.
 10. Assemble the result from the applied diff followed by renderStatus of every hunk.
 11. Return the assembled text, or an error when a guard, or commit fails.
 
-## resolveReplacement(r replacement, content string, fileLines int, maxCandidates int) hunkStatus
+## resolveReplacement(path string, r replacement, content string, fileLines int, maxCandidates int) (status hunkStatus)
 
-1. Determine the region span: when startLine and endLine are both non-zero, call file.RegionSpan(startLine, endLine, fileLines); mark the region set only when it returns ok.
+1. If both bounds are zero (omitted), search the whole file. Otherwise default the omitted start to 1 and omitted end to fileLines, then call file.RegionSpan(). If it returns false, return an invalid_region status with the requested bounds and file line count; never fall back to whole-file search.
 2. Gather all matches of r.find in content with file.FindMatches.
-3. When the region is set, keep only those matches that overlap [startLine, endLine]; otherwise keep all matches.
+3. When a region was supplied, keep only matches whose line spans overlap the returned clamped bounds; otherwise keep all matches. All coordinates refer to original content.
 4. Branch on the surviving matches:
    1. Zero matches: return a not_matched hunkStatus whose diagnostics are built by resolveMismatchDiagnostics.
-   2. Exactly one match: return an applied hunkStatus wrapping a locatedReplacement over the match.
-   3. More than one match: return a not_matched hunkStatus whose diagnostics list the ambiguous locations.
+   2. Exactly one match: return a resolved hunkStatus wrapping a locatedReplacement over the match.
+   3. More than one match: return not_matched with the ambiguous locations and separate not-applied diffs for up to maxCandidates matches in byte order, noting omitted candidates. Each preview substitutes replace at that exact span in a fresh copy of original content and calls file.ComputeDiff(path, content, hypothetical); never commit previews.
 
-## resolveMismatchDiagnostics(label string, r replacement, content string, matches file.Match, maxCandidates int) string
+## resolveMismatchDiagnostics(path string, r replacement, content string, startLine int, endLine int, maxCandidates int) (diagnostics string)
 
-1. When the region is set, report the region span and append a file.ExcerptRange snippet over it.
-2. Take the first non-empty line of find, without trimming, and search for it in content.
-3. If it does not match, retry once with the first non-empty line of find trimmed of leading and trailing whitespace.
-4. When a match is found, append the partial-match hint from partialMatchDiagnostic.
-5. Otherwise append a line stating find did not match, suggesting whitespace, indentation, or CRLF line endings.
+1. Receive the effective search bounds from resolveReplacement(), using the whole file when no region was supplied. Report those bounds and a capped file.ExcerptRange() snippet.
+2. Find the first non-empty line of find, preserving whitespace. Search for it within the bounds; if no hits exist, retry with leading and trailing whitespace trimmed. An empty anchor yields no candidates.
+3. For each anchor hit in byte order, infer the candidate starting line by subtracting the anchor's zero-based line index within find. Select file.CountLines(find) whole lines, preserving original line endings. Discard spans extending outside the effective bounds and deduplicate identical spans.
+4. For up to maxCandidates spans, substitute replace for that span in a fresh copy of original content and call file.ComputeDiff(path, content, hypothetical). Label each diff not applied, approximate whole-line candidate, with its original line range; note omitted candidates. If hypothetical content is unchanged, explicitly report an empty preview.
+5. If no candidates remain, report no preview candidate, retain the excerpt, and suggest checking whitespace, indentation, or CRLF endings. Never invent a location or write preview content.
+
+Candidate selection is a deterministic diagnostic heuristic, not fuzzy matching or permission to apply.
 
 ## renderStatus(statuses []hunkStatus) string
 
-1. Prefix the output with the applied and not_matched tallies.
-2. For each hunk, in batch order, emit a line: applied hunks show the match start/end line and char offset; not_matched hunks show the diagnostics.
+1. Prefix the output with tallies for each final outcome; resolved is internal and must not appear in output.
+2. For each hunk, in batch order, emit its outcome. Applied and would_apply hunks show original match start/end line and char offset; rejected hunks show diagnostics. Label dry-run output explicitly as not written.
 
 #### Rationale
 
 - Resolving every replacement independently means a bad guess on one hunk never discards the good hunks in the same batch.
-- Region targeting narrows a byte-exact find to a single location without the model reproducing exact bytes, absorbing the indentation drift that would otherwise defeat a plain find.
+- Region targeting disambiguates repeated byte-exact text without requiring surrounding context in find; loose matching remains deferred.
 - When applied hunks overlap, the first hunk in sorted byte order wins and every later hunk crossing its span is dropped, so one edit never invalidates the byte offsets of another; independent application is per-hunk, not per-byte.
-- A not_matched hunk is rendered as a preview rather than aborting the batch, giving the model the diff-shaped feedback it expects on failure.
+- A not_matched hunk receives diagnostic previews when candidates exist, otherwise an excerpt; neither case aborts unrelated hunks.
 
 ## Shared helpers (existing, not added here)
 
-- openFileForEdit, validateFindReplace, partialMatchDiagnostic, and (editedFile).commit live in file_edit.go and are reused by handleFileReplace as-is.
+- openFileForEdit, validateFindReplace, and (editedFile).commit live in file_edit.go and are reused by handleFileReplace as-is.
 - file.FindMatches, file.RegionSpan, file.ExcerptRange, and file.ComputeDiff live in the file package; RegionSpan is the only new primitive.

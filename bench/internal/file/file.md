@@ -55,13 +55,14 @@ The package provides substring matching, line counting, diagnostic excerpts, dif
 ## RegionSpan(startLine, endLine, fileLines int) (start, end int, ok bool)
 
 1. Clamp startLine to 1 when it is below 1.
-2. Clamp endLine to fileLines when it exceeds fileLines, and to 1 when it is below 1.
-3. Return the clamped span and true when startLine is at or before endLine.
-4. Return zero and false when the region is empty after clamping.
+2. Clamp endLine to fileLines when it exceeds fileLines.
+3. If startLine exceeds endLine, return (0, 0, false): the clamped range is empty, including when the file has no lines.
+4. Otherwise return (startLine, endLine, true).
 
 #### Rationale
 
-- RegionSpan is the anchor-based resolver for file_replace region targeting: the handler scopes a byte-exact find to [start, end] so a model can target "the block in buildSessionConfig" without reproducing exact bytes. It returns ok=false only when the clamped range is empty, letting the caller distinguish "no region" from "region is valid."
+- The caller fills omitted bounds before calling RegionSpan and uses the returned bounds for filtering. False means an invalid, empty region, never permission to search the whole file.
+
 ## ComputeDiff(path, before, after) string
 
 1. Compute the edits using the Myers algorithm.

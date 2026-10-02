@@ -1,3 +1,9 @@
+# Automatic nearest-candidate application
+
+Deferred; not modeled or implemented. An optional automatic mode could apply a replacement to the nearest candidate and return the actual diff, explicitly identifying the selected location. The current scope supports diagnostic previews only: approximate candidates are never written, and the caller must resend a corrected exact find or narrower region to commit.
+
+Before introducing automatic application, define candidate ranking, ambiguity handling, and explicit opt-in separately from the diagnostic preview heuristic.
+
 # Loose matching
 
 Deferred. Extracted from the `FileReplace` spec so it stays out of the implemented scope. The mechanism that partially covers the same need is region targeting (`bench/spc/file-replace/spec.md`, §3).
