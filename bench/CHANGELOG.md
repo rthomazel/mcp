@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.9.2](https://github.com/rthomazel/mcp/pull/54) docs: model forgiving file_replace
+
+### models
+
+- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(handlers/file_replace, internal/file)** models independent hunk resolution, region-scoped exact matching, invalid-region rejection without unrestricted fallback, deterministic overlap dropping, candidate diff previews, and explicit dry-run outcomes.
+
+### docs
+
+- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(spc/file-replace)** aligns the specification and acceptance criteria with the models; defers loose matching and automatic nearest-candidate application. This release changes specifications and models only; runtime behavior is unchanged.
+
 ## [0.9.1](https://github.com/rthomazel/mcp/pull/53) docs: convert docs to spec-driven development
 
 ### docs
