@@ -52,6 +52,17 @@ The package provides substring matching, line counting, diagnostic excerpts, dif
 2. Select the lines in range, capping the span to maxLines.
 3. Prefix each output line with its 1-based number.
 
+## RegionSpan(startLine, endLine, fileLines int) (start, end int, ok bool)
+
+1. Clamp startLine to 1 when it is below 1.
+2. Clamp endLine to fileLines when it exceeds fileLines.
+3. If startLine exceeds endLine, return (0, 0, false): the clamped range is empty, including when the file has no lines.
+4. Otherwise return (startLine, endLine, true).
+
+#### Rationale
+
+- The caller fills omitted bounds before calling RegionSpan and uses the returned bounds for filtering. False means an invalid, empty region, never permission to search the whole file.
+
 ## ComputeDiff(path, before, after) string
 
 1. Compute the edits using the Myers algorithm.
