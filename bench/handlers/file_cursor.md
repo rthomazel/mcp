@@ -54,7 +54,7 @@ Proposed shared plumbing for file_insert and file_delete. Reuses existing file-e
 - **2.** if value is outside int bounds, return a range error before conversion.
 - **2.** if a float64 value exceeds the exactly representable integer range, return a range error.
 
-## applyCursorEdit(request cursorRequest, transform func(string, int) string) (result string, toolErr string)
+## applyCursorEdit(request cursorRequest, transform func(original string, cursor int) (transformed string)) (result string, toolErr string)
 
 1. Call openFileForEdit().
 2. Defer file.ReleaseLock() for the opened file for every subsequent return.

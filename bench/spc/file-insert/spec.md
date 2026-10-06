@@ -30,7 +30,9 @@ no-op after validation.
 
 ## Cursor contract
 
-`path` identifies an existing file. `line` is a positive, 1-based integer.
+`path` is an absolute path identifying an existing regular text file.
+Paths, anchors, insertion content, and existing file content must be valid UTF-8
+without null characters; unsupported inputs fail without writing. `line` is a positive, 1-based integer.
 Find the first literal occurrence of `anchor` on that line and position the
 cursor immediately after it. The anchor is retained. An empty anchor positions
 the cursor at the start of the line. A nonempty anchor cannot contain a line
@@ -45,7 +47,10 @@ encoding; no indentation or newline normalization is performed.
 ## Results and safety
 
 Return a unified diff of the change. `dry_run` defaults to false; when true,
-perform the same validation and return the proposed diff without writing.
+validate the inputs and captured file snapshot and return the proposed diff without
+writing. Write-time external-modification checks apply only when an actual change
+is committed; previews and successful no-ops do not guarantee the file remains
+unchanged by another process.
 Report a successful no-op explicitly. Neither tool creates missing files.
 
 ## Scope
@@ -67,3 +72,5 @@ not documentation of an existing implementation.
 ## Changelog
 
 - Initial agreed specification for dedicated anchored insertion.
+- Clarify the supported text/path domain and snapshot-based dry-run validation
+  following review in [PR #55](https://github.com/rthomazel/mcp/pull/55).

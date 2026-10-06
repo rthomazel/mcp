@@ -15,11 +15,20 @@ The package provides file-edit plumbing: symlink resolution, file opening, commi
 
 # Functions
 
-## resolveTarget(path) (string, error)
+## resolveTarget(path string) (realPath string, toolErr string)
 
-1. Lstat the path to determine whether the final element is missing.
-2. Resolve the parent directory when the final element is missing.
-3. Otherwise resolve the path and return the real path.
+1. Call os.Lstat() to inspect the final element.
+   1. if it is missing, resolve the parent with filepath.EvalSymlinks(), then return filepath.Join() of the resolved parent and original base name.
+2. Otherwise resolve the complete path with filepath.EvalSymlinks() and return it.
+
+#### Errors
+
+- **1.1.** if parent resolution reports a missing path, return a parent-directory-does-not-exist diagnostic.
+- **1.1.** if parent resolution otherwise fails, return the contextual resolve-path diagnostic.
+
+---
+
+- **2.** if complete-path resolution fails, return the contextual resolve-path diagnostic. Non-missing Lstat failures proceed to this resolution, matching the existing helper.
 
 ## openFileForEdit(path string) (opened *editedFile, toolErr string)
 
@@ -61,7 +70,7 @@ The package provides file-edit plumbing: symlink resolution, file opening, commi
 
 - **3.** if atomic writing fails, return the contextual write error rather than a success diff.
 
-The caller retains ownership of the lock and releases it on every return.
+The caller retains ownership of the lock and releases it on every return. Dry-run validates the captured snapshot; checksum revalidation is a write-time guard, not part of preview validation. Successful no-ops likewise skip commit and write-time revalidation.
 
 ## validateFindReplace(find, replace, maxLines) error
 
@@ -87,5 +96,5 @@ The caller retains ownership of the lock and releases it on every return.
 
 #### Rationale
 
-- openFileForEdit takes the lock before reading so a concurrent edit cannot slip in.
-- The checksum re-check in commit detects an external modification between the read and the write.
+- The process-local lock serializes cooperating edits after acquisition; target type and mode are inspected before locking.
+- The checksum re-check detects external changes visible at re-read, not changes occurring between that check and atomic replacement. It does not exclude external writers.
