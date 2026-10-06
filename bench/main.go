@@ -122,9 +122,10 @@ func run() error {
 				mcp.Items(map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"find":        map[string]any{"type": "string", "description": "Unique substring to find, matched by character including whitespace."},
-						"replace":     map[string]any{"type": "string", "description": "Replacement text. Empty string deletes the match."},
-						"line_number": map[string]any{"type": "integer", "description": "Optional. Narrows the match to occurrences spanning this line (original-file line number)."},
+						"find":       map[string]any{"type": "string", "description": "Unique substring to find, matched by character including whitespace."},
+						"replace":    map[string]any{"type": "string", "description": "Replacement text. Empty string deletes the match."},
+						"start_line": map[string]any{"type": "integer", "description": "Optional. Region targeting: 1-based inclusive start line. Omitted defaults to 1."},
+						"end_line":   map[string]any{"type": "integer", "description": "Optional. Region targeting: 1-based inclusive end line. Omitted defaults to the last line."},
 					},
 					"required": []any{"find", "replace"},
 				}),
