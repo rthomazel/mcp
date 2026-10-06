@@ -4,6 +4,7 @@ type: spec
 summary: Makes file_replace easy to use for non-deterministic models through independent hunks, diff-on-failure, and line/region targeting.
 author: Thom
 created: 2026-09-29
+updated: 2026-10-06
 agents: merlin, rook2
 ---
 
@@ -11,13 +12,13 @@ agents: merlin, rook2
 
 ## Description
 
-`file_replace` should be easy to use for models that are not deterministic in nature. Today it demands that a model reproduce a unique substring exactly — byte-for-byte, including tabs and indentation — and if any single item in a batch fails, the whole batch is rejected. Models respond by reaching for the shell: writing a Python or heredoc script with its own assertions, or running `sed -i`. The telemetry shows these escape hatches are common and usually succeed, so the tool is the problem, not the models.
+`file_replace` should be easy to use for models that are not deterministic in nature. Previously it demanded that a model reproduce a unique substring exactly — byte-for-byte, including tabs and indentation — and if any single item in a batch fails, the whole batch is rejected. Models respond by reaching for the shell: writing a Python or heredoc script with its own assertions, or running `sed -i`. The telemetry shows these escape hatches are common and usually succeed, so the tool is the problem, not the models.
 
 The intent is to remove the reasons a model would choose the shell over `file_replace`, without sacrificing the surgical precision that makes the tool valuable. Three capabilities accomplish this. Each is optional on its own but they share one direction: reduce the context the model must reproduce and provide actionable feedback when an exact match fails.
 
 ### 1. Independent hunk application
 
-`file_replace` currently fails fast: every item in a batch is validated against the original file before any edit is applied, and one failing item rejects the entire batch. For a non-deterministic writer this is hostile — a model may send a batch where three hunks are right and one is slightly off, losing all three good edits because of the one bad guess.
+The previous implementation failed fast: every item in a batch is validated against the original file before any edit is applied, and one failing item rejects the entire batch. For a non-deterministic writer this is hostile — a model may send a batch where three hunks are right and one is slightly off, losing all three good edits because of the one bad guess.
 
 The tool should apply each item independently. A hunk that does not match contributes nothing; the hunks that do match are still written. The response reports each hunk's outcome — applied, not matched, invalid region, or dropped because of overlap — so the model gets the same per-item visibility it would have had from a successful atomic batch. Atomicity is not relied upon by models; per-hunk feedback is.
 
@@ -54,6 +55,22 @@ The three capabilities each absorb one axis of model non-determinism. Line targe
 - **Overlap semantics.** Process resolved hunks in starting-location order, breaking ties by input order. Keep each hunk unless it overlaps an already kept hunk; drop the conflicting hunk and report which earlier hunk won. Unrelated hunks still apply.
 - **file_replace_all is unchanged.** Its single-match-per-find contract and its existing line-range scoping are sufficient. This work targets `file_replace` only.
 - **file_create is out of scope.** Write-only heredocs (`cat > file << EOF`) migrate to `file_create` by adoption, not by feature changes here. That tool is new and climbing fast on its own.
+
+## Input and safety contract
+
+The target must be an absolute path to an existing regular UTF-8 text file. Symlinks are resolved and edits operate on the real target while preserving its permissions. There is no hidden create mode: missing files belong to `file_create`. Target existence is checked before replacement-content validation.
+
+Each replacement supplies required `find` and `replace` strings. Empty replacement text deletes the match. Empty find, identical find and replace, null bytes, invalid UTF-8, and replacement text exceeding the configured newline limit reject the entire request before resolution. Independent outcomes apply to matching, region, and overlap failures—not malformed replacement contents. Malformed requests and file I/O failures remain tool errors.
+
+Optional `start_line` and `end_line` are integers in original-file coordinates; omitted or zero bounds default to the corresponding file boundary. Fractional or unrepresentable coordinates are rejected rather than truncated. `line_number` is replaced by these bounds. Optional `dry_run` computes the proposed diff and outcomes without writing. All finds resolve against the original snapshot: targeting text produced by an earlier edit requires another call.
+
+Defaults are 50 newlines per replacement (`BENCH_MCP_EDIT_MAX_LINES`) and 5 diagnostic candidates per failed hunk (`BENCH_MCP_MAX_CANDIDATES`). No-match excerpts contain at most 10 lines. Candidate limits bound the number of previews, not individual line lengths.
+
+Substring occurrences are non-overlapping and searched left-to-right. A match's end line contains its last byte: a trailing newline belongs to the line it terminates, not the next line. Empty files have zero lines; a final newline does not create another addressable line. Character positions in outcomes are byte offsets within the starting line. Matching preserves line endings and remains byte-exact; LF find text does not match CRLF content containing different bytes.
+
+The response contains the kept hunks' unified diff followed by outcome tallies and each hunk's result in input order. Final outcomes are `applied`, `would_apply`, `not_matched`, `invalid_region`, and `overlap`. Applied outcomes identify original locations; dry runs explicitly say not written. Diagnostic candidates are always labeled not applied and rendered independently against original content. When every hunk is rejected, nothing is written; the response still reports the outcomes rather than a whole-request match error.
+
+Edits use a per-target lock and a checksum recheck before an atomic replacement of the target. External-modification detection is best-effort: external changes between the final re-read and rename are not detected. Successful writes mean the rename completed, not guaranteed durable persistence after a crash. Dry runs validate the captured snapshot without write-time checksum revalidation. These safeguards remain shared with the other file-editing tools.
 
 ## Acceptance criteria
 

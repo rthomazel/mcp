@@ -29,7 +29,7 @@ Forgiving, per-hunk file editing. Each replacement resolves independently agains
 ## Handler.HandleFileReplace(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
 1. Extract path, dryRun, and the replacements array from the request arguments; reject an empty array.
-2. For each raw replacement item, assert it is a map[string]any; extract find and replace, and the optional start_line and end_line coordinates, coercing each coordinate with a float64 assertion and rejecting any non-integer coordinate.
+2. For each raw replacement item, assert it is a map[string]any; extract find and replace, and the optional start_line and end_line coordinates, coercing each coordinate with a float64 assertion and rejecting any non-finite, fractional, or out-of-int-range coordinate before conversion.
 3. Time the call, invoke handleFileReplace, and record a stats call with path, replacement count, per-item find/replace byte lengths, and the dryRun flag.
 4. Return an error result when handleFileReplace returns an error, otherwise a text result.
 
@@ -78,6 +78,20 @@ Candidate selection is a deterministic diagnostic heuristic, not fuzzy matching 
 - Region targeting disambiguates repeated byte-exact text without requiring surrounding context in find; loose matching remains deferred.
 - When applied hunks overlap, the first hunk in sorted byte order wins and every later hunk crossing its span is dropped, so one edit never invalidates the byte offsets of another; independent application is per-hunk, not per-byte.
 - A not_matched hunk receives diagnostic previews when candidates exist, otherwise an excerpt; neither case aborts unrelated hunks.
+
+## Diagnostic implementation helpers
+
+- ambiguousDiagnostics(path, r, matches, content, maxCandidates) string renders the multi-match branch of resolveReplacement: exact-span previews capped in byte order.
+- writeCandidatePreview(builder, path, content, hypothetical, label) emits a label and unified diff, or explicitly reports an empty preview.
+- findWithinBounds(content, needle, startLine, endLine) []file.Match filters matches by overlapping line spans.
+- anchorLineIndex(find) int returns the zero-based first non-whitespace line index.
+- dedupeSpans(hits, anchorIndex, nLines, content, startLine, endLine) [][2]int infers whole-line candidate ranges, discards out-of-bounds ranges, and deduplicates while preserving hit order.
+- lineBoundaries(content) [][2]int retains byte boundaries including original line terminators; lineByteSpan(content, startLine, endLine) (int, int, bool) selects the corresponding half-open byte range.
+- noPreviewCandidate() string supplies the no-candidate hint; indent(text, prefix) string formats diagnostic lines in per-hunk output. Each rejected status ends with a newline so adjacent statuses remain separate.
+
+## Tool registration
+
+Register required string path, required nonempty replacements array with required string find/replace per item, optional integer start_line/end_line, and optional boolean dry_run. Descriptions explain independent original-file resolution, not-applied previews, and byte-order overlap selection with input-order ties. There is no line_number or automatic-candidate option.
 
 ## Shared helpers (existing, not added here)
 

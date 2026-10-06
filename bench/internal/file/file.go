@@ -56,6 +56,25 @@ func FindMatches(content, find string) []Match {
 	return matches
 }
 
+// RegionSpan clamps a 1-based inclusive line range to the file's line count.
+// The caller fills omitted bounds before calling; the returned bounds are what
+// callers use for filtering. ok is false only for an empty (invalid) range,
+// never permission to fall back to an unrestricted search.
+func RegionSpan(startLine, endLine, fileLines int) (start, end int, ok bool) {
+	start = startLine
+	if start < 1 {
+		start = 1
+	}
+	end = endLine
+	if end > fileLines {
+		end = fileLines
+	}
+	if start > end {
+		return 0, 0, false
+	}
+	return start, end, true
+}
+
 // CountLines returns the editor-style line count of s: strings.Count(s, "\n") plus 1
 // if s is non-empty and does not end with "\n". Returns 0 for empty s.
 func CountLines(s string) int {

@@ -114,17 +114,19 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("file_replace",
-			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff. The file must already exist."),
+			mcp.WithDescription("Replace byte-exact substrings independently against original file content. Returns the applied diff and per-hunk outcomes; failed matches receive not-applied previews when candidates exist. The file must already exist."),
 			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
 			mcp.WithArray("replacements",
 				mcp.Required(),
-				mcp.Description("One or more find/replace pairs. Order does not matter."),
+				mcp.MinItems(1),
+				mcp.Description("One or more find/replace pairs in original-file coordinates. Overlaps keep the earliest starting match, breaking ties by input order; unrelated hunks still apply."),
 				mcp.Items(map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"find":        map[string]any{"type": "string", "description": "Unique substring to find, matched by character including whitespace."},
-						"replace":     map[string]any{"type": "string", "description": "Replacement text. Empty string deletes the match."},
-						"line_number": map[string]any{"type": "integer", "description": "Optional. Narrows the match to occurrences spanning this line (original-file line number)."},
+						"find":       map[string]any{"type": "string", "description": "Unique substring to find, matched by character including whitespace."},
+						"replace":    map[string]any{"type": "string", "description": "Replacement text. Empty string deletes the match."},
+						"start_line": map[string]any{"type": "integer", "description": "Optional. Region targeting: 1-based inclusive start line. Omitted defaults to 1."},
+						"end_line":   map[string]any{"type": "integer", "description": "Optional. Region targeting: 1-based inclusive end line. Omitted defaults to the last line."},
 					},
 					"required": []any{"find", "replace"},
 				}),
