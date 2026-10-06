@@ -1,6 +1,10 @@
 # CHANGELOG
 
-## [0.9.3](https://github.com/rthomazel/mcp/pull/55) docs: specify file_insert and file_delete
+## [0.9.3](https://github.com/rthomazel/mcp/pull/55) docs: specify and model file_insert and file_delete
+
+### models
+
+- [PR #55](https://github.com/rthomazel/mcp/pull/55) **(handlers/file_insert, handlers/file_delete, handlers/file_cursor, handlers/file_edit, internal/file, main)** proposes thin insertion/deletion handlers sharing cursor parsing, edit lifecycle, no-op reporting, and telemetry; adds cursor resolution and Unicode traversal primitives and tool registration. Models await review; no runtime changes.
 
 ### docs
 

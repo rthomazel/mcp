@@ -14,6 +14,22 @@ The package provides substring matching, line counting, diagnostic excerpts, dif
 
 # Functions
 
+## ResolveCursor(content string, line int, anchor string) (cursor int, toolErr string)
+
+Proposed primitive for file_insert and file_delete; existing replacement matching is unchanged.
+
+1. Require positive line and a valid UTF-8 anchor containing neither null bytes nor CR/LF. Content has already passed openFileForEdit validation.
+2. Locate the requested line by scanning LF boundaries while retaining original byte offsets. Follow CountLines for nonempty files: a final LF terminates its line rather than creating an extra addressable line. Special-case an empty file to permit line 1. This line-addressing detail is proposed for model review.
+3. Exclude LF and its preceding CR, when present, from the searchable line text. Preserve both in original content. A lone CR is not a line separator under this LF-based convention.
+4. An empty anchor returns the line's start byte. Otherwise strings.Index selects its first literal occurrence in the searchable text; return the byte immediately after the match. Never search other lines or clamp an invalid line.
+5. On invalid line, return requested line and available line count. On missing anchor, report the selected line with a quoted excerpt truncated to at most 200 Unicode code points and an explicit truncation marker. Do not echo an unbounded anchor or file. No diagnostic changes the cursor or authorizes a write.
+
+## AdvanceCodePoints(content string, cursor int, count int) int
+
+1. Receive valid UTF-8 content, a resolved byte-boundary cursor, and a positive count.
+2. Starting at cursor, decode one rune at a time and advance by its byte width until count code points have been consumed or EOF is reached.
+3. Return the end byte offset. Count tabs and LF as one each and CRLF as two. Never normalize, split a UTF-8 encoding, or allocate proportional to count. Combining marks are separate code points.
+
 ## FindMatches(content, find) []Match
 
 1. Return nil when find is empty.

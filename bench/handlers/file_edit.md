@@ -1,6 +1,6 @@
 # Shared file-editing helpers
 
-The package provides the plumbing shared by file_replace and file_replace_all: symlink resolution, file opening, commit, input guards, and the three error builders.
+The package provides file-edit plumbing: symlink resolution, file opening, commit, replacement input guards, and error builders. Proposed file_insert and file_delete reuse openFileForEdit and commit through file_cursor.md; they do not use replacement-specific validation or match diagnostics. file_create also reuses resolveTarget.
 
 # Types
 
@@ -17,14 +17,14 @@ The package provides the plumbing shared by file_replace and file_replace_all: s
 
 ## resolveTarget(path) (string, error)
 
-1. Lstat the path, returning an error when the final element is missing.
+1. Lstat the path to determine whether the final element is missing.
 2. Resolve the parent directory when the final element is missing.
 3. Otherwise resolve the path and return the real path.
 
 ## openFileForEdit(path) (*editedFile, error)
 
 1. Resolve the target, returning an error on failure.
-2. Stat the target, rejecting a missing or non-regular file.
+2. Stat the target, rejecting a missing or non-regular file. Proposed diagnostic cleanup: report file does not exist without replacement-specific find-not-found wording for every caller.
 3. Acquire the per-file lock.
 4. Read the content, rejecting null bytes and invalid UTF-8.
 5. Return the opened file.
