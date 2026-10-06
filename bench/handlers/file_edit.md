@@ -1,6 +1,6 @@
 # Shared file-editing helpers
 
-The package provides file-edit plumbing: symlink resolution, file opening, commit, replacement input guards, and error builders. Proposed file_insert and file_delete reuse openFileForEdit and commit through file_cursor.md; they do not use replacement-specific validation or match diagnostics. file_create also reuses resolveTarget.
+The package provides file-edit plumbing: symlink resolution, file opening, commit, replacement input guards, and error builders. file_insert and file_delete reuse openFileForEdit and commit through file_cursor.md; they do not use replacement-specific validation or match diagnostics. file_create also reuses resolveTarget.
 
 # Types
 
@@ -44,7 +44,7 @@ The package provides file-edit plumbing: symlink resolution, file opening, commi
 
 ---
 
-- **2.** if the file is missing, return file does not exist. Removing replacement-specific find-not-found wording is proposed for all callers.
+- **2.** if the file is missing, return file does not exist. Uses tool-neutral wording for all callers.
 - **2.** if stat otherwise fails, return the contextual stat error.
 - **2.** if the target is non-regular, return a file-type error.
 

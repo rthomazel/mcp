@@ -16,10 +16,10 @@ The package provides substring matching, line counting, diagnostic excerpts, dif
 
 ## ResolveCursor(content string, line int, anchor string) (cursor int, toolErr string)
 
-Proposed primitive for file_insert and file_delete; existing replacement matching is unchanged.
+Primitive for file_insert and file_delete; existing replacement matching is unchanged.
 
 1. Require positive line and a valid UTF-8 anchor containing neither null bytes nor CR/LF. Content has already passed openFileForEdit validation.
-2. Locate the requested line by scanning LF boundaries while retaining original byte offsets. Follow CountLines for nonempty files: a final LF terminates its line rather than creating an extra addressable line. Special-case an empty file to permit line 1. This line-addressing detail is proposed for model review.
+2. Locate the requested line by scanning LF boundaries while retaining original byte offsets. Follow CountLines for nonempty files: a final LF terminates its line rather than creating an extra addressable line. Special-case an empty file to permit line 1.
 3. Exclude LF and its preceding CR, when present, from the searchable line text. Preserve both in original content. A lone CR is not a line separator under this LF-based convention.
 4. Select the cursor within the searchable line text.
    1. if anchor is empty, return the line's start byte.

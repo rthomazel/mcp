@@ -1,4 +1,4 @@
-Proposed handler for the approved file-insert specification. Shares parsing and edit lifecycle with file_cursor.md. Awaiting model review.
+Handler for the approved file-insert specification. Shares parsing and edit lifecycle with file_cursor.md. Model approved through merged PR #55.
 
 # Functions
 

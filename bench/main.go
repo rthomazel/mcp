@@ -136,6 +136,24 @@ func run() error {
 		h.HandleFileReplace,
 	)
 
+	s.AddTool(mcp.NewTool("file_insert",
+		mcp.WithDescription("Insert content verbatim into an existing file after the first literal occurrence of anchor on the specified 1-based line. An empty anchor inserts at the start of the line; an empty file accepts line 1 with an empty anchor. No indentation or newlines are added automatically. Returns a unified diff; dry_run previews without writing. Invalid lines or missing anchors fail without writing."),
+		mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to an existing file.")),
+		mcp.WithInteger("line", mcp.Required(), mcp.Min(1), mcp.Description("Positive 1-based integer line.")),
+		mcp.WithString("anchor", mcp.Required(), mcp.Description("Literal single-line anchor; empty means start of line.")),
+		mcp.WithString("content", mcp.Required()),
+		mcp.WithBoolean("dry_run", mcp.Description("Preview without writing.")),
+	), h.HandleFileInsert)
+
+	s.AddTool(mcp.NewTool("file_delete",
+		mcp.WithDescription("Delete up to count Unicode code points after the first literal occurrence of anchor on the specified 1-based line, retaining the anchor. An empty anchor starts deletion at the beginning of the line. Count must be a positive integer. Deletion can cross line boundaries and stops at EOF without error; deletion at EOF succeeds as a reported no-op. Returns a unified diff; dry_run previews without writing. Invalid lines or missing anchors fail without writing."),
+		mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to an existing file.")),
+		mcp.WithInteger("line", mcp.Required(), mcp.Min(1), mcp.Description("Positive 1-based integer line.")),
+		mcp.WithString("anchor", mcp.Required(), mcp.Description("Literal single-line anchor; empty means start of line.")),
+		mcp.WithInteger("count", mcp.Required(), mcp.Min(1), mcp.Description("Positive number of Unicode code points to delete.")),
+		mcp.WithBoolean("dry_run", mcp.Description("Preview without writing.")),
+	), h.HandleFileDelete)
+
 	s.AddTool(
 		mcp.NewTool("file_create",
 			mcp.WithDescription("Create a new file, or overwrite an existing file when overwrite=true. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff. Replaces the old 'file_replace creates a missing file' behavior."),

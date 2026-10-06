@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
@@ -220,4 +221,52 @@ func ReleaseLock(path string, e *LockEntry) {
 		delete(fileLocksPool, path)
 	}
 	fileLocksMapMu.Unlock()
+}
+
+// ResolveCursor finds the byte after the first anchor on the selected line.
+func ResolveCursor(content string, line int, anchor string) (int, string) {
+	if line <= 0 {
+		return 0, "line must be a positive integer."
+	}
+	if !utf8.ValidString(anchor) || strings.ContainsAny(anchor, "\x00\r\n") {
+		return 0, "anchor must be valid UTF-8 without null bytes, CR, or LF."
+	}
+	lines := CountLines(content)
+	if line > lines && (content != "" || line != 1) {
+		return 0, fmt.Sprintf("line %d out of range (file has %d lines).", line, lines)
+	}
+	start := 0
+	for current := 1; current < line; current++ {
+		start += strings.IndexByte(content[start:], '\n') + 1
+	}
+	end := len(content)
+	if offset := strings.IndexByte(content[start:], '\n'); offset >= 0 {
+		end = start + offset
+		if end > start && content[end-1] == '\r' {
+			end--
+		}
+	}
+	if anchor == "" {
+		return start, ""
+	}
+	text := content[start:end]
+	if offset := strings.Index(text, anchor); offset >= 0 {
+		return start + offset + len(anchor), ""
+	}
+	excerptEnd := AdvanceCodePoints(text, 0, 200)
+	suffix := ""
+	if excerptEnd < len(text) {
+		suffix = " (truncated)"
+	}
+	return 0, fmt.Sprintf("anchor not found on line %d: %q%s", line, text[:excerptEnd], suffix)
+}
+
+// AdvanceCodePoints advances a valid byte cursor without splitting UTF-8.
+func AdvanceCodePoints(content string, cursor int, count int) int {
+	for count > 0 && cursor < len(content) {
+		_, width := utf8.DecodeRuneInString(content[cursor:])
+		cursor += width
+		count--
+	}
+	return cursor
 }
