@@ -20,6 +20,10 @@ The hypothesis is that line-scoped anchors reduce effort and retries compared
 with counting offsets or restating existing text. Tool selection alone does not
 prove usability; evaluate successful edits, failures, and retries as well.
 
+## Tool description
+
+Insert content verbatim into an existing file after the first literal occurrence of anchor on the specified 1-based line. An empty anchor inserts at the start of the line; an empty file accepts line 1 with an empty anchor. No indentation or newlines are added automatically. Returns a unified diff; dry_run previews without writing. Invalid lines or missing anchors fail without writing.
+
 ## Interface
 
 `file_insert(path, line, anchor, content, dry_run?)`

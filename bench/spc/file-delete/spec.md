@@ -18,6 +18,10 @@ Behavioral contract approved by Thom. Specification only; not yet implemented.
 Allow agents to delete forward from a line-scoped anchor without reproducing
 the deleted text. Keep the operation simple and deterministic.
 
+## Tool description
+
+Delete up to count Unicode code points after the first literal occurrence of anchor on the specified 1-based line, retaining the anchor. An empty anchor starts deletion at the beginning of the line. Count must be a positive integer. Deletion can cross line boundaries and stops at EOF without error; deletion at EOF succeeds as a reported no-op. Returns a unified diff; dry_run previews without writing. Invalid lines or missing anchors fail without writing.
+
 ## Interface
 
 `file_delete(path, line, anchor, count, dry_run?)`
