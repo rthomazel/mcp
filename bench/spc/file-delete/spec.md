@@ -11,7 +11,7 @@ agents: merlin
 
 ## Status
 
-Behavioral contract approved by Thom. Implemented; awaiting operator QA.
+Behavioral contract approved by Thom. Implemented.
 
 ## Intent
 
