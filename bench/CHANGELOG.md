@@ -1,9 +1,19 @@
 # CHANGELOG
 
-## Unreleased
+## [0.10.0](https://github.com/rthomazel/mcp/pull/58) feat: implement forgiving file_replace
+
+### feat
 
 - [PR #58](https://github.com/rthomazel/mcp/pull/58) implements the forgiving `file_replace` specification approved in #54: independent hunks, region targeting, deterministic overlap dropping, candidate previews, and explicit dry-run outcomes. Replaces `line_number` with `start_line`/`end_line`; loose matching and automatic application remain deferred.
 - Consolidates the obsolete file-replace documentation into its specification, documents implementation helpers, and adds acceptance-focused validation, preview, region, overlap, and safety tests. Ready for operator QA after automated verification; not deployed.
+
+### models
+
+- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(handlers/file_replace, internal/file)** models independent hunk resolution, region-scoped exact matching, invalid-region rejection without unrestricted fallback, deterministic overlap dropping, candidate diff previews, and explicit dry-run outcomes.
+
+### docs
+
+- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(spc/file-replace)** aligns the specification and acceptance criteria with the models; defers loose matching and automatic nearest-candidate application. Implemented by [PR #58](https://github.com/rthomazel/mcp/pull/58) in this release.
 
 ## [0.9.3](https://github.com/rthomazel/mcp/pull/55) docs: specify and model file_insert and file_delete
 
@@ -14,16 +24,6 @@
 ### docs
 
 - [PR #55](https://github.com/rthomazel/mcp/pull/55) **(spc/file-insert, spc/file-delete)** specifies dedicated insertion and deletion tools with a shared line-scoped anchor cursor, unified diffs, and dry-run support. Deletion counts Unicode code points, crosses line boundaries, stops at EOF, and clearly reports EOF no-ops. Specifications only; runtime behavior is unchanged.
-
-## [0.9.2](https://github.com/rthomazel/mcp/pull/54) docs: model forgiving file_replace
-
-### models
-
-- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(handlers/file_replace, internal/file)** models independent hunk resolution, region-scoped exact matching, invalid-region rejection without unrestricted fallback, deterministic overlap dropping, candidate diff previews, and explicit dry-run outcomes.
-
-### docs
-
-- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(spc/file-replace)** aligns the specification and acceptance criteria with the models; defers loose matching and automatic nearest-candidate application. This release changes specifications and models only; runtime behavior is unchanged.
 
 ## [0.9.1](https://github.com/rthomazel/mcp/pull/53) docs: convert docs to spec-driven development
 
