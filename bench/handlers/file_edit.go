@@ -56,7 +56,7 @@ func openFileForEdit(path string) (*editedFile, string) {
 	info, statErr := os.Stat(realPath)
 	if statErr != nil {
 		if os.IsNotExist(statErr) {
-			return nil, "find not found in file (file does not exist)."
+			return nil, "file does not exist."
 		}
 		return nil, fmt.Sprintf("stat: %v", statErr)
 	}

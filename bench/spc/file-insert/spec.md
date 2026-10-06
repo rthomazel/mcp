@@ -11,7 +11,7 @@ agents: merlin
 
 ## Status
 
-Behavioral contract approved by Thom. Specification only; not yet implemented.
+Behavioral contract approved by Thom. Implemented; awaiting operator QA.
 
 ## Intent
 
@@ -60,8 +60,7 @@ Report a successful no-op explicitly. Neither tool creates missing files.
 ## Scope
 
 One operation per call. Batching, fuzzy matching, numeric character offsets,
-and anchor occurrence selectors are out of scope. These are proposed tools,
-not documentation of an existing implementation.
+and anchor occurrence selectors are out of scope. These specifications describe the intended tool contracts.
 
 ## Acceptance examples
 

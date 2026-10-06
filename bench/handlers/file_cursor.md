@@ -1,4 +1,4 @@
-Proposed shared plumbing for file_insert and file_delete. Reuses existing file-edit locking, checksum protection, diff generation, and atomic writes. Model awaiting review; no implementation yet.
+Shared plumbing for file_insert and file_delete. Reuses existing file-edit locking, checksum protection, diff generation, and atomic writes. Model approved through merged PR #55.
 
 # Types
 

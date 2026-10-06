@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased — feat: anchored file insertion and deletion
+
+- Implement the contracts and models from PR #55: shared validated cursors, verbatim insertion, Unicode code-point deletion, dry-run diffs, and explicit no-ops.
+- Reuse file locks, checksum guards, and atomic writes; record cursor-tool telemetry without payloads.
+- Add cursor, handler, validation, safety, and telemetry tests.
+
 ## [0.9.3](https://github.com/rthomazel/mcp/pull/55) docs: specify and model file_insert and file_delete
 
 ### models
