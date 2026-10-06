@@ -418,18 +418,25 @@ func TestFileReplace_InvalidUTF8(t *testing.T) {
 	}
 }
 
-func TestFileReplace_LineNumberBelowOne(t *testing.T) {
+func TestFileReplace_InvalidRegion(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "h", replace: "x", lineNumber: -1}}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for line_number -1")
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "l", replace: "x", startLine: 5, endLine: 10}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
 	}
-	if !strings.Contains(toolErr, "line_number must be") {
-		t.Fatalf("error = %q, want line_number must be", toolErr)
+	if !strings.Contains(result, "invalid_region") {
+		t.Fatalf("expected invalid_region status, got %q", result)
+	}
+	if !strings.Contains(result, "out of range") {
+		t.Fatalf("error = %q, want out of range", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "hello" {
+		t.Fatalf("invalid region must not modify: %q", string(got))
 	}
 }
 
@@ -474,6 +481,31 @@ func TestFileReplace_MultiReplacement(t *testing.T) {
 	}
 }
 
+func TestFileReplace_IndependentHunks(t *testing.T) {
+	h := newTestHandler(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.txt")
+	mustSucceed(t, os.WriteFile(path, []byte("foo bar baz"), 0o644))
+
+	result, toolErr := h.handleFileReplace(path, []replacement{
+		{find: "foo", replace: "X"},
+		{find: "missing", replace: "Y"},
+	}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	if !strings.Contains(result, "applied") {
+		t.Fatalf("expected applied hunk despite the bad hunk, got %q", result)
+	}
+	if !strings.Contains(result, "not_matched") {
+		t.Fatalf("expected not_matched for the bad hunk, got %q", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "X bar baz" {
+		t.Fatalf("content = %q", string(got))
+	}
+}
+
 func TestFileReplace_DryRun(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
@@ -493,15 +525,18 @@ func TestFileReplace_DryRun(t *testing.T) {
 	}
 }
 
-func TestFileReplace_LineNumberNarrows(t *testing.T) {
+func TestFileReplace_RegionNarrows(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("foo\nfoo"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", lineNumber: 2}}, false)
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", startLine: 2, endLine: 2}}, false)
 	if toolErr != "" {
 		t.Fatalf("unexpected error: %s", toolErr)
+	}
+	if !strings.Contains(result, "applied") {
+		t.Fatalf("expected applied hunk, got %q", result)
 	}
 	got, _ := os.ReadFile(path)
 	if string(got) != "foo\nbar" {
@@ -509,18 +544,22 @@ func TestFileReplace_LineNumberNarrows(t *testing.T) {
 	}
 }
 
-func TestFileReplace_LineNumberOutOfRange(t *testing.T) {
+func TestFileReplace_InvertedRegion(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
-	mustSucceed(t, os.WriteFile(path, []byte("foo"), 0o644))
+	mustSucceed(t, os.WriteFile(path, []byte("foo\nbar\nbaz"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", lineNumber: 5}}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for out-of-range line_number")
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", startLine: 3, endLine: 1}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
 	}
-	if !strings.Contains(toolErr, "out of range") {
-		t.Fatalf("error = %q, want out of range", toolErr)
+	if !strings.Contains(result, "invalid_region") {
+		t.Fatalf("expected invalid_region status, got %q", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "foo\nbar\nbaz" {
+		t.Fatalf("inverted region must not modify: %q", string(got))
 	}
 }
 
@@ -530,19 +569,22 @@ func TestFileReplace_OverlappingReplacements(t *testing.T) {
 	path := filepath.Join(dir, "new.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("abc"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{
+	result, toolErr := h.handleFileReplace(path, []replacement{
 		{find: "ab", replace: "1"},
 		{find: "bc", replace: "2"},
 	}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for overlapping replacements")
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
 	}
-	if !strings.Contains(toolErr, "overlapping") {
-		t.Fatalf("error = %q, want overlapping", toolErr)
+	if !strings.Contains(result, "applied") {
+		t.Fatalf("expected one applied hunk, got %q", result)
+	}
+	if !strings.Contains(result, "overlap") {
+		t.Fatalf("expected overlap status, got %q", result)
 	}
 	got, _ := os.ReadFile(path)
-	if string(got) != "abc" {
-		t.Fatalf("overlapping write must not modify: %q", string(got))
+	if string(got) != "1c" {
+		t.Fatalf("content = %q", string(got))
 	}
 }
 
@@ -552,57 +594,77 @@ func TestFileReplace_MultiMatch(t *testing.T) {
 	path := filepath.Join(dir, "new.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("foo foo"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar"}}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for multi-match")
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar"}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
 	}
-	if !strings.Contains(toolErr, "matched 2 locations") {
-		t.Fatalf("error = %q, want matched 2 locations", toolErr)
+	if !strings.Contains(result, "not_matched") {
+		t.Fatalf("expected not_matched status, got %q", result)
+	}
+	if !strings.Contains(result, "matched 2 locations") {
+		t.Fatalf("expected match-count diagnostics, got %q", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "foo foo" {
+		t.Fatalf("ambiguous match must not modify: %q", string(got))
 	}
 }
 
-func TestFileReplace_MultiMatchWithLineNumber(t *testing.T) {
+func TestFileReplace_RegionAmbiguous(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("foo foo\nfoo\nfoo"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", lineNumber: 1}}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for multi-match with line_number")
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "foo", replace: "bar", startLine: 1, endLine: 1}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
 	}
-	if !strings.Contains(toolErr, "ambiguous at line") {
-		t.Fatalf("error = %q, want ambiguous at line", toolErr)
+	if !strings.Contains(result, "not_matched") {
+		t.Fatalf("expected not_matched status, got %q", result)
+	}
+	if !strings.Contains(result, "matched 2 locations") {
+		t.Fatalf("expected match-count diagnostics, got %q", result)
 	}
 }
 
-func TestFileReplace_ZeroMatch(t *testing.T) {
+func TestFileReplace_NoMatch(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("hello"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "xyz", replace: "q"}}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for zero match")
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "xyz", replace: "q"}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
 	}
-	if !strings.Contains(toolErr, "find not found in file") {
-		t.Fatalf("error = %q, want find not found in file", toolErr)
+	if !strings.Contains(result, "not_matched") {
+		t.Fatalf("expected not_matched status, got %q", result)
+	}
+	if !strings.Contains(result, "did not match") {
+		t.Fatalf("expected not-match diagnostics, got %q", result)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "hello" {
+		t.Fatalf("no match must not modify: %q", string(got))
 	}
 }
 
-func TestFileReplace_ZeroMatchWithLineNumber(t *testing.T) {
+func TestFileReplace_NoMatchInRegion(t *testing.T) {
 	h := newTestHandler(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new.txt")
 	mustSucceed(t, os.WriteFile(path, []byte("foo\nbar\nbaz"), 0o644))
 
-	_, toolErr := h.handleFileReplace(path, []replacement{{find: "xyz", replace: "q", lineNumber: 2}}, false)
-	if toolErr == "" {
-		t.Fatalf("expected error for zero match with line_number")
+	result, toolErr := h.handleFileReplace(path, []replacement{{find: "xyz", replace: "q", startLine: 2, endLine: 2}}, false)
+	if toolErr != "" {
+		t.Fatalf("unexpected error: %s", toolErr)
 	}
-	if !strings.Contains(toolErr, "not found at line") {
-		t.Fatalf("error = %q, want not found at line", toolErr)
+	if !strings.Contains(result, "not_matched") {
+		t.Fatalf("expected not_matched status, got %q", result)
+	}
+	if !strings.Contains(result, "within lines 2-2") {
+		t.Fatalf("expected region diagnostics, got %q", result)
 	}
 }
 

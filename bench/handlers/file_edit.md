@@ -86,14 +86,6 @@ The caller retains ownership of the lock and releases it on every return. Dry-ru
 2. Search for it anywhere in content.
 3. Return a hint when it matches, otherwise an empty hint.
 
-## zeroMatchError(label, find, content, maxCandidates) error
-
-1. Build the diagnostic when find matches zero times.
-
-## multiMatchError(label, find, content, maxCandidates) error
-
-1. Build the diagnostic when find matches more than once.
-
 #### Rationale
 
 - The process-local lock serializes cooperating edits after acquisition; target type and mode are inspected before locking.

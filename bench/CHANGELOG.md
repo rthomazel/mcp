@@ -1,22 +1,30 @@
 # CHANGELOG
 
-## Unreleased — feat: anchored file insertion and deletion
+## [0.11.0](https://github.com/rthomazel/mcp/pull/57) feat: anchored file_insert and file_delete
 
-- Implement the contracts and models from PR #55: shared validated cursors, verbatim insertion, Unicode code-point deletion, dry-run diffs, and explicit no-ops.
-- Reuse file locks, checksum guards, and atomic writes; record cursor-tool telemetry without payloads.
-- Add cursor, handler, validation, safety, and telemetry tests.
+### feat
 
-## [0.9.3](https://github.com/rthomazel/mcp/pull/55) docs: specify and model file_insert and file_delete
+- [PR #57](https://github.com/rthomazel/mcp/pull/57) implements the contracts and models approved in #55: shared line-scoped cursors, verbatim insertion, Unicode code-point deletion across line boundaries, EOF truncation, unified diffs, dry-run previews, and explicit no-ops.
+- Reuses file locks, checksum guards, and atomic writes; preserves symlinks, file modes, and remaining newline bytes. Validates inputs and records success/error telemetry without edit payloads.
 
 ### models
 
-- [PR #55](https://github.com/rthomazel/mcp/pull/55) **(handlers/file_insert, handlers/file_delete, handlers/file_cursor, handlers/file_edit, internal/file, main)** proposes thin insertion/deletion handlers sharing cursor parsing, edit lifecycle, no-op reporting, and telemetry; adds cursor resolution and Unicode traversal primitives and tool registration. Models await review; no runtime changes.
+- [PR #55](https://github.com/rthomazel/mcp/pull/55) **(handlers/file_insert, handlers/file_delete, handlers/file_cursor, handlers/file_edit, internal/file, main)** models thin insertion/deletion handlers sharing cursor parsing, edit lifecycle, no-op reporting, and telemetry; adds cursor resolution, Unicode traversal primitives, and tool registration. Implemented by #57.
 
 ### docs
 
-- [PR #55](https://github.com/rthomazel/mcp/pull/55) **(spc/file-insert, spc/file-delete)** specifies dedicated insertion and deletion tools with a shared line-scoped anchor cursor, unified diffs, and dry-run support. Deletion counts Unicode code points, crosses line boundaries, stops at EOF, and clearly reports EOF no-ops. Specifications only; runtime behavior is unchanged.
+- [PR #55](https://github.com/rthomazel/mcp/pull/55) **(spc/file-insert, spc/file-delete)** specifies dedicated insertion and deletion tools with first-literal-match line-scoped anchors, unified diffs, and dry-run support. Deletion counts Unicode code points, crosses line boundaries, stops at EOF, and explicitly reports EOF no-ops. Implemented by #57.
 
-## [0.9.2](https://github.com/rthomazel/mcp/pull/54) docs: model forgiving file_replace
+### test
+
+- [PR #57](https://github.com/rthomazel/mcp/pull/57) adds cursor, handler, validation, safety, and telemetry tests covering Unicode, CRLF, line bounds, first-match anchors, EOF, previews/no-ops, bounded diagnostics, symlink/mode preservation, and external-change detection.
+
+## [0.10.0](https://github.com/rthomazel/mcp/pull/58) feat: implement forgiving file_replace
+
+### feat
+
+- [PR #58](https://github.com/rthomazel/mcp/pull/58) implements the forgiving `file_replace` specification approved in #54: independent hunks, region targeting, deterministic overlap dropping, candidate previews, and explicit dry-run outcomes. Replaces `line_number` with `start_line`/`end_line`; loose matching and automatic application remain deferred.
+- Consolidates the obsolete file-replace documentation into its specification, documents implementation helpers, and adds acceptance-focused validation, preview, region, overlap, and safety tests. Ready for operator QA after automated verification; not deployed.
 
 ### models
 
@@ -24,7 +32,7 @@
 
 ### docs
 
-- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(spc/file-replace)** aligns the specification and acceptance criteria with the models; defers loose matching and automatic nearest-candidate application. This release changes specifications and models only; runtime behavior is unchanged.
+- [PR #54](https://github.com/rthomazel/mcp/pull/54) **(spc/file-replace)** aligns the specification and acceptance criteria with the models; defers loose matching and automatic nearest-candidate application. Implemented by [PR #58](https://github.com/rthomazel/mcp/pull/58) in this release.
 
 ## [0.9.1](https://github.com/rthomazel/mcp/pull/53) docs: convert docs to spec-driven development
 
