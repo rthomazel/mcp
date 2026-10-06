@@ -1,6 +1,6 @@
 # Shared file-editing helpers
 
-The package provides the plumbing shared by file_replace and file_replace_all: symlink resolution, file opening, commit, input guards, and the three error builders.
+The package provides file-edit plumbing: symlink resolution, file opening, commit, replacement input guards, and error builders. Proposed file_insert and file_delete reuse openFileForEdit and commit through file_cursor.md; they do not use replacement-specific validation or match diagnostics. file_create also reuses resolveTarget.
 
 # Types
 
@@ -15,26 +15,62 @@ The package provides the plumbing shared by file_replace and file_replace_all: s
 
 # Functions
 
-## resolveTarget(path) (string, error)
+## resolveTarget(path string) (realPath string, toolErr string)
 
-1. Lstat the path, returning an error when the final element is missing.
-2. Resolve the parent directory when the final element is missing.
-3. Otherwise resolve the path and return the real path.
+1. Call os.Lstat() to inspect the final element.
+   1. if it is missing, resolve the parent with filepath.EvalSymlinks(), then return filepath.Join() of the resolved parent and original base name.
+2. Otherwise resolve the complete path with filepath.EvalSymlinks() and return it.
 
-## openFileForEdit(path) (*editedFile, error)
+#### Errors
 
-1. Resolve the target, returning an error on failure.
-2. Stat the target, rejecting a missing or non-regular file.
-3. Acquire the per-file lock.
-4. Read the content, rejecting null bytes and invalid UTF-8.
-5. Return the opened file.
+- **1.1.** if parent resolution reports a missing path, return a parent-directory-does-not-exist diagnostic.
+- **1.1.** if parent resolution otherwise fails, return the contextual resolve-path diagnostic.
 
-## (ef *editedFile) commit(working, dryRun) (result, error)
+---
 
-1. Return the diff on dry-run without writing.
-2. Re-read the file and abort when an external modification changed the checksum.
-3. Atomically write the working content at the recorded mode.
-4. Return the diff.
+- **2.** if complete-path resolution fails, return the contextual resolve-path diagnostic. Non-missing Lstat failures proceed to this resolution, matching the existing helper.
+
+## openFileForEdit(path string) (opened *editedFile, toolErr string)
+
+1. Resolve the target with resolveTarget().
+2. Stat the target and inspect its type.
+3. Acquire the per-file lock with file.AcquireLock().
+4. Read content with os.ReadFile() and validate it.
+5. Return the opened file with its content, checksum, mode, line count, and owned lock.
+
+#### Errors
+
+- **1.** if resolution fails, return its diagnostic.
+
+---
+
+- **2.** if the file is missing, return file does not exist. Removing replacement-specific find-not-found wording is proposed for all callers.
+- **2.** if stat otherwise fails, return the contextual stat error.
+- **2.** if the target is non-regular, return a file-type error.
+
+---
+
+- **4.** if reading fails, release the lock with file.ReleaseLock() and return the contextual read error.
+- **4.** if content contains null bytes or invalid UTF-8, release the lock with file.ReleaseLock() and return the binary-content error.
+
+## editedFile.commit(working string, dryRun bool) (result string, toolErr string)
+
+1. Inspect dryRun.
+   1. if true, return file.ComputeDiff() without writing.
+2. Re-read the file and compare its checksum to the captured checksum.
+3. Call file.AtomicWrite() with working content and the recorded mode.
+4. Return file.ComputeDiff().
+
+#### Errors
+
+- **2.** if re-reading fails, return the contextual re-read error without writing.
+- **2.** if the checksum differs, return the external-modification error without writing.
+
+---
+
+- **3.** if atomic writing fails, return the contextual write error rather than a success diff.
+
+The caller retains ownership of the lock and releases it on every return. Dry-run validates the captured snapshot; checksum revalidation is a write-time guard, not part of preview validation. Successful no-ops likewise skip commit and write-time revalidation.
 
 ## validateFindReplace(find, replace, maxLines) error
 
@@ -60,5 +96,5 @@ The package provides the plumbing shared by file_replace and file_replace_all: s
 
 #### Rationale
 
-- openFileForEdit takes the lock before reading so a concurrent edit cannot slip in.
-- The checksum re-check in commit detects an external modification between the read and the write.
+- The process-local lock serializes cooperating edits after acquisition; target type and mode are inspected before locking.
+- The checksum re-check detects external changes visible at re-read, not changes occurring between that check and atomic replacement. It does not exclude external writers.
