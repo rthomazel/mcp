@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.9.3](https://github.com/rthomazel/mcp/pull/55) docs: specify file_insert and file_delete
+
+### docs
+
+- [PR #55](https://github.com/rthomazel/mcp/pull/55) **(spc/file-insert, spc/file-delete)** specifies dedicated insertion and deletion tools with a shared line-scoped anchor cursor, unified diffs, and dry-run support. Deletion counts Unicode code points, crosses line boundaries, stops at EOF, and clearly reports EOF no-ops. Specifications only; runtime behavior is unchanged.
+
 ## [0.9.2](https://github.com/rthomazel/mcp/pull/54) docs: model forgiving file_replace
 
 ### models
