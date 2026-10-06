@@ -9,6 +9,10 @@ agents: merlin
 
 # FileInsert
 
+## Status
+
+Behavioral contract approved by Thom. Specification only; not yet implemented.
+
 ## Intent
 
 Allow agents to add text without reproducing surrounding text in a replacement.
