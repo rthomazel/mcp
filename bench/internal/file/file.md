@@ -21,10 +21,26 @@ Proposed primitive for file_insert and file_delete; existing replacement matchin
 1. Require positive line and a valid UTF-8 anchor containing neither null bytes nor CR/LF. Content has already passed openFileForEdit validation.
 2. Locate the requested line by scanning LF boundaries while retaining original byte offsets. Follow CountLines for nonempty files: a final LF terminates its line rather than creating an extra addressable line. Special-case an empty file to permit line 1. This line-addressing detail is proposed for model review.
 3. Exclude LF and its preceding CR, when present, from the searchable line text. Preserve both in original content. A lone CR is not a line separator under this LF-based convention.
-4. An empty anchor returns the line's start byte. Otherwise strings.Index selects its first literal occurrence in the searchable text; return the byte immediately after the match. Never search other lines or clamp an invalid line.
-5. On invalid line, return requested line and available line count. On missing anchor, report the selected line with a quoted excerpt truncated to at most 200 Unicode code points and an explicit truncation marker. Do not echo an unbounded anchor or file. No diagnostic changes the cursor or authorizes a write.
+4. Select the cursor within the searchable line text.
+   1. if anchor is empty, return the line's start byte.
+5. Find the first literal match with strings.Index().
+6. Return the byte immediately after the match.
 
-## AdvanceCodePoints(content string, cursor int, count int) int
+#### Errors
+
+- **1.** if line is nonpositive or anchor contains invalid UTF-8, null bytes, CR, or LF, return a validation error.
+
+---
+
+- **2.** if the line does not exist, return requested line and available line count; never clamp or search elsewhere.
+
+---
+
+- **5.** if no match exists, return a missing-anchor diagnostic with the selected line quoted and truncated to at most 200 Unicode code points, adding a truncation marker when needed. Do not echo an unbounded anchor or file.
+
+No diagnostic changes the cursor or authorizes a write.
+
+## AdvanceCodePoints(content string, cursor int, count int) (end int)
 
 1. Receive valid UTF-8 content, a resolved byte-boundary cursor, and a positive count.
 2. Starting at cursor, decode one rune at a time and advance by its byte width until count code points have been consumed or EOF is reached.

@@ -21,20 +21,47 @@ The package provides file-edit plumbing: symlink resolution, file opening, commi
 2. Resolve the parent directory when the final element is missing.
 3. Otherwise resolve the path and return the real path.
 
-## openFileForEdit(path) (*editedFile, error)
+## openFileForEdit(path string) (opened *editedFile, toolErr string)
 
-1. Resolve the target, returning an error on failure.
-2. Stat the target, rejecting a missing or non-regular file. Proposed diagnostic cleanup: report file does not exist without replacement-specific find-not-found wording for every caller.
-3. Acquire the per-file lock.
-4. Read the content, rejecting null bytes and invalid UTF-8.
-5. Return the opened file.
+1. Resolve the target with resolveTarget().
+2. Stat the target and inspect its type.
+3. Acquire the per-file lock with file.AcquireLock().
+4. Read content with os.ReadFile() and validate it.
+5. Return the opened file with its content, checksum, mode, line count, and owned lock.
 
-## (ef *editedFile) commit(working, dryRun) (result, error)
+#### Errors
 
-1. Return the diff on dry-run without writing.
-2. Re-read the file and abort when an external modification changed the checksum.
-3. Atomically write the working content at the recorded mode.
-4. Return the diff.
+- **1.** if resolution fails, return its diagnostic.
+
+---
+
+- **2.** if the file is missing, return file does not exist. Removing replacement-specific find-not-found wording is proposed for all callers.
+- **2.** if stat otherwise fails, return the contextual stat error.
+- **2.** if the target is non-regular, return a file-type error.
+
+---
+
+- **4.** if reading fails, release the lock with file.ReleaseLock() and return the contextual read error.
+- **4.** if content contains null bytes or invalid UTF-8, release the lock with file.ReleaseLock() and return the binary-content error.
+
+## editedFile.commit(working string, dryRun bool) (result string, toolErr string)
+
+1. Inspect dryRun.
+   1. if true, return file.ComputeDiff() without writing.
+2. Re-read the file and compare its checksum to the captured checksum.
+3. Call file.AtomicWrite() with working content and the recorded mode.
+4. Return file.ComputeDiff().
+
+#### Errors
+
+- **2.** if re-reading fails, return the contextual re-read error without writing.
+- **2.** if the checksum differs, return the external-modification error without writing.
+
+---
+
+- **3.** if atomic writing fails, return the contextual write error rather than a success diff.
+
+The caller retains ownership of the lock and releases it on every return.
 
 ## validateFindReplace(find, replace, maxLines) error
 

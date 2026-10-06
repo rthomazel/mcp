@@ -1,15 +1,26 @@
-# file_insert
-
-Proposed handler for the approved file-insert specification. Shares request parsing, cursor resolution, edit lifecycle, no-op reporting, and telemetry with file_cursor.md. Awaiting model review.
+Proposed handler for the approved file-insert specification. Shares parsing and edit lifecycle with file_cursor.md. Awaiting model review.
 
 # Functions
 
-## Handler.HandleFileInsert(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error)
+## Handler.HandleFileInsert(ctx context.Context, req mcp.CallToolRequest) (result *mcp.CallToolResult, err error)
 
-1. Start timing before parsing; parse common arguments with parseCursorRequest.
-2. Require content to be present and a string, allowing an empty string. Reject invalid UTF-8 and null bytes. Preserve all other content exactly, without indentation or newline normalization.
-3. If validation succeeds, call applyCursorEdit with a pure transform returning original[:cursor] + content + original[cursor:].
-4. Record exactly one stats call via recordCursorEdit, including validation failures. Classify parsing/payload errors as validation_error and applyCursorEdit failures as edit_error.
-5. Return an MCP error result on failure, otherwise the returned text result. Tool failures use the MCP result rather than a transport error.
+1. Start timing, initialize telemetry fields, and defer Handler.recordCursorEdit() so every return records exactly one call.
+2. Call parseCursorRequest().
+3. Extract and validate required content.
+4. Call applyCursorEdit() with a pure transform returning original[:cursor] + content + original[cursor:].
+5. Return mcp.NewToolResultText() with the edit result and nil transport error.
 
-No replacement hunk or substring duplication is required. Empty insertion still validates the file and cursor before reporting no-op. No insertion-specific newline cap is introduced by this model; the approved contract permits multiline content.
+#### Errors
+
+- **2.** if common parsing fails, set validation_error and return mcp.NewToolResultError() with its diagnostic and nil transport error.
+
+---
+
+- **3.** if content is missing or not a string, set validation_error and return mcp.NewToolResultError() with a parameter-specific diagnostic and nil transport error.
+- **3.** if content contains null bytes or invalid UTF-8, set validation_error and return mcp.NewToolResultError() with the validation diagnostic and nil transport error.
+
+---
+
+- **4.** if editing fails, set edit_error and return mcp.NewToolResultError() with its diagnostic and nil transport error.
+
+The deferred recording reads final telemetry fields at return, not values captured before parsing. Empty content is valid; file and cursor validation still precede no-op reporting. Content is otherwise preserved verbatim, with no insertion-specific newline cap. ctx is unused.

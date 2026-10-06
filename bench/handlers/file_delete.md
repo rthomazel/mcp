@@ -1,15 +1,25 @@
-# file_delete
-
-Proposed handler for the approved file-delete specification. Shares request parsing, cursor resolution, edit lifecycle, no-op reporting, and telemetry with file_cursor.md. Awaiting model review.
+Proposed handler for the approved file-delete specification. Shares parsing and edit lifecycle with file_cursor.md. Awaiting model review.
 
 # Functions
 
-## Handler.HandleFileDelete(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error)
+## Handler.HandleFileDelete(ctx context.Context, req mcp.CallToolRequest) (result *mcp.CallToolResult, err error)
 
-1. Start timing before parsing; parse common arguments with parseCursorRequest.
-2. Require count and parse it with parsePositiveInteger. Zero, negative, fractional, missing, and nonnumeric counts fail even at EOF.
-3. If validation succeeds, call applyCursorEdit with a pure transform: compute end = file.AdvanceCodePoints(original, cursor, count), then return original[:cursor] + original[end:].
-4. Record exactly one stats call via recordCursorEdit, including validation failures. Classify parsing errors as validation_error and applyCursorEdit failures as edit_error.
-5. Return an MCP error result on failure, otherwise the returned text result. Tool failures use the MCP result rather than a transport error.
+1. Start timing, initialize telemetry fields, and defer Handler.recordCursorEdit() so every return records exactly one call.
+2. Call parseCursorRequest().
+3. Extract count and call parsePositiveInteger().
+4. Call applyCursorEdit() with a pure transform computing end via file.AdvanceCodePoints() and returning original[:cursor] + original[end:].
+5. Return mcp.NewToolResultText() with the edit result and nil transport error.
 
-The anchor is retained. Deletion may cross line boundaries and stops at EOF without error. A resolved cursor at EOF produces a successful, clearly reported no-op. No count-sized allocation or count-to-byte arithmetic is performed.
+#### Errors
+
+- **2.** if common parsing fails, set validation_error and return mcp.NewToolResultError() with its diagnostic and nil transport error.
+
+---
+
+- **3.** if count is missing or parsing fails, set validation_error and return mcp.NewToolResultError() with the parameter diagnostic and nil transport error, even at EOF.
+
+---
+
+- **4.** if editing fails, set edit_error and return mcp.NewToolResultError() with its diagnostic and nil transport error.
+
+The deferred recording reads final telemetry fields at return, not values captured before parsing. The anchor is retained; traversal stops at EOF without error, including a successful no-op when already at EOF. No count-sized allocation is performed. ctx is unused.

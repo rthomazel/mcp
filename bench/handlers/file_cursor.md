@@ -1,5 +1,3 @@
-# Anchored file-edit orchestration
-
 Proposed shared plumbing for file_insert and file_delete. Reuses existing file-edit locking, checksum protection, diff generation, and atomic writes. Model awaiting review; no implementation yet.
 
 # Types
@@ -15,28 +13,74 @@ Proposed shared plumbing for file_insert and file_delete. Reuses existing file-e
 
 ## parseCursorRequest(args map[string]any) (request cursorRequest, toolErr string)
 
-1. Require string path and anchor and a numeric line. Distinguish missing anchor from an explicitly empty anchor.
-2. Parse line with parsePositiveInteger. Reject non-boolean dry_run when supplied; default it to false.
-3. Reject a non-absolute path, null bytes, or invalid UTF-8 in path or anchor. Reject CR or LF in anchor.
-4. Return the parsed request; never access the filesystem here.
+1. Extract required path and anchor strings and the line value, retaining successfully parsed fields for telemetry.
+2. Parse line with parsePositiveInteger().
+3. Extract optional dry_run, defaulting to false.
+4. Validate absolute path, UTF-8, null bytes, and anchor line boundaries.
+5. Return request and an empty toolErr.
 
-## parsePositiveInteger(value any, name string) (int, string)
+#### Errors
 
-1. Accept the numeric representation decoded by MCP only when finite, integral, positive, and representable as an int without overflow. Do not coerce strings, booleans, null, or fractional numbers.
-2. Check bounds before conversion. For JSON float64 values, also reject values outside the exactly representable integer range.
-3. Return the integer or a parameter-specific validation error. Shared by line and count.
+- **1.** if path or anchor is missing or not a string, return a parameter-specific error. An explicitly empty anchor is valid.
+- **1.** if line is missing, return a required-parameter error.
 
-## applyCursorEdit(request cursorRequest, transform func(string, int) string) (result, toolErr string)
+---
 
-1. Call openFileForEdit(request.path); on failure return its error. On success defer file.ReleaseLock for the entire remaining operation.
-2. Resolve a byte cursor with file.ResolveCursor over the locked, validated original content. Return its bounded diagnostic on failure without invoking transform.
-3. Invoke transform with original content and the resolved cursor. The two callers supply only pure insertion/deletion operations over valid UTF-8.
-4. If working content equals original content, return an explicit successful no-op with an empty diff and no write. For dry-run label it no-op, not written. Validation and cursor resolution still precede this branch.
-5. Otherwise call editedFile.commit(working, request.dryRun), preserving checksum checking, permissions, symlink target handling, and atomic replacement. Propagate commit errors before reporting success.
-6. Return the unified diff; label dry-run output as not written.
+- **2.** if parsing fails, return its error without filesystem access.
+
+---
+
+- **3.** if supplied dry_run is not boolean, return a type error.
+
+---
+
+- **4.** if path is not absolute, return a path error.
+- **4.** if path or anchor contains null bytes or invalid UTF-8, return a validation error.
+- **4.** if anchor contains CR or LF, return a single-line-anchor error.
+
+## parsePositiveInteger(value any, name string) (parsed int, toolErr string)
+
+1. Inspect the numeric representation decoded by MCP.
+2. Validate positivity, integrality, finiteness, and representability before conversion.
+3. Convert to int and return it with an empty toolErr.
+
+#### Errors
+
+- **1.** if value is missing, null, boolean, a string, or otherwise nonnumeric, return a parameter-specific numeric-type error; never coerce it.
+
+---
+
+- **2.** if value is nonfinite, fractional, zero, or negative, return a positive-integer error.
+- **2.** if value is outside int bounds, return a range error before conversion.
+- **2.** if a float64 value exceeds the exactly representable integer range, return a range error.
+
+## applyCursorEdit(request cursorRequest, transform func(string, int) string) (result string, toolErr string)
+
+1. Call openFileForEdit().
+2. Defer file.ReleaseLock() for the opened file for every subsequent return.
+3. Call file.ResolveCursor() over the validated original content.
+4. Invoke transform with original content and the resolved byte cursor.
+   1. if the result equals original content, return explicit successful no-op text and an empty diff without writing; label dry-run as not written.
+5. Call editedFile.commit() with transformed content and request.dryRun.
+6. Return the unified diff, labeling dry-run output as not written.
+
+#### Errors
+
+- **1.** if opening fails, return its error; openFileForEdit() releases any lock it acquired before failure.
+
+---
+
+- **3.** if cursor resolution fails, return its bounded diagnostic without invoking transform or writing.
+
+---
+
+- **5.** if checksum verification or writing fails, return the commit error rather than reporting success.
+
+The supplied transforms are pure insertion/deletion over valid UTF-8. File and cursor validation precede the no-op branch.
 
 ## Handler.recordCursorEdit(tool string, started time.Time, request cursorRequest, errorKind string)
 
-1. Record tool name, start time, elapsed duration, file path, dry-run flag, and error kind using the existing stats.ToolCall fields and Handler.record.
-2. Use validation_error for parse/payload guards and edit_error for resolution/open/commit failures; callers supply the classified error kind rather than raw file contents. Successful no-ops have no error kind.
-3. Do not record anchor or content, invent replacement counts, or add database columns. Tool names and outcomes support baseline usage/error analysis; retry inference remains separate.
+1. Construct stats.ToolCall with tool name, start time, duration, parsed path, dry-run flag, and caller-classified error kind.
+2. Call Handler.record() exactly once per invocation, including validation failures.
+
+Use validation_error for parse/payload guards and edit_error for open/resolution/commit failures. Successful no-ops have no error kind. Do not record anchor or content, invent replacement counts, or add database columns. Stats-disabled behavior remains delegated to Handler.record().
