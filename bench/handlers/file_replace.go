@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,14 +74,14 @@ func (h *Handler) HandleFileReplace(_ context.Context, req mcp.CallToolRequest) 
 		r.replace, _ = obj["replace"].(string)
 		if v, ok := obj["start_line"]; ok && v != nil {
 			f, ok2 := v.(float64)
-			if !ok2 {
+			if !ok2 || math.IsNaN(f) || math.Trunc(f) != f || f < -math.Exp2(strconv.IntSize-1) || f >= math.Exp2(strconv.IntSize-1) {
 				return mcp.NewToolResultError(fmt.Sprintf("Replacement %d: start_line must be an integer.", i+1)), nil
 			}
 			r.startLine = int(f)
 		}
 		if v, ok := obj["end_line"]; ok && v != nil {
 			f, ok2 := v.(float64)
-			if !ok2 {
+			if !ok2 || math.IsNaN(f) || math.Trunc(f) != f || f < -math.Exp2(strconv.IntSize-1) || f >= math.Exp2(strconv.IntSize-1) {
 				return mcp.NewToolResultError(fmt.Sprintf("Replacement %d: end_line must be an integer.", i+1)), nil
 			}
 			r.endLine = int(f)
@@ -159,7 +161,7 @@ func (h *Handler) handleFileReplace(path string, replacements []replacement, dry
 	// guess on one hunk never discards the good ones in the same batch.
 	statuses := make([]hunkStatus, len(replacements))
 	for i, r := range replacements {
-		s := resolveReplacement(path, r, theFile.content, theFile.lines, maxCandidates)
+		s := resolveReplacement(theFile.realPath, r, theFile.content, theFile.lines, maxCandidates)
 		s.pos = i + 1
 		if s.located != nil {
 			s.located.origIdx = i
@@ -274,8 +276,9 @@ func resolveReplacement(path string, r replacement, content string, fileLines in
 
 	// 2. Gather all byte-exact matches, then keep those whose line span overlaps
 	// the region (or all matches when no region was supplied).
-	matches := make([]file.Match, 0, len(file.FindMatches(content, r.find)))
-	for _, m := range file.FindMatches(content, r.find) {
+	allMatches := file.FindMatches(content, r.find)
+	matches := make([]file.Match, 0, len(allMatches))
+	for _, m := range allMatches {
 		if !regionSupplied || (m.StartLine <= regionEnd && regionStart <= m.EndLine) {
 			matches = append(matches, m)
 		}
@@ -306,7 +309,7 @@ func resolveReplacement(path string, r replacement, content string, fileLines in
 // deterministic heuristic, never permission to apply.
 func resolveMismatchDiagnostics(path string, r replacement, content string, startLine, endLine, maxCandidates int) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("find did not match within lines %d-%d.\n", startLine, endLine))
+	fmt.Fprintf(&sb, "find did not match within lines %d-%d.\n", startLine, endLine)
 	sb.WriteString(file.ExcerptRange(content, startLine, endLine, 10))
 
 	// 1. Anchor on the first non-empty line of find, preserving whitespace.
@@ -353,7 +356,7 @@ func resolveMismatchDiagnostics(path string, r replacement, content string, star
 		writeCandidatePreview(&sb, path, content, hypothetical, label)
 	}
 	if len(spans) > maxCandidates {
-		sb.WriteString(fmt.Sprintf("(showing first %d of %d)", maxCandidates, len(spans)))
+		fmt.Fprintf(&sb, "(showing first %d of %d)\n", maxCandidates, len(spans))
 	}
 	return sb.String()
 }
@@ -362,7 +365,7 @@ func resolveMismatchDiagnostics(path string, r replacement, content string, star
 // maxCandidates exact matches when find matched more than once.
 func ambiguousDiagnostics(path string, r replacement, matches []file.Match, content string, maxCandidates int) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("find matched %d locations; none applied. Provide start_line/end_line to narrow, or widen find.\n", len(matches)))
+	fmt.Fprintf(&sb, "find matched %d locations; none applied. Provide start_line/end_line to narrow, or widen find.\n", len(matches))
 	shown := matches
 	if len(shown) > maxCandidates {
 		shown = shown[:maxCandidates]
@@ -373,7 +376,7 @@ func ambiguousDiagnostics(path string, r replacement, matches []file.Match, cont
 		writeCandidatePreview(&sb, path, content, hypothetical, label)
 	}
 	if len(matches) > maxCandidates {
-		sb.WriteString(fmt.Sprintf("(showing first %d of %d)", maxCandidates, len(matches)))
+		fmt.Fprintf(&sb, "(showing first %d of %d)\n", maxCandidates, len(matches))
 	}
 	return sb.String()
 }
@@ -409,6 +412,7 @@ func renderStatus(statuses []hunkStatus) string {
 		default:
 			fmt.Fprintf(&sb, "Replacement %d: %s\n", s.pos, s.outcome)
 			sb.WriteString(indent(strings.TrimRight(s.diagnostics, "\n"), "  "))
+			sb.WriteByte('\n')
 		}
 	}
 	return sb.String()

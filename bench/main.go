@@ -114,11 +114,12 @@ func run() error {
 
 	s.AddTool(
 		mcp.NewTool("file_replace",
-			mcp.WithDescription("Find and replace unique substrings in a file. Returns a unified diff. The file must already exist."),
+			mcp.WithDescription("Replace byte-exact substrings independently against original file content. Returns the applied diff and per-hunk outcomes; failed matches receive not-applied previews when candidates exist. The file must already exist."),
 			mcp.WithString("path", mcp.Required(), mcp.Description("Absolute path to the file.")),
 			mcp.WithArray("replacements",
 				mcp.Required(),
-				mcp.Description("One or more find/replace pairs. Order does not matter."),
+				mcp.MinItems(1),
+				mcp.Description("One or more find/replace pairs in original-file coordinates. Overlaps keep the earliest starting match, breaking ties by input order; unrelated hunks still apply."),
 				mcp.Items(map[string]any{
 					"type": "object",
 					"properties": map[string]any{

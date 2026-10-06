@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+- [PR #58](https://github.com/rthomazel/mcp/pull/58) implements the forgiving `file_replace` specification approved in #54: independent hunks, region targeting, deterministic overlap dropping, candidate previews, and explicit dry-run outcomes. Replaces `line_number` with `start_line`/`end_line`; loose matching and automatic application remain deferred.
+- Consolidates the obsolete file-replace documentation into its specification, documents implementation helpers, and adds acceptance-focused validation, preview, region, overlap, and safety tests. Ready for operator QA after automated verification; not deployed.
+
 ## [0.9.3](https://github.com/rthomazel/mcp/pull/55) docs: specify and model file_insert and file_delete
 
 ### models
