@@ -1,10 +1,14 @@
 ---
 id: 2026-07-28-resource-management
-type: draft
+type: spec
 summary: Draft design plan for kernel-enforced cgroup resource limits. Not implemented.
+author: Thom
 created: 2026-07-28
 updated: 2026-09-29
 ---
+
+> **Status:** Draft. Not approved and not implemented; describes intent only.
+
 # MCP server resource management design
 
 ## problem statement & design direction

@@ -3,7 +3,7 @@ id: 2026-09-29-stats
 type: documentation
 summary: Documents how bench-mcp records and queries tool-call statistics.
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-11-13
 ---
 # stats design
 
@@ -15,7 +15,7 @@ analysis, and review of command history — similar in spirit to a shell history
 
 The database lives at `$BENCH_MCP_HOME/bench-mcp-stats.db` (default: `/root/bench-mcp-stats.db`).
 `/root` is already a named persistent volume, so the file survives container restarts with no
-additional configuration. `BENCH_MCP_HOME` is documented in [config.md](config.md).
+additional configuration. `BENCH_MCP_HOME` is documented in [config](../config/doc.md).
 
 The directory is created on startup if it does not exist. If the DB cannot be opened or the
 schema cannot be bootstrapped, stats are disabled for the session — the server continues
@@ -33,14 +33,14 @@ A `stats.Writer` is created in `handlers.New()` and stored on `Handler`. It wrap
 `Handler` gains a `Close()` method that:
 
 1. Closes the write channel, signalling the goroutine to stop accepting new records
-2. Waits up to 1 minute for the goroutine to drain all buffered records and exit; any records remaining after the deadline are dropped and counted in the log
+2. Waits up to 1 minute for the goroutine to drain all buffered records and exit; if the deadline passes an error is logged and pending records may be lost
 3. Closes the `*sql.DB`
 
 The MCP server calls `Handler.Close()` on shutdown.
 
 ### SQLite connection settings
 
-Applied at open time:
+Applied at open time (`journal_mode` by statement, `busy_timeout` and `foreign_keys` through the connection string):
 
 ```sql
 PRAGMA journal_mode=WAL;     -- allows concurrent readers alongside the single writer
@@ -74,14 +74,15 @@ Every tool call produces one row. Recording happens on both success and failure 
 | ----------------------------------- | ----------------------------------------------------------------------------- |
 | `shell`                             | after each `runCommand` returns — one row per command in the `commands` array |
 | `shell_background` / `setup`        | inside the job goroutine after `cmd.Run()` returns                            |
-| `file_replace` / `file_replace_all` | at handler return, regardless of success                                      |
+| `file_replace` / `file_replace_all` / `file_create` | at handler return, regardless of success                              |
+| `file_insert` / `file_delete`       | at the end of the edit, success or failure                                    |
 | `context` / `status` / `stats`      | at handler return                                                             |
 
 ## schema
 
 The schema is managed with `golang-migrate/migrate/v4`. Migration files live in `db/migrations/`
 and are embedded in the binary.
-A `stats.Writer.Migrate()` method runs pending migrations at startup before any inserts.
+`stats.Open` runs pending migrations (`internal.MigrateDB`) at startup before any inserts; a migration failure disables stats for the session.
 `schema_migrations` tracking is handled by golang-migrate — no custom version table is needed.
 
 Initial migration (`db/migrations/1_initial_schema.up.sql`):
@@ -109,11 +110,12 @@ CREATE TABLE tool_calls (
     job_id                TEXT,                         -- links shell_background/setup to job ID
     redacted_byte_counts  TEXT,                         -- JSON: [N, ...] original byte size per redacted token
 
-    -- file_replace / file_replace_all
+    -- file tools
     file_path             TEXT,                         -- full path as provided
     replacement_count     INTEGER,                      -- number of items in the replacements array
     replacement_bytes     TEXT,                         -- JSON: [[find_bytes, replace_bytes], ...]
     dry_run               INTEGER                       CHECK (dry_run IS NULL OR dry_run IN (0,1)),
+    overwrite             INTEGER                       CHECK (overwrite IS NULL OR overwrite IN (0,1)),  -- file_create
 
     -- setup
     setup_paths           TEXT                          -- JSON array of paths passed to setup
@@ -165,7 +167,7 @@ One new env var and one Docker Secret, both optional:
 | `bench_mcp_stats_encryption_key_v1` | Docker Secret | Enables full command storage. Base64-encoded 32-byte AES-256 key, read from `/run/secrets/bench_mcp_stats_encryption_key_v1`. When present, the post-pipeline redacted command is encrypted and stored in `cmd_encrypted`. When absent, only `base_cmd` and `cmd_hash` are stored. |
 | `BENCH_MCP_STATS_REDACT_PATTERNS`   | env var       | Newline-separated Go regex strings added as a user-defined redaction tier. Each match is replaced with `[USER REDACTED]`. Patterns that fail to compile are skipped and logged at startup.                                                                                         |
 
-`BENCH_MCP_HOME` controls the DB directory and is documented in [config.md](config.md).
+`BENCH_MCP_HOME` controls the DB directory and is documented in [config](../config/doc.md).
 
 ### key setup with Docker Secrets
 
@@ -190,8 +192,9 @@ services:
 ```
 
 The server reads the key from `/run/secrets/bench_mcp_stats_encryption_key_v1` at startup.
-If the file is absent or empty, full command storage is disabled and only `base_cmd` and
-`cmd_hash` are recorded.
+If the file is absent, full command storage is disabled and only `base_cmd` and
+`cmd_hash` are recorded. If the file exists but is empty, not valid base64, or does not decode to 32 bytes,
+stats are disabled entirely for the session and the error is logged.
 
 ### encrypted storage envelope
 
@@ -250,7 +253,9 @@ it is explicit in each handler.
 | tool                           | what is recorded directly                                        | command passed to ProcessCommand |
 | ------------------------------ | ---------------------------------------------------------------- | -------------------------------- |
 | `file_replace`                 | `file_path`, `replacement_count`, `replacement_bytes`, `dry_run` | none — passes 2–4 skipped        |
-| `file_replace_all`             | same + `start_line`, `end_line`                                  | none                             |
+| `file_replace_all`             | same as `file_replace` (line range is not recorded)             | none                             |
+| `file_create`                  | `file_path`, `dry_run`, `overwrite`                              | none                             |
+| `file_insert` / `file_delete`  | `file_path`, `dry_run`                                           | none                             |
 | `shell` / `shell_background`   | `cwd`, `exit_code`, `timed_out`                                  | full command string              |
 | `setup`                        | `setup_paths`, `cwd`                                             | full command string              |
 | `context` / `status` / `stats` | duration only                                                    | none                             |
@@ -425,7 +430,7 @@ One optional parameter:
 SQLite has no built-in percentile function. The `stats` handler loads all matching
 `duration_ms` values into a Go slice, sorts it, and uses the nearest-rank formula:
 `index = ceil(0.95 × n) - 1` (zero-based). For 100 samples this yields index 94,
-the 95th value. Groups with fewer than 20 samples omit the p95 field.
+the 95th value. Groups with fewer than 20 samples omit the p95 field. A non-numeric `days` value is ignored and a negative one is treated as 30.
 
 ### output format
 
@@ -433,32 +438,32 @@ Plain text, consistent with other tools. Example:
 
 ```
 tool usage (last 30 days):
-  shell              142 calls   avg 1.2s   p95 8.4s
+  shell              142 calls   avg 1.2s     p95 8.4s
   shell_background    38 calls   avg 45.2s
-  file_replace        27 calls   avg 0.3s
+  file_replace        27 calls   avg 300.0ms
   setup               12 calls
   context              8 calls
   stats                3 calls
 
-top commands by frequency (grouped by cmd_hash, labeled by base_cmd):
-  git   [a3f9c2]   89 calls   avg 2.1s   p95 12.3s   ← consider shell_background
-  go    [b17d44]   31 calls   avg 5.4s   p95 47.1s   ← consider shell_background
-  npm   [c90e11]   12 calls   avg 22.0s  p95 91.0s   ← consider shell_background
-  cat   [f4a812]   18 calls   avg 0.1s
-  grep  [221bc9]   15 calls   avg 0.2s
+top commands by frequency:
+  git [HASHED a3f9c2]   89 calls   avg 2.1s   p95 12.3s   ← consider shell_background
+  go [HASHED b17d44]    31 calls   avg 5.4s   p95 47.1s   ← consider shell_background
+  npm [HASHED c90e11]   12 calls   avg 22.0s  p95 91.0s   ← consider shell_background
+  cat [HASHED f4a812]   18 calls   avg 100.0ms
+  grep [HASHED 221bc9]  15 calls   avg 200.0ms
 
 note: commands stored as hash only — configure the bench_mcp_stats_encryption_key_v1 Docker Secret to store and display full commands
 ```
 
 The `note:` line is omitted when the Docker Secret is configured; the decrypted redacted
-command is shown instead of the hash prefix. The displayed command is always post-redaction —
+command is shown instead of the `base_cmd [HASHED prefix]` label. The displayed command is always post-redaction —
 never the raw input.
 
-Hash prefixes shown are the first 6 hex characters of `cmd_hash`. Rows are grouped by
-`(normalizer_version, cmd_hash)` — only rows sharing both values are aggregated, preventing
-stale hashes from inflating counts. `base_cmd` labels the group in output. The stats tool
-only groups rows matching the current `normalizer_version` by default; older rows are
-counted in totals but excluded from the top-commands breakdown.
+Durations under one second print in milliseconds with one decimal; one second or more print in seconds.
+The top-commands table covers `shell`, `shell_background`, and `setup` rows, shows at most 20 groups, and sorts by call count.
+Hash prefixes shown are the first 6 hex characters of `cmd_hash`. Only rows with the current
+`normalizer_version` are grouped, by `cmd_hash`; older rows are counted in the per-tool totals but excluded from the
+top-commands breakdown. `base_cmd` labels the group (`(unknown)` when empty).
 
 ### shell_background hint
 

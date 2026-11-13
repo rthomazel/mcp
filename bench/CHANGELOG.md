@@ -8,6 +8,8 @@
 - **(spc/file-replace)** promote the deferred ideas to `loose-matching.spec.md` and `nearest-candidate.spec.md`; document that a `find` matching more than once is `not_matched` with previews; add Status, Changelog, and Refs sections.
 - **(spc/file-insert, spc/file-delete)** state that insertion content has no newline limit and that each tool does not create files.
 - **(spc/architecture, spc/config, spc/file-create)** fix stale content: full handler and internal package layout, current handler names, no default command aliases, path-snapshot-based detection, `BENCH_MCP_MAX_CANDIDATES` and `BENCH_MCP_STATS_REDACT_PATTERNS`, and remove the nonexistent newline limit from `file_create`.
+- **(spc)** move `doc/` markdown into `spc/`: `volume-mounting` (documentation) and the draft design notes `job-runner`, `log-analysis`, `log-tools`, `resource-management`, `ideas` (specs marked draft). README link updated.
+- **(spc/stats)** fix stale content: `overwrite` column, file tools in the write and pass-1 tables, migration and shutdown behavior, key-file failure behavior, output format, and broken links.
 
 ## [0.11.0](https://github.com/rthomazel/mcp/pull/57) feat: anchored file_insert and file_delete
 

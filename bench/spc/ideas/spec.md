@@ -1,10 +1,14 @@
 ---
 id: 2026-07-28-ideas
-type: draft
-summary: Inkubation — open ideas, unimplemented features, and "what not to add" notes.
+type: spec
+summary: Incubation — open ideas, unimplemented features, and "what not to add" notes.
+author: Thom
 created: 2026-07-28
 updated: 2026-09-29
 ---
+
+> **Status:** Draft. Not approved and not implemented; describes intent only.
+
 # ideas
 
 - [ ] Go dependency update cron job workflow copy from other projects.

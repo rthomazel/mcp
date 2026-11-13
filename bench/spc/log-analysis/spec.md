@@ -1,10 +1,14 @@
 ---
 id: 2026-07-28-log-analysis
-type: draft
+type: spec
 summary: Draft design plan for the log analysis tool. Not implemented.
+author: Thom
 created: 2026-07-28
 updated: 2026-09-29
 ---
+
+> **Status:** Draft. Not approved and not implemented; describes intent only.
+
 ### Design Plan — Log Analysis MCP Tool
 
 ## Precondition

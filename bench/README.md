@@ -86,7 +86,7 @@ ${EDITOR:-vi} docker-compose.yml
 
 Mount your projects under `/projects` (or anywhere — the agent discovers them dynamically via `context`).
 
-For advanced volume tricks (read-only mounts, hiding subdirectories) see [doc/volume-mounting-tricks.md](./doc/volume-mounting-tricks.md).
+For advanced volume tricks (read-only mounts, hiding subdirectories) see [spc/volume-mounting/doc.md](./spc/volume-mounting/doc.md).
 
 ### 3. Wire up your client
 
