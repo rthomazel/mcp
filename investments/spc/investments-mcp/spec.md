@@ -28,8 +28,8 @@ concentration and risk. It is not a brokerage integration or an accounting platf
 
 The MCP server is the application backend. It owns database access, calculations,
 market data ingestion and the market data provider credential. There is no
-separate backend API service. It is deployed on the existing LGA VPS together with
-a new dedicated PostgreSQL service.
+separate backend API service. It is deployed on the existing LGA VPS and uses its
+own database on a shared PostgreSQL server (LGA Postgres).
 
 ## Scope
 
@@ -251,15 +251,22 @@ market-trends workflow.
 
 ## Deployment
 
-The server and a new dedicated PostgreSQL service are added to the LGA stack as
-compose services alongside the existing MCP servers, with their secrets managed the
-way LGA manages the others. The server is then registered in LiteLLM so LibreChat
+LGA gets one PostgreSQL server, called LGA Postgres, hosting multiple databases.
+The Investments MCP uses a dedicated investments database on it, with its own role
+that has no access to other databases. Future systems get their own databases on
+the same server rather than their own servers. A read replica may be added later,
+for example to serve the trading service; that is not part of v1.
+
+LGA Postgres and the server are added to the LGA stack as compose services alongside
+the existing MCP servers, with their secrets managed the way LGA manages the others. The server is then registered in LiteLLM so LibreChat
 can use it. Database storage must persist across restarts and be
-covered by LGA's backup practice. Staging and rollout order are in the plan.
+covered by LGA's backup practice, per database. Staging and rollout order are in the plan.
 
 ## Decisions
 
 - One Go service and five tables; no separate API backend.
+- One shared PostgreSQL server on LGA with a database per system; this server owns
+  only the investments database.
 - PostgreSQL numeric types for all money and quantities.
 - Ownership history comes from the ledger; portfolio history from daily
   instrument-level snapshots.

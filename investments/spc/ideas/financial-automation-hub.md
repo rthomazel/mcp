@@ -33,8 +33,9 @@ distorting the model.
 
 ## To be decided
 
-- Whether consolidation means one server and one database with distinct areas, or
-  several servers sharing conventions, access and notifications.
+- Whether consolidation means one server with distinct areas, or several servers
+  sharing conventions, access and notifications. Databases are already separate
+  per system on the shared LGA Postgres server.
 - What the systems truly share: the ledger concepts, price and valuation handling,
   the ingestion job, the access path through the gateway, and notifications.
 - Whether the name and scope of the project should change if it grows beyond investments.
