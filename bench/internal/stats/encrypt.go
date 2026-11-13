@@ -16,14 +16,24 @@ import (
 // LoadKey reads the encryption key from the Docker Secret file.
 // Returns nil, nil if the file does not exist or is empty — stats run without encryption.
 func LoadKey() ([]byte, error) {
-	raw, err := os.ReadFile(internal.StatsEncryptionKeyPath)
+	return loadKeyFrom(internal.StatsEncryptionKeyPath)
+}
+
+// loadKeyFrom reads the key at path. A missing or blank file yields nil, nil.
+// A present but malformed key is an error.
+func loadKeyFrom(path string) ([]byte, error) {
+	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read stats key: %w", err)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(raw)))
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return nil, nil
+	}
+	decoded, err := base64.StdEncoding.DecodeString(trimmed)
 	if err != nil {
 		return nil, fmt.Errorf("decode stats key: %w", err)
 	}
