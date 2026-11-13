@@ -1,6 +1,7 @@
 # Types
 
 All five spec tables are created in the first migration so the schema is reviewed whole. Prices, snapshots and updates are used by later stages.
+Migration files are versioned with a UNIX timestamp prefix, not a sequence number, so parallel branches do not collide: this one is 1794592445_initial_schema.up.sql.
 Money and quantities are NUMERIC without precision limits. Event types and statuses are text with CHECK constraints, not Postgres enums, so they can change in a migration without type surgery.
 
 ## instruments
