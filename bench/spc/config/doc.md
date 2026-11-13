@@ -3,7 +3,7 @@ id: 2026-09-29-config
 type: documentation
 summary: Documents the configuration environment variables of bench-mcp.
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-11-13
 ---
 # configuration
 
@@ -20,6 +20,8 @@ Config is loaded from environment variables only — no flags, no config files.
 | `BENCH_MCP_HOME`               | `$HOME`   | Base directory for the path snapshot file and the persistent-install note. Override when running as a non-root user without access to the default home. |
 | `BENCH_MCP_MISE_DIR`           | `/mise`   | Directory where mise is mounted. Used to prepend the shims path to `$PATH` on startup and to mark the volume as persistent in context output.           |
 | `BENCH_MCP_EDIT_MAX_LINES`     | `50`      | Maximum lines allowed in `replace` per item for `file_replace` and `file_replace_all`. Increase to allow larger replacements.                           |
+| `BENCH_MCP_MAX_CANDIDATES`     | `5`       | Maximum diagnostic candidate previews shown per failed or ambiguous `file_replace` hunk, and candidates listed by `file_replace_all`. Must be a positive integer.                                  |
+| `BENCH_MCP_STATS_REDACT_PATTERNS` | _(unset)_ | Newline-separated Go regular expressions added to the stats redaction pipeline. Blank lines are ignored; an invalid pattern is logged and skipped.                                                |
 | `BENCH_MCP_TOOL_CALL_WORKERS`  | `1`       | Number of concurrent workers processing queued `tools/call` requests over stdio (passed to mcp-go's `WithWorkerPoolSize`). `1` (default) drains the queue strictly FIFO, so responses complete in the same order requests arrived — required for any client that batches ordering-dependent calls (e.g. `git commit` immediately followed by `git push`) into the same turn. Raise only if every call you batch is truly independent; with more than one worker, tool calls run and return concurrently, so completion order is **not** guaranteed to match submission order. |
 
 Values must be valid Go duration strings (e.g. `30s`, `2m`, `1h`).

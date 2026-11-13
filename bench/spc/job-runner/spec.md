@@ -1,10 +1,14 @@
 ---
 id: 2026-07-28-job-runner
-type: draft
+type: spec
 summary: Draft design plan for the remote job-runner MCP server. Not implemented.
+author: Thom
 created: 2026-07-28
 updated: 2026-09-29
 ---
+
+> **Status:** Draft. Not approved and not implemented; describes intent only.
+
 # Remote Job Runner MCP Design (v1)
 
 ## Problem

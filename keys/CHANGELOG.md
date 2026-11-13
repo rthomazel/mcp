@@ -19,6 +19,12 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## [0.1.3](https://github.com/rthomazel/mcp/pull/60) docs: document current implementation under spc/
+
+### docs
+
+- **(spc)** add documentation of the current implementation: architecture, config, http-tool, secrets. Written from the code; where it differs from `doc/design.md` (`response_headers` parameter, `base_url` path prefixes, no per-call logging) the new docs follow the code.
+
 ## [0.1.2](https://github.com/rthomazel/mcp/pull/44) fix: pin mcp SDK below 2.0; follow same-origin redirects
 
 ### fix

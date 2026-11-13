@@ -1,3 +1,12 @@
+---
+id: 2026-11-13-volume-mounting
+type: documentation
+summary: Documents Docker volume tricks for bench-mcp: read-only paths and hidden files or directories.
+author: Thom
+created: 2026-11-13
+agents: claude
+---
+
 # volume mounting tricks
 
 ## Read-only paths

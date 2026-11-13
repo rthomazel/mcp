@@ -61,7 +61,7 @@ validate the inputs and captured file snapshot and return the proposed diff with
 writing. Write-time external-modification checks apply only when an actual change
 is committed; previews and successful no-ops do not guarantee the file remains
 unchanged by another process.
-Report a successful no-op explicitly. Neither tool creates missing files.
+Report a successful no-op explicitly. `file_delete` does not create missing files.
 
 ## Scope
 
@@ -88,3 +88,4 @@ and anchor occurrence selectors are out of scope. These specifications describe 
   deletion crosses lines and stops at EOF, and deletion at EOF succeeds as a no-op.
 - Clarify the supported text/path domain and snapshot-based dry-run validation
   following review in [PR #55](https://github.com/rthomazel/mcp/pull/55).
+- State that `file_delete` does not create files (previously worded as "neither tool").
