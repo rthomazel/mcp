@@ -23,6 +23,7 @@ func pass2Redact(cmd string, userPatterns []*regexp.Regexp) (string, []int) {
 	cmd = redactPEMBlocks(cmd, &counts)
 	cmd = redactUUIDs(cmd, &counts)
 	cmd = redactLongHex(cmd, &counts)
+	cmd = redactBase64(cmd, &counts)
 	cmd = redactEmails(cmd, &counts)
 	cmd = redactPublicIPs(cmd, &counts)
 	for _, pattern := range userPatterns {
@@ -42,8 +43,9 @@ var (
 	rePEM            = regexp.MustCompile(`-----BEGIN [A-Z ]+-----[^-]+-----END [A-Z ]+-----`)
 
 	// Tier 2 — high-entropy patterns
-	reUUID = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
-	reHex  = regexp.MustCompile(`[0-9a-fA-F]{32,}`)
+	reUUID   = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
+	reHex    = regexp.MustCompile(`[0-9a-fA-F]{32,}`)
+	reBase64 = regexp.MustCompile(`[A-Za-z0-9+/]{24,}={0,2}`)
 
 	// Tier 3 — PII
 	reEmail = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
@@ -168,6 +170,34 @@ func redactLongHex(cmd string, counts *[]int) string {
 		*counts = append(*counts, len(match))
 		return fmt.Sprintf("[HEX %dB]", len(match))
 	})
+}
+
+// redactBase64 replaces long base64-looking runs. To avoid redacting paths and
+// identifiers, a run must mix upper case, lower case, and digits, and must not
+// start with "/" (absolute and ./, ~/ paths).
+func redactBase64(cmd string, counts *[]int) string {
+	return reBase64.ReplaceAllStringFunc(cmd, func(match string) string {
+		if strings.HasPrefix(match, "/") || !mixesCharClasses(match) {
+			return match
+		}
+		*counts = append(*counts, len(match))
+		return fmt.Sprintf("[BASE64 %dB]", len(match))
+	})
+}
+
+func mixesCharClasses(s string) bool {
+	var upper, lower, digit bool
+	for _, r := range s {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			upper = true
+		case r >= 'a' && r <= 'z':
+			lower = true
+		case r >= '0' && r <= '9':
+			digit = true
+		}
+	}
+	return upper && lower && digit
 }
 
 func redactEmails(cmd string, counts *[]int) string {

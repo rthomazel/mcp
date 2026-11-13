@@ -94,6 +94,38 @@ func TestProcessCommand_Redaction(t *testing.T) {
 			wantPresent: []string{"[UUID]"},
 		},
 		{
+			name:        "base64 redacted",
+			input:       "curl -d aGVsbG8gd29ybGQgSGVsbG8gV29ybGQ1MjM= http://example.com",
+			wantAbsent:  []string{"aGVsbG8gd29ybGQ"},
+			wantPresent: []string{"[BASE64 "},
+		},
+		{
+			name:        "base64 without padding redacted",
+			input:       "echo Zm9vQmFyQmF6MTIzNDU2Nzg5MEFiQ2RF",
+			wantAbsent:  []string{"Zm9vQmFy"},
+			wantPresent: []string{"[BASE64 32B]"},
+		},
+		{
+			name:        "short base64-like token preserved",
+			input:       "echo Zm9vQmFyMTIz",
+			wantPresent: []string{"Zm9vQmFyMTIz"},
+		},
+		{
+			name:        "absolute path with mixed case and digits preserved",
+			input:       "ls /Users/JohnDoe/Projects/Bench2Mcp/handlers",
+			wantPresent: []string{"/Users/JohnDoe/Projects/Bench2Mcp/handlers"},
+		},
+		{
+			name:        "long lowercase identifier preserved",
+			input:       "go test -run testprocesscommandhashgroupingacrossversions",
+			wantPresent: []string{"testprocesscommandhashgroupingacrossversions"},
+		},
+		{
+			name:        "long camel case identifier without digits preserved",
+			input:       "go test -run TestProcessCommandHashGroupingAcrossVersions",
+			wantPresent: []string{"TestProcessCommandHashGroupingAcrossVersions"},
+		},
+		{
 			name:        "email redacted",
 			input:       "git log --author=user@example.com -n 5",
 			wantAbsent:  []string{"user@example.com"},
