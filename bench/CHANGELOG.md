@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [0.11.2](https://github.com/rthomazel/mcp/pull/61) fix: stats keep running with a blank encryption key; redact base64
+## [0.11.2](https://github.com/rthomazel/mcp/pull/62) fix: stats keep running with a blank encryption key; redact base64
 
 ### fix
 
