@@ -30,7 +30,7 @@ Insert content verbatim into an existing file after the first literal occurrence
 
 Insert `content` verbatim at the cursor. Content may span multiple lines.
 No automatic indentation or newline is added. Empty content is a successful
-no-op after validation.
+no-op after validation. Inserted content is not subject to the newline limit that applies to `file_replace` replacements; insertion size is deliberately unrestricted.
 
 ## Cursor contract
 
@@ -55,7 +55,7 @@ validate the inputs and captured file snapshot and return the proposed diff with
 writing. Write-time external-modification checks apply only when an actual change
 is committed; previews and successful no-ops do not guarantee the file remains
 unchanged by another process.
-Report a successful no-op explicitly. Neither tool creates missing files.
+Report a successful no-op explicitly. `file_insert` does not create missing files; creating files belongs to `file_create`.
 
 ## Scope
 
@@ -77,3 +77,4 @@ and anchor occurrence selectors are out of scope. These specifications describe 
 - Initial agreed specification for dedicated anchored insertion.
 - Clarify the supported text/path domain and snapshot-based dry-run validation
   following review in [PR #55](https://github.com/rthomazel/mcp/pull/55).
+- State that insertion content has no newline limit (intentional) and that `file_insert` does not create files.

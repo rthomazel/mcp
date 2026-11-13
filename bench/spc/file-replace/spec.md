@@ -10,6 +10,10 @@ agents: merlin, rook2
 
 # FileReplace
 
+## Status
+
+Implemented.
+
 ## Description
 
 `file_replace` should be easy to use for models that are not deterministic in nature. Previously it demanded that a model reproduce a unique substring exactly — byte-for-byte, including tabs and indentation — and if any single item in a batch fails, the whole batch is rejected. Models respond by reaching for the shell: writing a Python or heredoc script with its own assertions, or running `sed -i`. The telemetry shows these escape hatches are common and usually succeed, so the tool is the problem, not the models.
@@ -28,7 +32,7 @@ On success `file_replace` returns a unified diff — immediate proof of what cha
 
 When a hunk does not match, the tool should render a diff against plausible diagnostic candidates when available, clearly marked as not applied. When no candidate can be identified, it reports that fact with a bounded excerpt rather than inventing a location. The model sees what it tried to do, in the same artifact shape as success, without guessing whether its `find` was even close. This reuses the existing dry-run diff machinery.
 
-Only confirmation is in scope: candidate previews never write. The model resends with a corrected exact substring or a narrower region to commit. Automatic nearest-candidate application is deferred in ideas.md.
+Only confirmation is in scope: candidate previews never write. The model resends with a corrected exact substring or a narrower region to commit. Automatic nearest-candidate application is deferred; see [nearest-candidate.spec.md](nearest-candidate.spec.md). Loose matching is likewise deferred; see [loose-matching.spec.md](loose-matching.spec.md).
 
 ### 3. Line and region targeting
 
@@ -37,6 +41,10 @@ Only confirmation is in scope: candidate previews never write. The model resends
 The tool should narrow exact matching by line region. A model can supply a short byte-exact substring and the region containing the intended occurrence instead of quoting surrounding code to distinguish duplicates. This does not tolerate indentation drift within the substring; loose matching remains deferred.
 
 Either region bound may be omitted, defaulting to the corresponding file boundary. Bounds are clamped to the file; an empty resulting range rejects only that hunk and never becomes an unrestricted search. Matching uses original-file coordinates and retains occurrences whose line spans overlap the region.
+
+### Ambiguous finds
+
+A `find` must resolve to exactly one occurrence within its effective region. When it matches more than once, the hunk is not applied and is reported as `not_matched`, with a message stating how many locations matched and labeled not-applied previews of the first matches (bounded by the candidate limit). The model narrows the region with `start_line`/`end_line` or widens `find` and resends. The tool never picks among several matches on its own.
 
 ## Relationships between the three
 
@@ -75,8 +83,22 @@ Edits use a per-target lock and a checksum recheck before an atomic replacement 
 ## Acceptance criteria
 
 - A batch where one hunk fails still writes the hunks that match, and the response reports each hunk's status.
+- A `find` that matches more than once in its region is not applied, is reported as `not_matched` with the match count and labeled previews, and is never resolved by guessing.
 - A failed match renders clearly labeled not-applied candidate diffs when candidates exist; otherwise it reports no candidate and provides a bounded excerpt.
 - A call may narrow a required byte-exact substring by either or both region bounds without reproducing surrounding context.
 - An invalid region rejects only its hunk and never permits whole-file fallback.
 - Overlapping hunks follow the deterministic keep/drop policy and dropped hunks are never reported as applied.
 - Dry-run responses distinguish would-apply outcomes from actual writes; candidate previews never write.
+
+## Changelog
+
+- Implemented independent hunks, diff on failure, and region targeting in [PR #54](https://github.com/rthomazel/mcp/pull/54) and [PR #58](https://github.com/rthomazel/mcp/pull/58).
+- Document ambiguous-find behavior (more than one match is `not_matched` with previews) to match the implementation.
+
+## Refs
+
+- PR: https://github.com/rthomazel/mcp/pull/53
+- PR: https://github.com/rthomazel/mcp/pull/54
+- PR: https://github.com/rthomazel/mcp/pull/58
+- spec: 2026-11-13-file-replace-loose-matching
+- spec: 2026-11-13-file-replace-nearest-candidate

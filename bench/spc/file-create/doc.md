@@ -3,7 +3,7 @@ type: documentation
 id: 2026-09-29-file-create
 summary: Documents the current behavior of the file_create tool.
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-11-13
 ---
 
 # file_create
@@ -20,7 +20,7 @@ devices, and other non-regular targets are always rejected.
 ```json
 {
   "name": "file_create",
-  "description": "Create a new file, or overwrite an existing regular file when overwrite is true. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff.",
+  "description": "Create a new file, or overwrite an existing file when overwrite=true. Creates any missing parent directories. Returns a short message on success; on dry_run it returns a unified diff. Replaces the old 'file_replace creates a missing file' behavior.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -49,8 +49,8 @@ devices, and other non-regular targets are always rejected.
 
 ## Execution flow
 
-1. **Input guards**. Reject non-absolute paths, null bytes, invalid UTF-8, `content` exceeding
-   the newline limit, and `dry_run`/`overwrite` type errors.
+1. **Input guards**. Reject a missing `content` parameter, non-absolute paths, null bytes, and invalid UTF-8.
+   Content size is not limited; the newline limit applies only to `file_replace` and `file_replace_all`.
 2. **Resolve symlinks** — lock and operate on the real path.
 3. **Inspect** the target: determine whether it is missing, empty, non-empty regular, or a
    non-regular file.
