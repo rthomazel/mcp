@@ -31,9 +31,10 @@ its models before code. Technical design lives in the models, not here.
 
 ## LGA rollout
 
-1. Add the shared LGA Postgres server with persistent storage, backup coverage and
-   secrets, create the investments database and its dedicated role, and verify
-   them independently.
+1. Add the shared LGA Postgres server with persistent storage and
+   secrets, create the investments database and its dedicated role, set up the
+   daily per-database backup service, and verify them independently, including a
+   test restore.
 2. Publish the server image from the mcp repository.
 3. Add the server service to the LGA stack on the container network only, with no published ports.
 4. Run a manual refresh and one snapshot with a small real portfolio before

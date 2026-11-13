@@ -254,13 +254,17 @@ market-trends workflow.
 LGA gets one PostgreSQL server, called LGA Postgres, hosting multiple databases.
 The Investments MCP uses a dedicated investments database on it, with its own role
 that has no access to other databases. Future systems get their own databases on
-the same server rather than their own servers. A read replica may be added later,
+the same server rather than their own servers. This is the first database for the
+operator's own services; the databases behind other LGA services belong to
+third-party projects that deploy their own, and are out of scope. A read replica may be added later,
 for example to serve the trading service; that is not part of v1.
 
 LGA Postgres and the server are added to the LGA stack as compose services alongside
 the existing MCP servers, with their secrets managed the way LGA manages the others. The server is then registered in LiteLLM so LibreChat
 can use it. Database storage must persist across restarts and be
-covered by LGA's backup practice, per database. Staging and rollout order are in the plan.
+covered by a backup service that runs daily, per database. A backup that has
+not succeeded recently must be visible, and restoring from it must be verified at
+least once before the system is relied on. Staging and rollout order are in the plan.
 
 ## Decisions
 
@@ -301,6 +305,8 @@ covered by LGA's backup practice, per database. Staging and rollout order are in
 - The provider credential never appears in any response or log.
 - The server is unreachable from outside the container and Tailscale networks, and
   through LiteLLM rejects requests without a valid key.
+- A daily backup of the investments database runs, and a restore from it has been
+  verified.
 - Swapping the market data provider requires no change to stored data or agent contracts.
 
 ## Open questions
