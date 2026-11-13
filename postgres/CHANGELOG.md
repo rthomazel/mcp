@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.1.3](https://github.com/rthomazel/mcp/pull/60) docs: document current implementation under spc/
+
+### docs
+
+- **(spc)** add documentation of the current implementation: architecture, config, sql-validation, introspection, query-and-mutation, transactions, diagnostics. Written from the code; where it differs from `doc/design.md` (env var names, max rows default, fixed single-connection pool, `describe_schema`) the new docs follow the code.
+
 ## [0.1.2](https://github.com/rthomazel/mcp/pull/44) fix: pin mcp SDK below 2.0
 
 ### fix
