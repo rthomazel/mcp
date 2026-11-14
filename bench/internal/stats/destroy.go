@@ -136,9 +136,36 @@ func consumeWrapper(tokens []string) []string {
 	if len(tokens) == 0 {
 		return tokens
 	}
-	tokens = tokens[1:] // drop the wrapper itself
+	wrapper := tokens[0]
+	tokens = tokens[1:]
 	for len(tokens) > 0 && strings.HasPrefix(tokens[0], "-") {
+		flag := tokens[0]
 		tokens = tokens[1:]
+		// A flag that takes a separate value also consumes the next token;
+		// attached forms (-n10, --user=root) are a single token already.
+		if wrapperValueFlags[wrapper][flag] && len(tokens) > 0 {
+			tokens = tokens[1:]
+		}
 	}
 	return tokens
+}
+
+// wrapperValueFlags lists, per wrapper, the flags that take a separate value.
+var wrapperValueFlags = map[string]map[string]bool{
+	"sudo": setOf("-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "-r", "-t",
+		"--user", "--group", "--host", "--prompt", "--close-from", "--chdir", "--chroot",
+		"--role", "--type", "--other-user", "--command-timeout"),
+	"nice":   setOf("-n", "--adjustment"),
+	"ionice": setOf("-c", "-n", "-p", "-P", "-u", "--class", "--classdata", "--pid", "--pgid", "--uid"),
+	"env":    setOf("-u", "-C", "-S", "--unset", "--chdir", "--split-string"),
+	"time":   setOf("-f", "-o", "--format", "--output"),
+	"exec":   setOf("-a"),
+}
+
+func setOf(items ...string) map[string]bool {
+	set := make(map[string]bool, len(items))
+	for _, item := range items {
+		set[item] = true
+	}
+	return set
 }

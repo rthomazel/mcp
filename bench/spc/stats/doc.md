@@ -401,9 +401,12 @@ until no further progress is made:
    value, redacted or not). Repeat until the first token is not an assignment.
 3. **Strip leading wrapper tokens.** If the first token is a known wrapper
    (`sudo`, `env`, `time`, `command`, `exec`, `nice`, `ionice`), consume it
-   along with the tokens that follow it and start with `-` (`sudo -n`). Option
-   *values* are not consumed (see the known limitation below). Repeat step 2 after
-   each wrapper consumed.
+   along with the option flags that follow it (tokens starting with `-`). A flag
+   known to take a separate value consumes that value too (`sudo -u USER`,
+   `nice -n N`, `ionice -c N`, `env -u NAME`); attached forms such as `-n10` or
+   `--user=root` are a single token. The value-taking flags are listed per wrapper
+   in the code; an unlisted flag's value is left in place. Repeat step 2 after each
+   wrapper consumed.
 4. **Converge.** If neither step 2 nor step 3 made progress, stop.
 5. **First remaining token is `base_cmd`.** If none remains, `base_cmd` is NULL.
 
@@ -413,14 +416,13 @@ Examples:
 | ------------------------------------------ | -------- |
 | `TOKEN=REDACTED git status`                | `git`    |
 | `sudo -n git status`                       | `git`    |
-| `sudo -u root bash -c [INLINE_SCRIPT 42B]` | `root`   |
+| `sudo -u root bash -c [INLINE_SCRIPT 42B]` | `bash`   |
+| `nice -n 10 go build`                      | `go`     |
 | `cd /projects/foo && go test ./...`        | `go`     |
 | `env GOPATH=/root go build`                | `go`     |
 | `TOKEN=REDACTED`                           | NULL     |
 
-Known limitation: for `sudo -u root bash`, step 3 consumes `sudo -u` but not the option value
-`root`, so `base_cmd` is `root` (likewise `nice -n 10 go build` yields `10`). The test suite
-records this as a known gap; whether to fix it is undecided. Note on `env GOPATH=/root go build`: step 3 consumes
+Note on `sudo -u root bash`: step 3 consumes `sudo -u root` (the flag and its value), leaving `bash` as the first token. Note on `env GOPATH=/root go build`: step 3 consumes
 `env`, then step 2 strips `GOPATH=/root`, leaving `go`. Note on `cd ... && go test`: step 1
 discards the `cd` segment, taking `go test ./...` from the next segment.
 
