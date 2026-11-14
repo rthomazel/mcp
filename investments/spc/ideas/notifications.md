@@ -31,6 +31,21 @@ as delivered. Delivery failures are retried without losing or duplicating events
 more than the channel tolerates. Because producers only write events, other
 delivery channels could be added later without touching them.
 
+## Proven pattern
+
+A service already in production uses this pattern, so it can be followed closely.
+
+- An events table holds each event's type, a free-form data payload, an error count, a backoff-until time, a processed-at time and the list of handlers that have already succeeded.
+- State changes write their event in the same transaction, so an event exists only if the change committed.
+- Event types are centralized as named constants in the domain package, not scattered string literals.
+- A handler has a stable name and a handle operation. The name is persisted with the event, so renaming a handler breaks events that are still in flight.
+- A registry maps each event type to its handlers. A polling worker runs every few seconds, fetches events that are unprocessed and past their backoff, and runs each handler that has not yet succeeded.
+- Retries are per handler, not per event. A failed handler doubles its delay from a base of about thirty seconds, with a cap of ten doublings, which is roughly four and a half hours.
+- An event is complete once every registered handler has succeeded.
+- The worker can be driven for one pass in tests without a timer.
+
+For Telegram this means one handler per notification kind, registered against the events listed below.
+
 ## Candidate events
 
 - A daily run completed, or was recorded incomplete, with the reason.

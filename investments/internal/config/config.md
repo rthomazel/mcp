@@ -13,7 +13,7 @@ defaultStalePriceDays = 5, from the spec: a price five or more days older than t
 
 # Functions
 
-## LoadConfig() (*Config, error)
+## Load() (*Config, error)
 
 1. Read INVESTMENTS_MCP_DSN.
 2. Read INVESTMENTS_MCP_QUERY_TIMEOUT as a duration, defaulting to defaultQueryTimeout.
