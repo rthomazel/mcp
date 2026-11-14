@@ -13,6 +13,10 @@ var (
 	ErrInstrumentNotFound = errors.New("instrument not found")
 	// ErrInstrumentExists is returned when the symbol and exchange pair already exists.
 	ErrInstrumentExists = errors.New("instrument already registered")
+	// ErrSymbolNotFound is returned by a PriceProvider that does not cover a symbol.
+	ErrSymbolNotFound = errors.New("symbol not found")
+	// ErrRateLimited is returned by a PriceProvider that throttles a request.
+	ErrRateLimited = errors.New("provider rate limited")
 	// ErrNegativeBalance is matched through NegativeBalanceError.
 	ErrNegativeBalance = errors.New("transaction would make ownership negative")
 )

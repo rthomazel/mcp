@@ -143,3 +143,33 @@ func TestNegativeBalanceError(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNegativeBalance)
 	assert.Contains(t, err.Error(), "2026-01-05")
 }
+
+func TestPriceBarValidate(t *testing.T) {
+	good := PriceBar{
+		Date: time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC),
+		Open: "698.66", High: "698.81", Low: "687.5", Close: "693.38", AdjustedClose: "693.38", Volume: 5521455,
+	}
+	require.NoError(t, good.Validate())
+
+	fund := good
+	fund.Volume = 0
+	require.NoError(t, fund.Validate(), "mutual funds report zero volume")
+
+	for name, mutate := range map[string]func(*PriceBar){
+		"zero date":       func(b *PriceBar) { b.Date = time.Time{} },
+		"bad open":        func(b *PriceBar) { b.Open = "x" },
+		"bad high":        func(b *PriceBar) { b.High = "" },
+		"bad low":         func(b *PriceBar) { b.Low = "1e3" },
+		"bad close":       func(b *PriceBar) { b.Close = "-" },
+		"bad adjusted":    func(b *PriceBar) { b.AdjustedClose = "n/a" },
+		"zero close":      func(b *PriceBar) { b.Close = "0.00" },
+		"negative close":  func(b *PriceBar) { b.Close = "-5" },
+		"negative volume": func(b *PriceBar) { b.Volume = -1 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			bad := good
+			mutate(&bad)
+			assert.ErrorIs(t, bad.Validate(), ErrInvalidInput)
+		})
+	}
+}

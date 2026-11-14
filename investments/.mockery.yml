@@ -8,3 +8,8 @@ packages:
           dir: internal/domain
           filename: mock_store.go
           pkgname: domain
+      PriceProvider:
+        config:
+          dir: internal/domain
+          filename: mock_price_provider.go
+          pkgname: domain

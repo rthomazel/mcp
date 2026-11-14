@@ -18,6 +18,7 @@ type Config struct {
 	DSN            string
 	QueryTimeout   time.Duration
 	StalePriceDays int
+	TiingoAPIKey   string // server-side secret, never logged or returned
 }
 
 // Load reads the configuration from INVESTMENTS_MCP_* environment variables.
@@ -26,10 +27,15 @@ func Load() (*Config, error) {
 		DSN:            os.Getenv("INVESTMENTS_MCP_DSN"),
 		QueryTimeout:   defaultQueryTimeout,
 		StalePriceDays: defaultStalePriceDays,
+		TiingoAPIKey:   os.Getenv("INVESTMENTS_MCP_TIINGO_API_KEY"),
 	}
 
 	if cfg.DSN == "" {
 		return nil, errors.New("INVESTMENTS_MCP_DSN is required")
+	}
+
+	if cfg.TiingoAPIKey == "" {
+		return nil, errors.New("INVESTMENTS_MCP_TIINGO_API_KEY is required")
 	}
 
 	if v := os.Getenv("INVESTMENTS_MCP_QUERY_TIMEOUT"); v != "" {
