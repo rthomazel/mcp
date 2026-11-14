@@ -1,6 +1,6 @@
 # Constants
 
-longTimeout = 10 minutes, the deadline for tools that call the provider or rewrite many rows: add_instrument, refresh_prices and rebuild_snapshots.
+longTimeout = 3 minutes, the deadline for tools that call the provider or rewrite many rows: add_instrument, refresh_prices and rebuild_snapshots.
 internalErrorText = "internal error, see the server logs".
 
 # Types
