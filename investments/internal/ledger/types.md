@@ -55,17 +55,7 @@ A string, one of the Event constants.
 5. Currency string
 6. InstrumentType string
 
-## NewInstrument
-
-1. Symbol string
-2. Exchange string
-3. Name string
-4. Currency string
-5. InstrumentType string
-
-The New types are caller input; the others are stored rows returned to callers.
-Input is normalized and validated before it touches the database, carries no server-assigned fields, and for transactions allows an empty cash amount meaning zero, which a stored row never has.
-NewInstrument differs from Instrument only by the ID, so the split is kept mainly for symmetry with Transaction. It can be collapsed if that is judged not worth it.
+An Instrument also serves as a draft that is not yet saved: its ID is ignored and assigned on insert. Implementations name such variables draft.
 
 ## Transaction
 
@@ -78,7 +68,7 @@ NewInstrument differs from Instrument only by the ID, so the split is kept mainl
 7. EffectiveDate Date
 8. Notes *string
 
-## NewTransaction
+## DraftTransaction
 
 1. InstrumentID int
 2. EventType EventType
@@ -88,6 +78,7 @@ NewInstrument differs from Instrument only by the ID, so the split is kept mainl
 6. EffectiveDate Date, required
 7. Notes *string
 
+A draft is caller input that is not yet saved. It carries no server-assigned fields and, unlike a stored Transaction, allows an empty cash amount meaning zero. It is normalized and validated before it touches the database.
 Effective date is supplied by the caller. There is no market calendar, so an event executed after the close must be given the next session's date by whoever records it.
 
 ## NegativeBalanceError
@@ -114,20 +105,20 @@ Is(ErrNegativeBalance) is true.
 
 Return -1, 0 or 1 by inspecting the text: zero if every digit is zero, negative if it starts with a minus.
 
-## NewInstrument.Normalize() NewInstrument
+## Instrument.Normalize() Instrument
 
 Trim all fields; upper-case symbol, exchange, currency and instrument type.
 
-## NewInstrument.Validate() error
+## Instrument.Validate() error
 
 1. if symbol, exchange or name is empty, return ErrInvalidInput.
 2. if currency is not currencyUSD, return ErrInvalidInput.
 3. if instrument type is not one of the Instrument constants, return ErrInvalidInput.
 4. Return nil.
 
-Call Normalize first; Validate does not normalize.
+Call Normalize first; Validate does not normalize. Both ignore the ID.
 
-## NewTransaction.Validate() error
+## DraftTransaction.Validate() error
 
 1. if event type is not one of the Event constants, return ErrInvalidInput.
 2. if quantity change or non-empty cash amount does not parse, return ErrInvalidInput.

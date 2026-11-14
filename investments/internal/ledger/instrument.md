@@ -5,9 +5,9 @@ listInstrumentsSQL = select all instruments ordered by symbol, then exchange.
 
 # Functions
 
-## PostgresStore.RegisterInstrument(ctx Context, in NewInstrument) (Instrument, error)
+## PostgresStore.RegisterInstrument(ctx Context, draft Instrument) (Instrument, error)
 
-1. Normalize and validate in.
+1. Normalize and validate draft.
 2. Insert via insertInstrumentSQL and scan the result.
 3. Log the registration at info level with the instrument id, symbol and exchange.
 4. Return the instrument.

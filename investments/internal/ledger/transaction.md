@@ -25,9 +25,9 @@ listTransactionsSQL = select transactions matching the optional filters, newest 
 
 # Functions
 
-## PostgresStore.RecordTransaction(ctx Context, in NewTransaction) (RecordResult, error)
+## PostgresStore.RecordTransaction(ctx Context, draft DraftTransaction) (RecordResult, error)
 
-1. Validate in.
+1. Validate draft.
 2. Run inside storage.WithTx:
    1. Lock the instrument row via lockInstrumentSQL.
    2. Insert via insertTransactionSQL and scan the result.

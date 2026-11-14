@@ -1,7 +1,7 @@
 # Constants
 
-positionsSQL = per instrument, sum quantity_change over transactions whose effective_date is on or before the as-of date (all dates when none), keep sums above zero, join instruments for symbol and exchange, order by symbol then exchange.
-integritySQL = per instrument, order the ledger restricted to the as-of date by effective date, execution time, id; compute the running sum of quantity_change; return the first row at which the running sum is below zero, with its effective date and running sum.
+positionsSQL = per instrument, sum quantity_change over transactions whose effective_date is on or before the requested date (all dates when none), keep sums above zero, join instruments for symbol and exchange, order by symbol then exchange.
+integritySQL = per instrument, order the ledger restricted to the requested date by effective date, execution time, id; compute the running sum of quantity_change; return the first row at which the running sum is below zero, with its effective date and running sum.
 
 # Types
 
@@ -22,17 +22,17 @@ integritySQL = per instrument, order the ledger restricted to the as-of date by 
 
 ## PositionsResult
 
-1. AsOf *Date, nil means the whole ledger
+1. Date *Date, nil means the whole ledger
 2. Positions []Position, active positions only
 3. IntegrityErrors []IntegrityError
 
 # Functions
 
-## PostgresStore.GetPositions(ctx Context, asOf *Date) (PositionsResult, error)
+## PostgresStore.GetPositions(ctx Context, date *Date) (PositionsResult, error)
 
 1. Select active positions via positionsSQL.
 2. Select ledger integrity errors via integritySQL.
-3. Return both with the as-of date.
+3. Return both with the requested date.
 
 #### Errors
 

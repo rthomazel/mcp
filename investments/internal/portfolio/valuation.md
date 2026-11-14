@@ -1,6 +1,6 @@
 # Constants
 
-marketTimezone = "America/New_York", used to derive today's date when no as-of date is given.
+marketTimezone = "America/New_York", used to derive today's date when no date is given.
 
 valuationSQL = for each active position as of the reference date (positionsSQL), take the latest prices row with date on or before the reference date (lateral join, newest first, one row); return quantity, close, price date, days between the reference date and the price date, market value as quantity times close, the sum of market values over the rows that have a price, and each row's market value divided by that sum.
 
@@ -20,7 +20,7 @@ valuationSQL = for each active position as of the reference date (positionsSQL),
 
 ## Portfolio
 
-1. AsOf Date, the reference date
+1. Date Date, the reference session date
 2. SecuritiesValueUSD *Decimal, nil when incomplete
 3. Complete bool
 4. Holdings []Holding
@@ -28,9 +28,9 @@ valuationSQL = for each active position as of the reference date (positionsSQL),
 
 # Functions
 
-## PostgresStore.GetPortfolio(ctx Context, asOf *Date) (Portfolio, error)
+## PostgresStore.GetPortfolio(ctx Context, date *Date) (Portfolio, error)
 
-1. Derive the reference date: asOf, or today in the store's market location.
+1. Derive the reference date: date, or today in the store's market location.
 2. Run valuationSQL for the reference date.
 3. Mark each holding unusable when it has no price row ("missing") or its price is PostgresStore.stalePriceDays or more older than the reference date ("stale").
 4. Select integrity errors via integritySQL for the reference date.

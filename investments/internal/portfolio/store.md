@@ -2,8 +2,8 @@
 
 ## Store
 
-1. GetPositions(ctx Context, asOf *Date) (PositionsResult, error)
-2. GetPortfolio(ctx Context, asOf *Date) (Portfolio, error)
+1. GetPositions(ctx Context, date *Date) (PositionsResult, error)
+2. GetPortfolio(ctx Context, date *Date) (Portfolio, error)
 
 The surface consumers depend on, so the tool handlers can be tested against a mockery mock. Implemented by PostgresStore.
 
