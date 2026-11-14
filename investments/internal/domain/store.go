@@ -27,4 +27,17 @@ type Store interface {
 	UpsertPrices(ctx context.Context, instrumentID int, bars []PriceBar) error
 	// LatestPriceDate returns the latest stored price date, nil when there is none.
 	LatestPriceDate(ctx context.Context, instrumentID int) (*Date, error)
+	// LatestSessionDate returns the latest price date across all instruments, nil when none.
+	LatestSessionDate(ctx context.Context) (*Date, error)
+	// WriteSnapshot writes the snapshot rows for one date and logs the outcome
+	// in one transaction. It does nothing for a completed date and writes no
+	// rows when an active instrument lacks a price dated on date. Returns
+	// ErrInvalidInput or ErrSnapshotExists.
+	WriteSnapshot(ctx context.Context, date Date) (SnapshotResult, error)
+	// RebuildSnapshots replaces the snapshots for every price date in the
+	// range, all or nothing, and logs the rebuild. Returns ErrInvalidInput or
+	// an IncompleteSnapshotError.
+	RebuildSnapshots(ctx context.Context, from, to Date, reason string) (RebuildResult, error)
+	// RecordUpdate appends one row to the updates log. Returns ErrInvalidInput.
+	RecordUpdate(ctx context.Context, update Update) error
 }

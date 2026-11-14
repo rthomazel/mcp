@@ -19,6 +19,11 @@ var (
 	ErrRateLimited = errors.New("provider rate limited")
 	// ErrNegativeBalance is matched through NegativeBalanceError.
 	ErrNegativeBalance = errors.New("transaction would make ownership negative")
+	// ErrSnapshotIncomplete is matched through IncompleteSnapshotError.
+	ErrSnapshotIncomplete = errors.New("snapshot incomplete")
+	// ErrSnapshotExists is returned when snapshot rows exist for a date that is
+	// not marked completed.
+	ErrSnapshotExists = errors.New("snapshot already exists")
 )
 
 // NegativeBalanceError reports the first ledger entry at which ownership goes negative.
