@@ -65,10 +65,11 @@ type fakeStore struct {
 	upsertErr   map[int]error
 	listErr     error
 	latestErr   error
+	sold        map[int]bool
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{prices: map[int]map[time.Time]domain.PriceBar{}, upsertErr: map[int]error{}}
+	return &fakeStore{prices: map[int]map[time.Time]domain.PriceBar{}, upsertErr: map[int]error{}, sold: map[int]bool{}}
 }
 
 func (s *fakeStore) add(symbol string, bars ...domain.PriceBar) domain.Instrument {
@@ -93,6 +94,25 @@ func (s *fakeStore) RegisterInstrument(_ context.Context, draft domain.Instrumen
 
 func (s *fakeStore) ListInstruments(context.Context) ([]domain.Instrument, error) {
 	return s.instruments, s.listErr
+}
+
+// GetPositions reports every instrument as held unless it is marked sold.
+func (s *fakeStore) GetPositions(context.Context, *domain.Date) (domain.PositionsResult, error) {
+	if s.listErr != nil {
+		return domain.PositionsResult{}, s.listErr
+	}
+
+	result := domain.PositionsResult{}
+
+	for _, instrument := range s.instruments {
+		if !s.sold[instrument.ID] {
+			result.Positions = append(result.Positions, domain.Position{
+				InstrumentID: instrument.ID, Symbol: instrument.Symbol, Exchange: instrument.Exchange, Quantity: "1",
+			})
+		}
+	}
+
+	return result, nil
 }
 
 func (s *fakeStore) UpsertPrices(_ context.Context, id int, bars []domain.PriceBar) error {
@@ -197,7 +217,7 @@ func TestRegisterInstrumentBackfillFailureKeepsInstrument(t *testing.T) {
 	delete(store.upsertErr, 1)
 	provider.calls = nil
 
-	result := refresher.RefreshInstrument(context.Background(), instrument)
+	result := refresher.RefreshInstrument(context.Background(), instrument, nil)
 	require.NoError(t, result.Err)
 	assert.Nil(t, result.From)
 	assert.Equal(t, 2, result.Bars)
@@ -213,7 +233,7 @@ func TestRefreshInstrumentStartsAtLatestStoredDateInclusive(t *testing.T) {
 
 	provider := &fakeProvider{history: map[string][]domain.PriceBar{"VOO": {bar(10), revised, bar(12), bar(13)}}}
 
-	result := NewRefresher(store, provider).RefreshInstrument(context.Background(), instrument)
+	result := NewRefresher(store, provider).RefreshInstrument(context.Background(), instrument, nil)
 	require.NoError(t, result.Err)
 
 	require.NotNil(t, result.From)
@@ -232,7 +252,7 @@ func TestRefreshInstrumentFailuresNameTheSymbol(t *testing.T) {
 		instrument := store.add("VOO")
 		store.latestErr = errors.New("db down")
 
-		result := NewRefresher(store, &fakeProvider{}).RefreshInstrument(ctx, instrument)
+		result := NewRefresher(store, &fakeProvider{}).RefreshInstrument(ctx, instrument, nil)
 		require.Error(t, result.Err)
 		assert.Contains(t, result.Err.Error(), "VOO")
 		assert.Zero(t, result.Bars)
@@ -243,7 +263,7 @@ func TestRefreshInstrumentFailuresNameTheSymbol(t *testing.T) {
 		instrument := store.add("VOO")
 		provider := &fakeProvider{errs: map[string]error{"VOO": domain.ErrRateLimited}}
 
-		result := NewRefresher(store, provider).RefreshInstrument(ctx, instrument)
+		result := NewRefresher(store, provider).RefreshInstrument(ctx, instrument, nil)
 		assert.ErrorIs(t, result.Err, domain.ErrRateLimited)
 		assert.Contains(t, result.Err.Error(), "VOO")
 	})
@@ -254,7 +274,7 @@ func TestRefreshInstrumentFailuresNameTheSymbol(t *testing.T) {
 		store.upsertErr[instrument.ID] = errors.New("disk full")
 		provider := &fakeProvider{history: map[string][]domain.PriceBar{"VOO": {bar(12)}}}
 
-		result := NewRefresher(store, provider).RefreshInstrument(ctx, instrument)
+		result := NewRefresher(store, provider).RefreshInstrument(ctx, instrument, nil)
 		require.Error(t, result.Err)
 		assert.Zero(t, result.Bars)
 	})
@@ -274,7 +294,7 @@ func TestRefreshAll(t *testing.T) {
 			errs:    map[string]error{"BBB": errors.New("boom")},
 		}
 
-		results, err := NewRefresher(store, provider).RefreshAll(ctx)
+		results, err := NewRefresher(store, provider).RefreshAll(ctx, nil)
 		require.NoError(t, err)
 		require.Len(t, results, 3)
 		assert.NoError(t, results[0].Err)
@@ -294,7 +314,7 @@ func TestRefreshAll(t *testing.T) {
 			errs:    map[string]error{"BBB": domain.ErrRateLimited},
 		}
 
-		results, err := NewRefresher(store, provider).RefreshAll(ctx)
+		results, err := NewRefresher(store, provider).RefreshAll(ctx, nil)
 		require.NoError(t, err)
 		require.Len(t, results, 3)
 		assert.NoError(t, results[0].Err)
@@ -308,7 +328,7 @@ func TestRefreshAll(t *testing.T) {
 		store := newFakeStore()
 		store.listErr = errors.New("db down")
 
-		results, err := NewRefresher(store, &fakeProvider{}).RefreshAll(ctx)
+		results, err := NewRefresher(store, &fakeProvider{}).RefreshAll(ctx, nil)
 		require.Error(t, err)
 		assert.Nil(t, results)
 	})
@@ -320,14 +340,53 @@ func TestRefreshAll(t *testing.T) {
 		cancelled, cancel := context.WithCancel(ctx)
 		cancel()
 
-		results, err := NewRefresher(store, &fakeProvider{}).RefreshAll(cancelled)
+		results, err := NewRefresher(store, &fakeProvider{}).RefreshAll(cancelled, nil)
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.Empty(t, results)
 	})
 
 	t.Run("no instruments", func(t *testing.T) {
-		results, err := NewRefresher(newFakeStore(), &fakeProvider{}).RefreshAll(ctx)
+		results, err := NewRefresher(newFakeStore(), &fakeProvider{}).RefreshAll(ctx, nil)
 		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
+}
+
+func TestRefreshAllSkipsSoldInstruments(t *testing.T) {
+	store := newFakeStore()
+	store.add("VTI", bar(2))
+	sold := store.add("BND", bar(2))
+	store.sold[sold.ID] = true
+	provider := &fakeProvider{history: map[string][]domain.PriceBar{"VTI": {bar(2)}, "BND": {bar(2)}}}
+
+	results, err := NewRefresher(store, provider).RefreshAll(context.Background(), nil)
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "VTI", results[0].Instrument.Symbol)
+	assert.Equal(t, []fetchCall{{"VTI", new(day(2))}}, provider.calls, "a sold instrument costs no provider request")
+}
+
+func TestRefreshInstrumentFromEarlierDateRefetchesHistory(t *testing.T) {
+	store := newFakeStore()
+	instrument := store.add("VTI", bar(2), bar(5))
+	provider := &fakeProvider{history: map[string][]domain.PriceBar{"VTI": {bar(1), bar(2), bar(3), bar(5), bar(6)}}}
+
+	result := NewRefresher(store, provider).RefreshInstrument(context.Background(), instrument, new(day(1)))
+
+	require.NoError(t, result.Err)
+	assert.Equal(t, day(1), *result.From)
+	assert.Equal(t, 5, result.Bars)
+	assert.Contains(t, store.prices[instrument.ID], day(3), "the gap is filled")
+}
+
+func TestRefreshInstrumentFromLaterDateNeverOpensAGap(t *testing.T) {
+	store := newFakeStore()
+	instrument := store.add("VTI", bar(2))
+	provider := &fakeProvider{history: map[string][]domain.PriceBar{"VTI": {bar(2), bar(3)}}}
+
+	result := NewRefresher(store, provider).RefreshInstrument(context.Background(), instrument, new(day(10)))
+
+	require.NoError(t, result.Err)
+	assert.Equal(t, day(2), *result.From, "the start is clamped to the latest stored date")
 }

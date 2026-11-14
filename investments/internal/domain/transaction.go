@@ -58,16 +58,15 @@ type RecordResult struct {
 // TransactionFilter selects ledger entries to list.
 type TransactionFilter struct {
 	InstrumentID *int
-	From         *Date // inclusive effective date
-	To           *Date // inclusive effective date
-	Limit        int   // zero means defaultListLimit, capped at maxListLimit
+	From         *Date     // inclusive effective date
+	To           *Date     // inclusive effective date
+	Limit        int       // zero means defaultListLimit, capped at maxListLimit
+	EventType    EventType // empty for any
 }
 
 // Validate checks the draft's event type, amounts, dates, notes and signs.
 func (d DraftTransaction) Validate() error {
-	switch d.EventType {
-	case EventBuy, EventSell, EventDividend, EventTax, EventSplit, EventAdjustment:
-	default:
+	if !d.EventType.valid() {
 		return fmt.Errorf("%w: unknown event type %q", ErrInvalidInput, d.EventType)
 	}
 
@@ -131,7 +130,25 @@ func validateSigns(event EventType, quantity, cash int) error {
 	return nil
 }
 
-// Normalize applies the default and the cap to the limit and checks the range.
+func (e EventType) valid() bool {
+	switch e {
+	case EventBuy, EventSell, EventDividend, EventTax, EventSplit, EventAdjustment:
+		return true
+	}
+
+	return false
+}
+
+// resolveLimit applies the default and the cap to a list limit.
+func resolveLimit(limit int) int {
+	if limit == 0 {
+		limit = defaultListLimit
+	}
+
+	return min(limit, maxListLimit)
+}
+
+// Normalize applies the default and the cap to the limit and checks the range and event type.
 func (f TransactionFilter) Normalize() (TransactionFilter, error) {
 	if f.Limit < 0 {
 		return f, fmt.Errorf("%w: limit must not be negative", ErrInvalidInput)
@@ -141,11 +158,11 @@ func (f TransactionFilter) Normalize() (TransactionFilter, error) {
 		return f, fmt.Errorf("%w: from is after to", ErrInvalidInput)
 	}
 
-	if f.Limit == 0 {
-		f.Limit = defaultListLimit
+	if f.EventType != "" && !f.EventType.valid() {
+		return f, fmt.Errorf("%w: unknown event type %q", ErrInvalidInput, f.EventType)
 	}
 
-	f.Limit = min(f.Limit, maxListLimit)
+	f.Limit = resolveLimit(f.Limit)
 
 	return f, nil
 }

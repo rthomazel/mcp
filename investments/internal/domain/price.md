@@ -46,6 +46,10 @@ Returns daily bars for symbol, oldest first with strictly ascending dates, from 
 2. Return nil.
 
 
+## PriceFilter.ResolvedLimit() int
+
+Return Limit with the default applied when zero and the cap applied.
+
 ## PriceBar.Validate() error
 
 1. if date is zero, return ErrInvalidInput.

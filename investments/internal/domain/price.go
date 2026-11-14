@@ -16,6 +16,38 @@ type PriceBar struct {
 	Volume        int64   // zero for mutual funds
 }
 
+// PriceFilter selects stored price records of one instrument.
+type PriceFilter struct {
+	InstrumentID int
+	From         *Date // inclusive
+	To           *Date // inclusive
+	Limit        int   // zero means defaultListLimit, capped at maxListLimit
+}
+
+// Validate checks the instrument, the limit and the range.
+func (f PriceFilter) Validate() error {
+	if f.InstrumentID <= 0 {
+		return fmt.Errorf("%w: instrument is required", ErrInvalidInput)
+	}
+
+	return validateListFilter(f.Limit, f.From, f.To)
+}
+
+// ResolvedLimit applies the default and the cap to Limit.
+func (f PriceFilter) ResolvedLimit() int { return resolveLimit(f.Limit) }
+
+func validateListFilter(limit int, from, to *Date) error {
+	if limit < 0 {
+		return fmt.Errorf("%w: limit must not be negative", ErrInvalidInput)
+	}
+
+	if from != nil && to != nil && from.After(*to) {
+		return fmt.Errorf("%w: from is after to", ErrInvalidInput)
+	}
+
+	return nil
+}
+
 // PriceProvider is the provider-independent boundary to market data.
 type PriceProvider interface {
 	// Name is a short stable provider name.

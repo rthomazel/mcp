@@ -66,6 +66,10 @@ Selects snapshot rows.
 2. Return nil.
 
 
+## SnapshotFilter.ResolvedLimit() int
+
+Return Limit with the default applied when zero and the cap applied.
+
 ## IncompleteSnapshotError.Error() string
 
 Return a message naming the date and the symbols with issues.

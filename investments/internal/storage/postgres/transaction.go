@@ -41,6 +41,7 @@ FROM transactions
 WHERE ($1::int IS NULL OR instrument_id = $1)
   AND ($2::date IS NULL OR effective_date >= $2)
   AND ($3::date IS NULL OR effective_date <= $3)
+  AND ($5::text IS NULL OR event_type = $5)
 ORDER BY effective_date DESC, executed_at DESC, id DESC
 LIMIT $4`
 )
@@ -144,7 +145,8 @@ func (s *Store) ListTransactions(ctx context.Context, filter domain.TransactionF
 		return nil, err
 	}
 
-	rows, err := s.db.QueryxContext(ctx, listTransactionsSQL, filter.InstrumentID, filter.From, filter.To, filter.Limit)
+	rows, err := s.db.QueryxContext(ctx, listTransactionsSQL, filter.InstrumentID, filter.From, filter.To, filter.Limit,
+		nullIfEmpty(string(filter.EventType)))
 	if err != nil {
 		return nil, fmt.Errorf("listing transactions: %w", err)
 	}

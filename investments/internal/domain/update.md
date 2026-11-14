@@ -50,3 +50,7 @@ Mirrors the updates table checks.
 
 1. if DataType or Status is set and not one of its constants, or Limit is negative, return ErrInvalidInput.
 2. Return nil.
+
+## UpdateFilter.ResolvedLimit() int
+
+Return Limit with the default applied when zero and the cap applied.

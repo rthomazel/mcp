@@ -30,6 +30,15 @@ ON CONFLICT (instrument_id, date) DO UPDATE SET
     volume = EXCLUDED.volume`
 
 	latestPriceDateSQL = `SELECT max(date) FROM prices WHERE instrument_id = $1`
+
+	listPricesSQL = `
+SELECT date, open::text, high::text, low::text, close::text, adjusted_close::text, volume
+FROM prices
+WHERE instrument_id = $1
+  AND ($2::date IS NULL OR date >= $2)
+  AND ($3::date IS NULL OR date <= $3)
+ORDER BY date DESC
+LIMIT $4`
 )
 
 type priceBarJSON struct {
@@ -115,4 +124,40 @@ func (s *Store) LatestPriceDate(ctx context.Context, instrumentID int) (*domain.
 	date := latest.Time
 
 	return &date, nil
+}
+
+// ListPrices returns the stored price records of one instrument, newest first.
+func (s *Store) ListPrices(ctx context.Context, filter domain.PriceFilter) ([]domain.PriceBar, error) {
+	if err := filter.Validate(); err != nil {
+		return nil, err
+	}
+
+	bars := []domain.PriceBar{}
+
+	rows, err := s.db.QueryxContext(ctx, listPricesSQL, filter.InstrumentID, filter.From, filter.To, filter.ResolvedLimit())
+	if err != nil {
+		slog.ErrorContext(ctx, "listing prices failed", "instrument_id", filter.InstrumentID, "err", err)
+
+		return nil, fmt.Errorf("listing prices: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var bar domain.PriceBar
+		if err := rows.Scan(&bar.Date, &bar.Open, &bar.High, &bar.Low, &bar.Close, &bar.AdjustedClose, &bar.Volume); err != nil {
+			slog.ErrorContext(ctx, "scanning price failed", "err", err)
+
+			return nil, fmt.Errorf("scanning price: %w", err)
+		}
+
+		bars = append(bars, bar)
+	}
+
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "listing prices failed", "instrument_id", filter.InstrumentID, "err", err)
+
+		return nil, fmt.Errorf("listing prices: %w", err)
+	}
+
+	return bars, nil
 }

@@ -40,7 +40,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 
 	started := j.clock()
 
-	results, err := j.refresher.RefreshAll(ctx)
+	results, err := j.refresher.RefreshAll(ctx, nil)
 	if err != nil && ctx.Err() != nil {
 		slog.ErrorContext(ctx, "daily run cancelled", "step", "refreshing prices", "err", err)
 

@@ -43,8 +43,19 @@ type fakeStore struct {
 	snapshotted []domain.Date
 }
 
-func (s *fakeStore) ListInstruments(context.Context) ([]domain.Instrument, error) {
-	return s.instruments, s.listErr
+func (s *fakeStore) GetPositions(context.Context, *domain.Date) (domain.PositionsResult, error) {
+	if s.listErr != nil {
+		return domain.PositionsResult{}, s.listErr
+	}
+
+	result := domain.PositionsResult{}
+	for _, instrument := range s.instruments {
+		result.Positions = append(result.Positions, domain.Position{
+			InstrumentID: instrument.ID, Symbol: instrument.Symbol, Quantity: "1",
+		})
+	}
+
+	return result, nil
 }
 
 func (s *fakeStore) LatestPriceDate(context.Context, int) (*domain.Date, error) { return nil, nil }

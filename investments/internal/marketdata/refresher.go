@@ -62,8 +62,10 @@ func (r *Refresher) RegisterInstrument(ctx context.Context, draft domain.Instrum
 
 // RefreshInstrument fetches from the latest stored date inclusive, since the
 // provider revises a day after first publishing it, or the full history when
-// the instrument has no prices.
-func (r *Refresher) RefreshInstrument(ctx context.Context, instrument domain.Instrument) RefreshResult {
+// the instrument has no prices. A from date earlier than that re-fetches older
+// history; the start is never later than the latest stored date, so no gap opens.
+// It ignores holdings: a caller can refresh any named instrument.
+func (r *Refresher) RefreshInstrument(ctx context.Context, instrument domain.Instrument, from *domain.Date) RefreshResult {
 	result := RefreshResult{Instrument: instrument}
 
 	fail := func(step string, err error) RefreshResult {
@@ -77,7 +79,12 @@ func (r *Refresher) RefreshInstrument(ctx context.Context, instrument domain.Ins
 		return fail("reading latest price date", err)
 	}
 
-	bars, err := r.provider.FetchPrices(ctx, instrument.Symbol, latest)
+	start := latest
+	if from != nil && latest != nil && from.Before(*latest) {
+		start = from
+	}
+
+	bars, err := r.provider.FetchPrices(ctx, instrument.Symbol, start)
 	if err != nil {
 		return fail("fetching prices", err)
 	}
@@ -86,19 +93,27 @@ func (r *Refresher) RefreshInstrument(ctx context.Context, instrument domain.Ins
 		return fail("storing prices", err)
 	}
 
-	result.From = latest
+	result.From = start
 	result.Bars = len(bars)
 
 	return result
 }
 
-// RefreshAll refreshes every instrument in order. Rate limiting stops the run
-// and marks the remaining instruments; any other failure is left in that
-// instrument's result and the run continues.
-func (r *Refresher) RefreshAll(ctx context.Context) ([]RefreshResult, error) {
-	instruments, err := r.store.ListInstruments(ctx)
+// RefreshAll refreshes every held instrument, those with a positive quantity,
+// in order. Rate limiting stops the run and marks the remaining instruments;
+// any other failure is left in that instrument's result and the run continues.
+// A sold instrument costs no provider request.
+func (r *Refresher) RefreshAll(ctx context.Context, from *domain.Date) ([]RefreshResult, error) {
+	positions, err := r.store.GetPositions(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("listing instruments: %w", err)
+		return nil, fmt.Errorf("reading held instruments: %w", err)
+	}
+
+	instruments := make([]domain.Instrument, 0, len(positions.Positions))
+	for _, position := range positions.Positions {
+		instruments = append(instruments, domain.Instrument{
+			ID: position.InstrumentID, Symbol: position.Symbol, Exchange: position.Exchange,
+		})
 	}
 
 	results := make([]RefreshResult, 0, len(instruments))
@@ -108,7 +123,7 @@ func (r *Refresher) RefreshAll(ctx context.Context) ([]RefreshResult, error) {
 			return results, err
 		}
 
-		result := r.RefreshInstrument(ctx, instrument)
+		result := r.RefreshInstrument(ctx, instrument, from)
 		results = append(results, result)
 
 		if errors.Is(result.Err, domain.ErrRateLimited) {

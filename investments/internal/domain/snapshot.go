@@ -24,6 +24,34 @@ type SnapshotResult struct {
 	Issues   []SnapshotIssue
 }
 
+// SnapshotRow is one stored snapshot row with its date's total and its share.
+type SnapshotRow struct {
+	Date           Date
+	InstrumentID   int
+	Symbol         string
+	Exchange       string
+	Quantity       Decimal
+	ClosePrice     Decimal
+	PriceDate      Date
+	MarketValueUSD Decimal
+	DateTotalUSD   Decimal // over every instrument snapshotted that date, whatever the filter
+	Allocation     Decimal // market value divided by the date total
+}
+
+// SnapshotFilter selects snapshot rows.
+type SnapshotFilter struct {
+	InstrumentID *int
+	From         *Date // inclusive
+	To           *Date // inclusive
+	Limit        int   // zero means defaultListLimit, capped at maxListLimit
+}
+
+// Validate checks the limit and the range.
+func (f SnapshotFilter) Validate() error { return validateListFilter(f.Limit, f.From, f.To) }
+
+// ResolvedLimit applies the default and the cap to Limit.
+func (f SnapshotFilter) ResolvedLimit() int { return resolveLimit(f.Limit) }
+
 // RebuildResult is the outcome of a snapshot rebuild.
 type RebuildResult struct {
 	From  Date

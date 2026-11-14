@@ -2,7 +2,7 @@
 
 Personal investment monitoring MCP server: instrument registry, transaction ledger, positions and securities valuation, backed by its own PostgreSQL database. Go.
 
-Specification and plan: [`spc/investments-mcp/`](./spc/investments-mcp/spec.md). Models sit next to the code they describe. No MCP tools are registered yet; stage 6 adds them.
+Specification and plan: [`spc/investments-mcp/`](./spc/investments-mcp/spec.md). Models sit next to the code they describe. The server exposes eleven MCP tools: `add_instrument`, `list_instruments`, `add_transaction`, `list_transactions`, `get_positions`, `get_portfolio`, `get_prices`, `refresh_prices`, `get_snapshots`, `rebuild_snapshots` and `list_updates`. Their descriptions, parameters and errors are in the models under `internal/handlers`.
 
 ## Develop
 

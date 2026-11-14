@@ -245,6 +245,21 @@ func TestListTransactions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, limited, 2)
 
+	_, err = record(t, store, voo.ID, domain.EventDividend, "0", "5", date(2026, 2, 6))
+	require.NoError(t, err)
+
+	dividends, err := store.ListTransactions(ctx, domain.TransactionFilter{EventType: domain.EventDividend})
+	require.NoError(t, err)
+	require.Len(t, dividends, 1)
+	assert.Equal(t, domain.EventDividend, dividends[0].EventType)
+
+	buysOfQQQ, err := store.ListTransactions(ctx, domain.TransactionFilter{InstrumentID: &qqq.ID, EventType: domain.EventBuy})
+	require.NoError(t, err)
+	assert.Len(t, buysOfQQQ, 1)
+
+	_, err = store.ListTransactions(ctx, domain.TransactionFilter{EventType: "GIFT"})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+
 	_, err = store.ListTransactions(ctx, domain.TransactionFilter{Limit: -1})
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 
