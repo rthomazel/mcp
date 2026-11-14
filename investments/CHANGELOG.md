@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## [0.1.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.1.0) feat: first release
 
 ### ci
 
