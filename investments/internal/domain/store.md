@@ -10,10 +10,14 @@
 6. GetPortfolio(ctx Context, date *Date) (Portfolio, error)
 7. UpsertPrices(ctx Context, instrumentID int, bars []PriceBar) error
 8. LatestPriceDate(ctx Context, instrumentID int) (*Date, error)
+9. LatestSessionDate(ctx Context) (*Date, error)
+10. WriteSnapshot(ctx Context, date Date) (SnapshotResult, error)
+11. RebuildSnapshots(ctx Context, from Date, to Date, reason string) (RebuildResult, error)
+12. RecordUpdate(ctx Context, update Update) error
 
 The one central persistence interface. Every consumer depends on it, and tests mock it with mockery. Implemented by internal/storage/postgres.
 Each method is a self-contained unit of work in its own transaction; composing several Store calls into one transaction is not supported.
-Later stages add price reading, snapshot, rebuild and update-log methods here.
+Later stages add price and snapshot reading here.
 
 ### RegisterInstrument(ctx Context, draft Instrument) (Instrument, error)
 
@@ -46,3 +50,19 @@ Inserts the bars for an instrument, replacing the stored record for any date tha
 ### LatestPriceDate(ctx Context, instrumentID int) (*Date, error)
 
 Returns the most recent stored price date for the instrument, or nil when it has no prices.
+
+### LatestSessionDate(ctx Context) (*Date, error)
+
+Returns the most recent price date across all instruments, or nil when no prices exist. It is the date the daily job snapshots.
+
+### WriteSnapshot(ctx Context, date Date) (SnapshotResult, error)
+
+Writes the snapshot rows for one date and records the outcome in the updates log, all in one transaction. Does nothing when the date is already completed. Writes no rows and records an incomplete run when an active instrument lacks a price dated exactly on date. Returns ErrInvalidInput for a date after today in the market timezone, and ErrSnapshotExists when unmarked rows exist for the date.
+
+### RebuildSnapshots(ctx Context, from Date, to Date, reason string) (RebuildResult, error)
+
+Replaces the snapshots for every price date in the range from the current ledger and prices, all or nothing, and records the rebuild with its reason and range. Returns ErrInvalidInput for an empty reason, an inverted range or a date after today, and an IncompleteSnapshotError when any date cannot be valued, in which case nothing changes and a failed rebuild is still logged.
+
+### RecordUpdate(ctx Context, update Update) error
+
+Appends one row to the updates log. Returns ErrInvalidInput for an invalid update.

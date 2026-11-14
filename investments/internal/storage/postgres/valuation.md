@@ -27,5 +27,5 @@ A stale or missing price is never replaced with an older or zero price, matching
 Valuation always uses close, never adjusted close.
 Cash is excluded: only quantity times price counts.
 The value, total and allocation arithmetic is done in SQL; Go only decides what to expose. Allocations are exact to NUMERIC division precision and sum to one within that rounding.
-Stage 5 reuses valuationSQL with the snapshot date as the reference date and requires the price date to equal it.
+valuedHoldings takes the query handle, so snapshots run it inside their transaction, and a snapshot treats any holding whose price date differs from the reference date as an issue.
 The stale price threshold is Store.stalePriceDays, set from the configuration when the store is opened.

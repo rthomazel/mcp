@@ -330,12 +330,6 @@ least once before the system is relied on. Staging and rollout order are in the 
   verified.
 - Swapping the market data provider requires no change to stored data or agent contracts.
 
-## Open questions
-
-1. **Daily schedule.** Set in the snapshot stage from the provider's publishing
-   times: US equities about 5:30 PM Eastern with corrections possible until 8 PM,
-   mutual funds after midnight Eastern.
-
 ## Resolved
 
 - Provider is Tiingo, selected through the market data spike. Reachability from the VPS was verified by the operator.
@@ -349,6 +343,9 @@ least once before the system is relied on. Staging and rollout order are in the 
 - Unexpectedly old means five or more days.
 - LiteLLM is the gateway and exposes the server to LibreChat.
 - The daily job is a routine inside the server process.
+- Daily schedule: the job runs at 8:30 PM and again at 6:00 AM Eastern, in the market timezone so daylight saving is followed. The evening run follows the US equity close, publication and corrections window; the morning run picks up mutual funds, which publish after midnight, so a date left incomplete in the evening completes the next morning.
+- The daily job snapshots only the latest date that has price data. A date missed while the server was down is not back-filled automatically; the agent fills it with a rebuild. A rebuilt date counts as completed.
+- A snapshot requires every active instrument to have a price dated exactly on the snapshot date.
 
 ## Refs
 
