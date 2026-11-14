@@ -189,13 +189,13 @@ never created. Otherwise the instrument is registered and the history stored. If
 storing the history fails, the instrument stays registered with no prices, and the
 next refresh fetches its full history, so the gap heals without intervention.
 
-Price refresh. A refresh fetches, for each instrument, everything from the latest
+Price refresh. A refresh covers the instruments with a positive quantity; a sold instrument is no longer refreshed, which saves provider requests, and its prices stop where they were. A refresh fetches, for each of them, everything from the latest
 stored date onward, inclusive, and inserts or updates the records. The latest stored
 day is fetched again because the provider revises a day's figures after first
 publishing it. A refresh never reaches further back than the latest stored date;
 correcting older prices is a deliberate, separate action. When the provider throttles
 requests, the refresh stops, reports which instruments were not refreshed, and
-can be run again later. One instrument failing does not stop the others.
+can be run again later. One instrument failing does not stop the others. An instrument that becomes held again, or is bought for the first time, catches up from its latest stored date through today, and recording the buy that opens the position triggers that catch-up immediately instead of waiting for the next daily run.
 
 ### Daily ingestion and snapshots
 

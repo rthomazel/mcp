@@ -72,17 +72,18 @@ By default a refresh does not reach back past the latest stored date. A caller p
 
 ## Refresher.RefreshAll(ctx Context, from *domain.Date) ([]RefreshResult, error)
 
-1. List the instruments through store.ListInstruments.
+1. Read the held instruments through store.GetPositions with no date, one instrument per position carrying its id, symbol and exchange, ordered as returned.
 2. For each instrument in order, run RefreshInstrument with from and collect its result.
 3. Return the results and nil.
 
 #### Errors
 
-- **1.** if listing fails, return nil and the wrapped error.
+- **1.** if reading the positions fails, return nil and the wrapped error.
 
 ---
 
 - **2.** if a result's error is domain.ErrRateLimited, stop and add a result with that error for every remaining instrument, so the caller sees which were not refreshed.
 - **2.1.** if ctx is cancelled, stop and return the results so far with the context error.
 
+Only instruments with a positive quantity are refreshed; a sold instrument costs no provider request and its prices stop where they were. RefreshInstrument itself ignores holdings, so a caller can still refresh any named instrument. An instrument that becomes held again catches up on the next refresh, because that fetches from its latest stored date through today.
 One instrument failing for any other reason does not stop the others; the caller inspects each result. Recording the outcome in the updates log belongs to the snapshot stage.

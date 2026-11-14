@@ -28,11 +28,11 @@ Description shown to the agent: Read stored daily prices for one instrument, new
 
 Tool refresh_prices. Fetches prices from the provider now, from each instrument's latest stored date inclusive, or from an earlier date to correct history.
 
-Description shown to the agent: Fetch new daily prices from the provider now, for one instrument or all of them, starting at each instrument's latest stored date inclusive so revised days are corrected, or at an earlier from date to re-fetch older history. Returns one result per instrument with symbol, exchange, bars stored and an error, empty on success; one instrument failing does not stop the others. When the provider rate limits, the run stops and the remaining instruments are reported as not refreshed; run it again later. The provider allows few requests per hour, so do not repeat it needlessly. Pass from only to correct older prices; the default refresh already covers the latest day. Writes no snapshot, and snapshots already stored are not recalculated when older prices change: follow a correction with rebuild_snapshots from that date.
+Description shown to the agent: Fetch new daily prices from the provider now, for one named instrument or for every held instrument (positive quantity; sold ones are skipped), starting at each instrument's latest stored date inclusive so revised days are corrected, or at an earlier from date to re-fetch older history. Returns one result per instrument with symbol, exchange, bars stored and an error, empty on success; one instrument failing does not stop the others. When the provider rate limits, the run stops and the remaining instruments are reported as not refreshed; run it again later. The provider allows few requests per hour, so do not repeat it needlessly. Pass from only to correct older prices; the default refresh already covers the latest day. Writes no snapshot, and snapshots already stored are not recalculated when older prices change: follow a correction with rebuild_snapshots from that date.
 
 - exchange string, optional when the symbol is unique
 - from string, optional YYYY-MM-DD; re-fetch history from this date, replacing the stored prices from it onward, instead of only the latest day
-- symbol string, optional; every instrument is refreshed when absent
+- symbol string, optional; every held instrument is refreshed when absent, and a named instrument is refreshed even when it is not held
 
 1. Parse from and derive a long-timeout context.
 2. if symbol is given, resolve the instrument and run refresher.RefreshInstrument for it with from.
