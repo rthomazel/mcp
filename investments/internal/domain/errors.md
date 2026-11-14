@@ -10,6 +10,14 @@ Wrapped with the specific reason for any validation failure, so callers match wi
 
 Returned when the symbol and exchange pair already exists.
 
+## ErrSymbolNotFound = "symbol not found"
+
+Returned by a PriceProvider that does not cover a symbol.
+
+## ErrRateLimited = "provider rate limited"
+
+Returned by a PriceProvider that throttles a request. Callers stop and retry later.
+
 ## ErrNegativeBalance = "transaction would make ownership negative"
 
 Matched through NegativeBalanceError.
