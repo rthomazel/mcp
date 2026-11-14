@@ -4,6 +4,8 @@
 
 Tool record_transaction. Appends one ledger entry. There is no tool to change or delete one.
 
+Description shown to the agent: Records one ledger entry for a registered instrument: a buy, sell, dividend, tax, split or adjustment. Quantities and cash are signed per event type: BUY has positive quantity and negative cash, SELL negative quantity and positive cash, DIVIDEND positive cash only, TAX negative cash only, SPLIT a nonzero quantity with no cash, ADJUSTMENT a nonzero quantity with optional cash. Entries cannot be edited or deleted. Holdings are long-only. When the entry changes history that snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots. Errors returned: invalid input (unknown event type, wrong signs for the event type, malformed decimal, date or timestamp, notes too long); instrument not found; ambiguous symbol (give the exchange); transaction would make ownership negative, naming the instrument, date and running quantity, in which case nothing is written; timed out.
+
 - cash_amount string, optional decimal, signed per the event type, zero when absent
 - effective_date string, required YYYY-MM-DD, the date the event economically applies to; after-hours events carry the next session's date
 - event_type string, required, one of BUY, SELL, DIVIDEND, TAX, SPLIT, ADJUSTMENT
@@ -35,6 +37,8 @@ Recording never rebuilds snapshots; telling the agent when a rebuild is needed i
 ## Handler.HandleListTransactions(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
 Tool list_transactions. Lists ledger entries, newest first by ledger order.
+
+Description shown to the agent: Lists ledger entries newest first by ledger order, optionally for one instrument and an effective date range. Errors returned: invalid input (malformed date, negative limit, from after to); instrument not found; ambiguous symbol (give the exchange); timed out.
 
 - exchange string, optional
 - from string, optional YYYY-MM-DD, inclusive effective date

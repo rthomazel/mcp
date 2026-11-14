@@ -21,7 +21,7 @@ Build a Handler.
 
 ## Handler.Register(server *MCPServer)
 
-Add the ten tools to server, each with its description, parameters and hints, bound to its handler method. Read tools carry the read-only hint; rebuild_snapshots carries the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
+Add the ten tools to server, each with the description, parameters and hints its model gives, bound to its handler method. A description says what the tool does, when to use it and every error it can return, since the agent sees nothing else. Every parameter carries a short description taken from its line in the model, including its format and default. Read tools carry the read-only hint; rebuild_snapshots carries the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
 
 ## Handler.resolveInstrument(ctx Context, symbol string, exchange string) (domain.Instrument, error)
 

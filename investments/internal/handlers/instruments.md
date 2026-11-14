@@ -4,6 +4,8 @@
 
 Tool register_instrument. Registers a USD-quoted instrument and backfills its full price history.
 
+Description shown to the agent: Registers a USD-quoted stock, ETF or fund by symbol and exchange, then downloads its full daily price history from the market data provider. Registration is rejected, with nothing created, when the symbol is not covered by the provider. Use it before recording transactions for a new holding. Errors returned: invalid input (missing parameter, unknown instrument type, currency other than USD, or a symbol the provider does not cover); instrument already registered (the symbol and exchange pair exists); provider rate limited (retry later); instrument registered but price backfill failed (call refresh_prices to retry); timed out.
+
 - currency string, optional, default "USD"; any other value is rejected
 - exchange string, required, listing exchange such as NYSE
 - instrument_type string, required, one of STOCK, ETF, FUND, OTHER
@@ -23,6 +25,8 @@ Tool register_instrument. Registers a USD-quoted instrument and backfills its fu
 ## Handler.HandleListInstruments(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
 Tool list_instruments. No parameters. Returns every instrument ordered by symbol, then exchange.
+
+Description shown to the agent: Lists every registered instrument with its symbol, exchange, name, type and currency, ordered by symbol. Call it to learn which symbols exist and whether a symbol needs an exchange to be unambiguous. Errors returned: internal error only.
 
 #### Errors
 
