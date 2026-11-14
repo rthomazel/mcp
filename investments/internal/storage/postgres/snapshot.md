@@ -98,3 +98,5 @@ Quantities and prices pass through as decimal text; the market value column is g
 - **6.** roll back so the deleted rows return, log the date and issues at error level, then record a failed snapshot_rebuild update with the range, reason and the error message in a separate statement, and return the IncompleteSnapshotError.
 
 Dates come from the price table, not from a calendar, matching the rule that a snapshot exists only when price data exists. The range may be the whole history, so the transaction can be long; accepted for a personal portfolio. Concurrent daily writes wait on the advisory lock.
+
+Every unexpected failure in these methods (query, statement, transaction, lock, marshalling) is logged at error level with the operation name and the dates involved before the wrapped error is returned. Validation failures and the sentinel errors that are not listed above as logged are the caller's mistakes, not faults, and are not logged.

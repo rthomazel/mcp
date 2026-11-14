@@ -28,7 +28,7 @@ Build a Job using the real clock.
 3. Record a prices update: completed when every instrument succeeded, incomplete otherwise, with the stored bar count, the provider name and the symbols that failed in the error message.
 4. Read the latest session date through store.LatestSessionDate; if none, return the report without a snapshot.
 5. Write the snapshot for that date through store.WriteSnapshot.
-6. Log each step at info level: instruments refreshed and failed with the failed symbols, the prices update status, the snapshot date and its outcome (written with row count, skipped, or incomplete with the instruments and issues). Log failures at error level and a rate limit at warn level.
+6. Log each step at info level: instruments refreshed and failed with the failed symbols, the prices update status, the snapshot date and its outcome (written with row count, skipped, or incomplete with the instruments and issues). Log every failure of steps 2 to 5 at error level, naming the step, and a rate limit at warn level.
 7. Return the report.
 
 #### Errors
