@@ -31,3 +31,4 @@ Built from the calendar date and wall clock in location, so daylight saving chan
 4. Repeat from step 1.
 
 A failed run never stops the loop; the next slot retries. There is no run at startup: a restart does not spend provider requests, and the next slot is at most about fourteen hours away. The job is the only caller, so runs do not overlap; the store lock also guards against an agent rebuild running at the same time.
+The host timezone never matters: run times and today's date come only from the market location, never from the local zone, so a host set to another zone such as Brasilia time behaves identically. A test runs nextRun with the process zone set to a different zone to pin this.
