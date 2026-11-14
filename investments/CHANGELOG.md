@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### ci
+
+- **(release)** pushing a tag `investments/vX.Y.Z` builds and publishes `ghcr.io/rthomazel/mcp/investments:X.Y.Z` and `:latest` for linux/amd64 and linux/arm64.
+
 ### feat
 
 - **(mcp)** eleven agent tools: add and list instruments, add and list transactions, positions, portfolio valuation, stored prices, price refresh, snapshots, snapshot rebuild and the updates log (stage 6). The refresh and the daily job now cover only held instruments, and opening a position fetches its prices right away.
