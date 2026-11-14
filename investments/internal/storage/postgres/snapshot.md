@@ -43,7 +43,7 @@ insertUpdateSQL = insert an updates row from every Update field.
 4. Value the date with valuedHoldings through the transaction.
 5. Mark as an issue every holding whose price date is not date: "missing" without a price, "stale" with an older one.
 6. if there are no issues, check snapshotRowsExistSQL, insert one row per holding via insertSnapshotSQL, and record a completed snapshots update with the row count.
-7. otherwise record an incomplete snapshots update whose error message names the symbols and their issues, writing no rows.
+7. otherwise log the date and each instrument's issue at warn level, and record an incomplete snapshots update whose error message names the symbols and their issues, writing no rows.
 8. Return the result.
 
 #### Errors
@@ -60,7 +60,7 @@ insertUpdateSQL = insert an updates row from every Update field.
 
 ---
 
-- **6.** if rows already exist, return ErrSnapshotExists and write nothing.
+- **6.** if rows already exist, log the date at error level, return ErrSnapshotExists and write nothing.
 - **6.1.** if an insert fails, return the wrapped error and roll back.
 
 The update row and the snapshot rows commit together, so the marker never disagrees with the rows. An incomplete update is committed as well, the transaction ending without error. Reusing valuedHoldings keeps one definition of the valuation; the strict date test is what separates a snapshot from the tolerant live portfolio. A date with no active positions writes no rows and is recorded complete.
@@ -75,7 +75,7 @@ Quantities and prices pass through as decimal text; the market value column is g
 5. For each date in order, value it as in WriteSnapshot steps 4 and 5; if no issues, insert its rows.
 6. if any date has issues, abort with an IncompleteSnapshotError for the first such date.
 7. Record a completed snapshot_rebuild update with the range, reason and row count, then commit.
-8. Return the result.
+8. Log the completed rebuild at info level with the range, reason, dates and rows, then return the result.
 
 #### Errors
 
@@ -95,6 +95,6 @@ Quantities and prices pass through as decimal text; the market value column is g
 
 ---
 
-- **6.** roll back so the deleted rows return, then record a failed snapshot_rebuild update with the range, reason and the error message in a separate statement, and return the IncompleteSnapshotError.
+- **6.** roll back so the deleted rows return, log the date and issues at error level, then record a failed snapshot_rebuild update with the range, reason and the error message in a separate statement, and return the IncompleteSnapshotError.
 
 Dates come from the price table, not from a calendar, matching the rule that a snapshot exists only when price data exists. The range may be the whole history, so the transaction can be long; accepted for a personal portfolio. Concurrent daily writes wait on the advisory lock.
