@@ -5,5 +5,10 @@ if [ "$INVESTMENTS_MCP_TRANSPORT" = "stdio" ]; then
     exec investments-mcp "$@"
 else
     echo "INFO: starting investments-mcp with mcp-proxy (native MCP/SSE)" >&2
-    exec mcp-proxy --pass-environment --host 0.0.0.0 --port 8001 -- investments-mcp "$@"
+    # mcp-proxy 0.15+ rejects Host headers it does not know (DNS rebinding protection), so
+    # the compose service name must be allowed or peers like LiteLLM get "Invalid Host header".
+    exec mcp-proxy --pass-environment --host 0.0.0.0 --port 8001 \
+        --allowed-host "${INVESTMENTS_MCP_ALLOWED_HOST:-mcpinvestments}" \
+        --allowed-host "${INVESTMENTS_MCP_ALLOWED_HOST:-mcpinvestments}:*" \
+        -- investments-mcp "$@"
 fi
