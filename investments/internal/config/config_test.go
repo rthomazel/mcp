@@ -11,6 +11,7 @@ import (
 func TestLoad(t *testing.T) {
 	t.Run("defaults", func(t *testing.T) {
 		t.Setenv("INVESTMENTS_MCP_DSN", "postgres://x")
+		t.Setenv("INVESTMENTS_MCP_TIINGO_API_KEY", "key")
 		t.Setenv("INVESTMENTS_MCP_QUERY_TIMEOUT", "")
 		t.Setenv("INVESTMENTS_MCP_STALE_PRICE_DAYS", "")
 
@@ -19,10 +20,12 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, "postgres://x", cfg.DSN)
 		assert.Equal(t, 30*time.Second, cfg.QueryTimeout)
 		assert.Equal(t, 5, cfg.StalePriceDays)
+		assert.Equal(t, "key", cfg.TiingoAPIKey)
 	})
 
 	t.Run("overrides", func(t *testing.T) {
 		t.Setenv("INVESTMENTS_MCP_DSN", "postgres://x")
+		t.Setenv("INVESTMENTS_MCP_TIINGO_API_KEY", "key")
 		t.Setenv("INVESTMENTS_MCP_QUERY_TIMEOUT", "5s")
 		t.Setenv("INVESTMENTS_MCP_STALE_PRICE_DAYS", "3")
 
@@ -34,6 +37,7 @@ func TestLoad(t *testing.T) {
 
 	for name, env := range map[string]map[string]string{
 		"missing dsn":      {"INVESTMENTS_MCP_DSN": ""},
+		"missing api key":  {"INVESTMENTS_MCP_TIINGO_API_KEY": ""},
 		"bad timeout":      {"INVESTMENTS_MCP_QUERY_TIMEOUT": "soon"},
 		"zero timeout":     {"INVESTMENTS_MCP_QUERY_TIMEOUT": "0s"},
 		"negative timeout": {"INVESTMENTS_MCP_QUERY_TIMEOUT": "-1s"},
@@ -42,6 +46,7 @@ func TestLoad(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Setenv("INVESTMENTS_MCP_DSN", "postgres://x")
+			t.Setenv("INVESTMENTS_MCP_TIINGO_API_KEY", "key")
 			t.Setenv("INVESTMENTS_MCP_QUERY_TIMEOUT", "")
 			t.Setenv("INVESTMENTS_MCP_STALE_PRICE_DAYS", "")
 

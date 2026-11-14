@@ -21,8 +21,9 @@ const (
 	pingBackoff    = 10 * time.Second
 	marketTimezone = "America/New_York"
 
-	postgresUniqueViolation = "23505"
-	postgresCheckViolation  = "23514"
+	postgresUniqueViolation     = "23505"
+	postgresForeignKeyViolation = "23503"
+	postgresCheckViolation      = "23514"
 )
 
 var _ domain.Store = (*Store)(nil)
@@ -77,6 +78,10 @@ func (s *Store) DB() *sql.DB {
 
 func isUniqueViolation(err error) bool {
 	return hasSQLState(err, postgresUniqueViolation)
+}
+
+func isForeignKeyViolation(err error) bool {
+	return hasSQLState(err, postgresForeignKeyViolation)
 }
 
 func isCheckViolation(err error) bool {

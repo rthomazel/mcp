@@ -21,4 +21,10 @@ type Store interface {
 	// GetPortfolio values active positions at real closes as of date, or today
 	// in the market timezone when nil.
 	GetPortfolio(ctx context.Context, date *Date) (Portfolio, error)
+	// UpsertPrices stores the bars for an instrument, replacing the record of
+	// any date already stored. All bars are stored or none. Returns
+	// ErrInvalidInput or ErrInstrumentNotFound.
+	UpsertPrices(ctx context.Context, instrumentID int, bars []PriceBar) error
+	// LatestPriceDate returns the latest stored price date, nil when there is none.
+	LatestPriceDate(ctx context.Context, instrumentID int) (*Date, error)
 }
