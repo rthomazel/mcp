@@ -7,7 +7,7 @@
 3. Exchange string
 4. Quantity Decimal
 5. ClosePrice *Decimal, nil when no usable price
-6. PriceDate *Date
+6. PriceDate *Date, set whenever a price row exists, so a stale price shows its age
 7. MarketValueUSD *Decimal, nil when no usable price
 8. Allocation *Decimal, nil when the portfolio is incomplete
 9. PriceIssue string, empty when usable, otherwise "missing" or "stale"

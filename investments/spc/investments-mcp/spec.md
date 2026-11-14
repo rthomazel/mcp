@@ -12,7 +12,8 @@ agents: claude
 ## Status
 
 Draft v1, design agreed with Thom in a prior session, restructured to SDD format.
-Not yet modelled or implemented. Remaining open questions are at the end.
+Plan stages 1 to 3 (foundations, ledger, positions and valuation) are modelled and implemented;
+the later stages are not. Remaining open questions are at the end.
 
 ## Intent
 

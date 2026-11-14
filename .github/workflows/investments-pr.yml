@@ -1,0 +1,63 @@
+name: investments pr
+run-name: ${{ github.head_ref }}@${{ github.sha }}
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'investments/**'
+      - '.github/workflows/investments-pr.yml'
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.27"
+
+      - run: cd investments && go build -o bin/investments-mcp ./cmd/investments
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      INVESTMENTS_MCP_TEST_DSN: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.27"
+
+      - run: cd investments && go test -race ./...
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.27"
+
+      - uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.15
+          working-directory: investments
