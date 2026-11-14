@@ -189,13 +189,13 @@ never created. Otherwise the instrument is registered and the history stored. If
 storing the history fails, the instrument stays registered with no prices, and the
 next refresh fetches its full history, so the gap heals without intervention.
 
-Price refresh. A refresh fetches, for each instrument, everything from the latest
+Price refresh. A refresh covers the instruments with a positive quantity; a sold instrument is no longer refreshed, which saves provider requests, and its prices stop where they were. A refresh fetches, for each of them, everything from the latest
 stored date onward, inclusive, and inserts or updates the records. The latest stored
 day is fetched again because the provider revises a day's figures after first
 publishing it. A refresh never reaches further back than the latest stored date;
 correcting older prices is a deliberate, separate action. When the provider throttles
 requests, the refresh stops, reports which instruments were not refreshed, and
-can be run again later. One instrument failing does not stop the others.
+can be run again later. One instrument failing does not stop the others. An instrument that becomes held again, or is bought for the first time, catches up from its latest stored date through today, and recording the buy that opens the position triggers that catch-up immediately instead of waiting for the next daily run.
 
 ### Daily ingestion and snapshots
 
@@ -242,7 +242,7 @@ provider can safely serve the day's data. No exchange-specific scheduler exists.
 Through MCP the agent can: register an instrument; list instruments; list ledger
 events; record transactions of any supported type; reconstruct current or historical
 positions; read current securities valuation and allocation; read historical prices;
-read historical snapshots; trigger a market data refresh; and rebuild snapshots
+read historical snapshots; read the updates log; trigger a market data refresh; and rebuild snapshots
 over a date range with a stated reason. Registering an instrument rejects any that
 is not USD-quoted. Transaction deletion is not an agent capability. Exact tool
 contracts are defined in the models.
@@ -345,6 +345,9 @@ least once before the system is relied on. Staging and rollout order are in the 
 - The daily job is a routine inside the server process.
 - Daily schedule: the job runs at 8:30 PM and again at 6:00 AM Eastern, in the market timezone so daylight saving is followed. The evening run follows the US equity close, publication and corrections window; the morning run picks up mutual funds, which publish after midnight, so a date left incomplete in the evening completes the next morning.
 - The daily job snapshots only the latest date that has price data. A date missed while the server was down is not back-filled automatically; the agent fills it with a rebuild. A rebuilt date counts as completed.
+- Agents refer to instruments by symbol, with the exchange only when the symbol alone is ambiguous; internal ids are never exposed.
+- Tool results are JSON with decimals as exact strings. Recording a transaction never rebuilds snapshots; when it makes snapshots stale, the result names the date to rebuild from.
+- The agent can read the updates log, to check freshness and why a day has no snapshot.
 - A snapshot requires every active instrument to have a price dated exactly on the snapshot date.
 
 ## Refs

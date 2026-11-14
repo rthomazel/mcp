@@ -4,7 +4,7 @@ lockInstrumentSQL = select the instrument id with FOR UPDATE.
 insertTransactionSQL = insert a transactions row returning the full row.
 firstNegativeSQL = for one instrument, order its ledger by effective date, execution time, id; compute the running sum of quantity_change; return the first row whose running sum is below zero, with its effective date and running sum.
 latestSnapshotDateSQL = select the maximum date in snapshots, null if none.
-listTransactionsSQL = select transactions matching the optional filters, newest first by ledger order, limited.
+listTransactionsSQL = select transactions matching the optional instrument, date range and event type filters, newest first by ledger order, limited.
 
 # Functions
 

@@ -8,6 +8,8 @@ insertSnapshotSQL = insert a snapshots row (date, instrument_id, quantity, close
 deleteSnapshotRangeSQL = delete the snapshots rows with date between $1 and $2.
 priceDatesSQL = select the distinct prices dates between $1 and $2, ascending.
 latestSessionDateSQL = select the maximum date from prices, null if none.
+listSnapshotsSQL = select snapshot rows joined to instruments between the optional bounds and instrument, with each date's total from a sum over all rows of that date and the row's market value divided by it, ordered by date descending, symbol, exchange, limited.
+listUpdatesSQL = select every updates column with the optional data type and status filters, ordered by started_at descending then id descending, limited.
 insertUpdateSQL = insert an updates row from every Update field.
 
 # Functions
@@ -98,5 +100,37 @@ Quantities and prices pass through as decimal text; the market value column is g
 - **6.** roll back so the deleted rows return, log the date and issues at error level, then record a failed snapshot_rebuild update with the range, reason and the error message in a separate statement, and return the IncompleteSnapshotError.
 
 Dates come from the price table, not from a calendar, matching the rule that a snapshot exists only when price data exists. The range may be the whole history, so the transaction can be long; accepted for a personal portfolio. Concurrent daily writes wait on the advisory lock.
+
+## Store.ListSnapshots(ctx Context, filter domain.SnapshotFilter) ([]domain.SnapshotRow, error)
+
+1. Validate filter and resolve the limit.
+2. Select via listSnapshotsSQL.
+3. Return the rows, empty when none.
+
+#### Errors
+
+- **1.** if invalid, return the domain.ErrInvalidInput error.
+
+---
+
+- **2.** return the wrapped error.
+
+The total is computed before the instrument filter applies, so a filtered row still shows its share of the whole portfolio.
+
+## Store.ListUpdates(ctx Context, filter domain.UpdateFilter) ([]domain.Update, error)
+
+1. Validate filter and resolve the limit.
+2. Select via listUpdatesSQL.
+3. Return the rows, empty when none.
+
+#### Errors
+
+- **1.** if invalid, return the domain.ErrInvalidInput error.
+
+---
+
+- **2.** return the wrapped error.
+
+A null error message, reason, provider or date becomes the empty value or nil.
 
 Every unexpected failure in these methods (query, statement, transaction, lock, marshalling) is logged at error level with the operation name and the dates involved before the wrapped error is returned. Validation failures and the sentinel errors that are not listed above as logged are the caller's mistakes, not faults, and are not logged.

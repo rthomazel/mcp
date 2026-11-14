@@ -52,6 +52,7 @@ Effective date is supplied by the caller. There is no market calendar, so an eve
 2. From *Date, inclusive effective date
 3. To *Date, inclusive effective date
 4. Limit int, zero means defaultListLimit, capped at maxListLimit
+5. EventType EventType, empty for any
 
 # Functions
 
@@ -82,3 +83,4 @@ These rules mirror the transactions CHECK constraint in the initial migration.
 
 - **1.** if the limit is negative, return ErrInvalidInput.
 - **1.1.** if From is after To, return ErrInvalidInput.
+- **1.2.** if EventType is set and not one of the Event constants, return ErrInvalidInput.

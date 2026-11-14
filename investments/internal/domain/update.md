@@ -13,18 +13,27 @@ The running status exists in the schema but is not used: an outcome is recorded 
 
 ## Update
 
-1. Provider *string, nil for runs that call no provider
-2. DataType string, one of the UpdateData constants
-3. StartedAt Time
-4. CompletedAt Time
-5. Status string, one of the UpdateStatus constants
-6. RecordsUpdated int
-7. ErrorMessage string, empty when none
-8. DateFrom *Date
-9. DateTo *Date
-10. Reason string, empty except for rebuilds
+1. ID int64, zero for an update not yet stored
+2. Provider *string, nil for runs that call no provider
+3. DataType string, one of the UpdateData constants
+4. StartedAt Time
+5. CompletedAt Time
+6. Status string, one of the UpdateStatus constants
+7. RecordsUpdated int
+8. ErrorMessage string, empty when none
+9. DateFrom *Date
+10. DateTo *Date
+11. Reason string, empty except for rebuilds
 
 One row of the updates log. A snapshot run records DateFrom and DateTo as the same date; a completed one is the idempotency marker for that date. A rebuild records its range and reason and also counts as completed for every date in the range.
+
+## UpdateFilter
+
+1. DataType string, empty for any
+2. Status string, empty for any
+3. Limit int, zero means defaultListLimit, capped at maxListLimit
+
+Selects updates log rows.
 
 # Functions
 
@@ -36,3 +45,8 @@ One row of the updates log. A snapshot run records DateFrom and DateTo as the sa
 4. Return nil.
 
 Mirrors the updates table checks.
+
+## UpdateFilter.Validate() error
+
+1. if DataType or Status is set and not one of its constants, or Limit is negative, return ErrInvalidInput.
+2. Return nil.
