@@ -28,7 +28,7 @@ listTransactionsSQL = select transactions matching the optional filters, newest 
 ## Store.RecordTransaction(ctx Context, in NewTransaction) (RecordResult, error)
 
 1. Validate in.
-2. Run inside pg.WithTx:
+2. Run inside storage.WithTx:
    1. Lock the instrument row via lockInstrumentSQL.
    2. Insert via insertTransactionSQL and scan the result.
    3. Check the whole instrument ledger with firstNegativeSQL.
