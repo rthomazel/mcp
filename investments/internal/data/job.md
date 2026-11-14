@@ -24,7 +24,7 @@ Build a Job using the real clock.
 ## Job.Run(ctx Context) (RunReport, error)
 
 1. Record the start time from clock.
-2. Refresh every instrument through refresher.RefreshAll.
+2. Refresh every instrument through refresher.RefreshAll with no from date.
 3. Record a prices update: completed when every instrument succeeded, incomplete otherwise, with the stored bar count, the provider name and the symbols that failed in the error message.
 4. Read the latest session date through store.LatestSessionDate; if none, return the report without a snapshot.
 5. Write the snapshot for that date through store.WriteSnapshot.

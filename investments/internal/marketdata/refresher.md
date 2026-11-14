@@ -48,10 +48,10 @@ Build a Refresher over the store and the provider.
 The history is fetched before registering so a mistyped symbol never creates an instrument that can never be priced. The provider looks securities up by symbol alone, so no instrument identity is needed for the fetch. A duplicate symbol and exchange costs one wasted provider request, which is acceptable.
 Only the first two steps depend on the provider; the stage 6 registration capability calls this method.
 
-## Refresher.RefreshInstrument(ctx Context, instrument domain.Instrument) RefreshResult
+## Refresher.RefreshInstrument(ctx Context, instrument domain.Instrument, from *domain.Date) RefreshResult
 
 1. Read the latest stored price date through store.LatestPriceDate.
-2. Fetch bars through provider.FetchPrices from that date inclusive, or the full history when the instrument has no prices.
+2. Choose the start: the earlier of from and the latest stored date, or the latest stored date when from is nil, or the full history when the instrument has no prices. Fetch bars through provider.FetchPrices from that date inclusive.
 3. Store them through store.UpsertPrices.
 4. Return the result with the starting date and the number of bars.
 
@@ -68,12 +68,12 @@ Only the first two steps depend on the provider; the stage 6 registration capabi
 - **3.** if storing fails, return a result whose Err wraps the error and names the symbol, with zero bars.
 
 The fetch starts at the latest stored date, not the day after, because the provider revises a day's figures after first publishing it; the upsert replaces the stored record. An instrument with no prices therefore gets its full history, which is also how a failed backfill heals.
-A refresh never reaches back past the latest stored date. Correcting older prices is a separate action not offered at this stage.
+By default a refresh does not reach back past the latest stored date. A caller passes from to re-fetch older history, which is how older prices are deliberately corrected; the start is never later than the latest stored date, so a gap can never open. Snapshots already written are not recalculated by a correction; the caller rebuilds them.
 
-## Refresher.RefreshAll(ctx Context) ([]RefreshResult, error)
+## Refresher.RefreshAll(ctx Context, from *domain.Date) ([]RefreshResult, error)
 
 1. List the instruments through store.ListInstruments.
-2. For each instrument in order, run RefreshInstrument and collect its result.
+2. For each instrument in order, run RefreshInstrument with from and collect its result.
 3. Return the results and nil.
 
 #### Errors

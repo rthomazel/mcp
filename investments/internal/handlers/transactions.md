@@ -38,9 +38,10 @@ Recording never rebuilds snapshots; telling the agent when a rebuild is needed i
 
 Tool list_transactions. Lists ledger entries, newest first by ledger order.
 
-Description shown to the agent: List ledger entries newest first by ledger order, optionally for one instrument and an inclusive effective-date range. Returns each entry with its symbol and exchange.
+Description shown to the agent: List ledger entries newest first by ledger order, optionally for one instrument, one event type such as DIVIDEND, and an inclusive effective-date range. Returns each entry with its symbol and exchange.
 
 - exchange string, optional
+- event_type string, optional, one of BUY, SELL, DIVIDEND, TAX, SPLIT, ADJUSTMENT
 - from string, optional YYYY-MM-DD, inclusive effective date
 - limit int, optional, default 100, maximum 500
 - symbol string, optional, filters to one instrument
