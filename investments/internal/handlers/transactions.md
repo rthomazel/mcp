@@ -4,7 +4,7 @@
 
 Tool record_transaction. Appends one ledger entry. There is no tool to change or delete one.
 
-Description shown to the agent: Records one ledger entry for a registered instrument: a buy, sell, dividend, tax, split or adjustment. Quantities and cash are signed per event type: BUY has positive quantity and negative cash, SELL negative quantity and positive cash, DIVIDEND positive cash only, TAX negative cash only, SPLIT a nonzero quantity with no cash, ADJUSTMENT a nonzero quantity with optional cash. Entries cannot be edited or deleted. Holdings are long-only. When the entry changes history that snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots. Errors returned: invalid input (unknown event type, wrong signs for the event type, malformed decimal, date or timestamp, notes too long); instrument not found; ambiguous symbol (give the exchange); transaction would make ownership negative, naming the instrument, date and running quantity, in which case nothing is written; timed out.
+Description shown to the agent: Append one ledger entry for a registered instrument. Signs are enforced per event type: BUY has positive quantity_change and negative cash_amount, SELL negative quantity and positive cash, DIVIDEND zero quantity and positive cash, TAX zero quantity and negative cash, SPLIT a nonzero quantity and no cash, ADJUSTMENT a nonzero quantity with optional cash. Holdings are long-only: an entry that would make ownership negative at any point in the timeline, backdated ones included, fails and writes nothing, and the error names the instrument, date and running quantity. Entries cannot be edited or deleted. Returns the stored entry. When the entry changes history that snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots; recording never rebuilds on its own.
 
 - cash_amount string, optional decimal, signed per the event type, zero when absent
 - effective_date string, required YYYY-MM-DD, the date the event economically applies to; after-hours events carry the next session's date
@@ -38,7 +38,7 @@ Recording never rebuilds snapshots; telling the agent when a rebuild is needed i
 
 Tool list_transactions. Lists ledger entries, newest first by ledger order.
 
-Description shown to the agent: Lists ledger entries newest first by ledger order, optionally for one instrument and an effective date range. Errors returned: invalid input (malformed date, negative limit, from after to); instrument not found; ambiguous symbol (give the exchange); timed out.
+Description shown to the agent: List ledger entries newest first by ledger order, optionally for one instrument and an inclusive effective-date range. Returns each entry with its symbol and exchange.
 
 - exchange string, optional
 - from string, optional YYYY-MM-DD, inclusive effective date

@@ -21,7 +21,7 @@ Build a Handler.
 
 ## Handler.Register(server *MCPServer)
 
-Add the ten tools to server, each with the description, parameters and hints its model gives, bound to its handler method. A description says what the tool does, when to use it and every error it can return, since the agent sees nothing else. Every parameter carries a short description taken from its line in the model, including its format and default. Read tools carry the read-only hint; rebuild_snapshots carries the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
+Add the ten tools to server, each with the description, parameters and hints its model gives, bound to its handler method. Descriptions follow the sibling bench server: plain dense sentences without markdown that lead with exactly what the tool does, state the return shape, say which failures leave nothing written, and point to the related tool for the next step. Parameter descriptions give the format and what absence means, start with Optional when they are, and use schema constraints such as enums and minimums instead of prose. Read tools carry the read-only hint; rebuild_snapshots carries the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
 
 ## Handler.resolveInstrument(ctx Context, symbol string, exchange string) (domain.Instrument, error)
 

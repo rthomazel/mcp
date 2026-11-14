@@ -4,7 +4,7 @@
 
 Tool get_prices. Reads stored daily prices of one instrument, newest first.
 
-Description shown to the agent: Reads stored daily prices for one instrument, newest first, with open, high, low, close, adjusted close and volume. Valuation uses the close, never the adjusted close. Only stored data is read; call refresh_prices to fetch newer prices. Errors returned: invalid input (missing symbol, malformed date, negative limit, from after to); instrument not found; ambiguous symbol (give the exchange); timed out.
+Description shown to the agent: Read stored daily prices for one instrument, newest first, with open, high, low, close, adjusted close and volume. Valuation uses close, never adjusted close. Reads stored data only; refresh_prices fetches newer prices.
 
 - exchange string, optional when the symbol is unique
 - from string, optional YYYY-MM-DD, inclusive
@@ -28,7 +28,7 @@ Description shown to the agent: Reads stored daily prices for one instrument, ne
 
 Tool refresh_prices. Fetches new prices from the provider now, from each instrument's latest stored date inclusive.
 
-Description shown to the agent: Fetches new daily prices from the market data provider now, for one instrument or for all of them, starting from each instrument's latest stored date. It does not create snapshots. The result lists each instrument with the bars stored or the error that stopped it; one instrument failing does not stop the others. When the provider rate limits, the run stops and the remaining instruments are reported as not refreshed, so run it again later. The provider allows few requests per hour, so avoid repeating it needlessly. Errors returned for the whole call: invalid input; instrument not found; ambiguous symbol (give the exchange); timed out. Per-instrument errors in the result: provider rate limited, symbol not found at the provider, or an internal failure.
+Description shown to the agent: Fetch new daily prices from the provider now, for one instrument or all of them, starting at each instrument's latest stored date inclusive so revised days are corrected. Returns one result per instrument with symbol, exchange, bars stored and an error, empty on success; one instrument failing does not stop the others. When the provider rate limits, the run stops and the remaining instruments are reported as not refreshed; run it again later. The provider allows few requests per hour, so do not repeat it needlessly. Writes no snapshot.
 
 - exchange string, optional when the symbol is unique
 - symbol string, optional; every instrument is refreshed when absent

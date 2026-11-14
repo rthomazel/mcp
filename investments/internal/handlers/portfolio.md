@@ -4,7 +4,7 @@
 
 Tool get_positions. Reconstructs active positions from the ledger.
 
-Description shown to the agent: Reconstructs active positions, the instruments with a positive quantity, from the ledger, for today or as of a past effective date. Any ledger integrity errors, instruments whose running quantity goes negative, are always returned alongside and should be reported to the user. Errors returned: invalid input (malformed date); timed out.
+Description shown to the agent: Reconstruct active positions, instruments with a positive quantity, from the ledger as of an effective date, or the whole ledger when no date is given. Returns the positions plus any integrity errors, instruments whose running quantity goes negative; report those to the user, they are never omitted.
 
 - date string, optional YYYY-MM-DD; positions as of that effective date, the whole ledger when absent
 
@@ -24,7 +24,7 @@ Description shown to the agent: Reconstructs active positions, the instruments w
 
 Tool get_portfolio. Values active positions at real closing prices. Results name the valuation as securities, excluding cash.
 
-Description shown to the agent: Values the active positions at real closing prices for today, in the New York market timezone, or a past date. The valuation covers securities only and excludes cash. When any holding has no price or a price five or more days old, the portfolio is marked incomplete: no total or allocation is returned, and the affected holdings are listed so the user can refresh prices. Errors returned: invalid input (malformed date); timed out.
+Description shown to the agent: Value active positions at real closing prices for a date, default today in the New York market timezone. Securities only, cash excluded. Returns per-holding quantity, close, price date and market value, plus the total and each allocation. A holding with no price, or a price five or more days older than the date, makes the portfolio incomplete: the total and allocations are withheld and the affected holdings are flagged missing or stale. Fix that with refresh_prices.
 
 - date string, optional YYYY-MM-DD; today in the market timezone when absent
 
