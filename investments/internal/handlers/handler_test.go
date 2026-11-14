@@ -149,6 +149,17 @@ func (p *fakeProvider) FetchPrices(_ context.Context, symbol string, _ *domain.D
 	return history, nil
 }
 
+// cancelingProvider cancels the run after the first fetch.
+type cancelingProvider struct{ cancel context.CancelFunc }
+
+func (p *cancelingProvider) Name() string { return "canceling" }
+
+func (p *cancelingProvider) FetchPrices(context.Context, string, *domain.Date) ([]domain.PriceBar, error) {
+	p.cancel()
+
+	return []domain.PriceBar{newBar(2)}, nil
+}
+
 func newBar(d int) domain.PriceBar {
 	return domain.PriceBar{Date: day(d), Open: "1", High: "1", Low: "1", Close: "1", AdjustedClose: "1", Volume: 1}
 }
@@ -558,6 +569,34 @@ func TestRefreshPrices(t *testing.T) {
 		results := decode(t, result, err).(map[string]any)["results"].([]any)
 		assert.Contains(t, results[0].(map[string]any)["error"], "rate limited")
 		assert.Contains(t, results[1].(map[string]any)["error"], "rate limited", "the rest are reported not refreshed")
+	})
+
+	t.Run("ending early keeps the results gathered", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		store := &fakeStore{instruments: twoInstruments(), positions: held}
+		provider := &cancelingProvider{cancel: cancel}
+
+		handler := New(store, marketdata.NewRefresher(store, provider), time.Minute)
+
+		result, err := handler.HandleRefreshPrices(ctx, request(nil))
+
+		message := toolError(t, result, err)
+		assert.Contains(t, message, `"results"`, "the finished instruments are still reported")
+		assert.Contains(t, message, `"error"`)
+		assert.Contains(t, message, "VTI")
+	})
+
+	t.Run("ending early before any result is a plain failure", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		store := &fakeStore{instruments: twoInstruments(), positions: held}
+
+		result, err := newHandler(store, &fakeProvider{}).HandleRefreshPrices(ctx, request(nil))
+
+		assert.NotContains(t, toolError(t, result, err), `"results"`)
 	})
 
 	t.Run("future from is rejected", func(t *testing.T) {

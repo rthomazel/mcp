@@ -264,6 +264,33 @@ func TestLatestSessionDate(t *testing.T) {
 	assert.Equal(t, date(2026, 11, 4), *latest)
 }
 
+// Nov 6 2026 is a Friday and Nov 9 a Monday: no market data exists for the weekend.
+func TestNoSnapshotForAWeekend(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	friday, saturday, monday := date(2026, 11, 6), date(2026, 11, 7), date(2026, 11, 9)
+	seedHolding(t, store, "VTI", "3", date(2026, 11, 2), friday, monday)
+
+	// The daily job snapshots the latest price date, which is never a weekend day.
+	latest, err := store.LatestSessionDate(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, monday, *latest)
+
+	// Asking for the weekend directly writes nothing and is recorded incomplete.
+	result, err := store.WriteSnapshot(ctx, saturday)
+	require.NoError(t, err)
+	assert.False(t, result.Complete)
+	assert.Zero(t, snapshotCount(t, store, saturday))
+	assert.Equal(t, []string{"incomplete"}, updateStatuses(t, store, "snapshots"))
+
+	// A rebuild over the weekend writes the two session dates only.
+	rebuilt, err := store.RebuildSnapshots(ctx, friday, monday, "weekend check")
+	require.NoError(t, err)
+	assert.Equal(t, 2, rebuilt.Dates)
+	assert.Zero(t, snapshotCount(t, store, saturday))
+	assert.Zero(t, snapshotCount(t, store, date(2026, 11, 8)))
+}
+
 func TestRecordUpdate(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
