@@ -12,8 +12,9 @@ agents: claude
 ## Status
 
 Draft v1, design agreed with Thom in a prior session, restructured to SDD format.
-Plan stages 1 to 3 (foundations, ledger, positions and valuation) are modelled and implemented;
-the later stages are not. Remaining open questions are at the end.
+Plan stages 1 to 3 (foundations, ledger, positions and valuation) are implemented.
+The market data provider is selected and stage 4 is being modelled; the later stages are not.
+Remaining open questions are at the end.
 
 ## Intent
 
@@ -165,17 +166,36 @@ portfolio performance.
 ### Market data
 
 The provider sits behind a provider-independent boundary so it can be replaced
-without changing the stored data or the agent-facing contract. Candidates are
-Tiingo, Alpha Vantage and Stooq. Selection weighs daily OHLCV availability,
-adjusted closes, historical depth, latest-price availability, limits and pricing,
-licensing, and reachability from the VPS.
+without changing the stored data or the agent-facing contract. The selected
+provider is Tiingo, on its free plan, whose terms allow this personal, internal
+use. It was chosen over Alpha Vantage and Stooq for daily raw and adjusted prices,
+decades of history, dividend and split data, usable free limits and clear
+licensing. Only the provider's own data enters storage; the agent-facing contract
+never exposes provider-specific shapes.
 
-No custom market-calendar service exists. The instrument's exchange identifies its
-market; the backend asks the provider for the latest completed daily price and relies
+No custom market-calendar service exists. The provider identifies a security by its
+ticker alone, so the instrument's exchange is descriptive and is never sent to it.
+The backend asks the provider for the latest completed daily price and relies
 on the provider for sessions, weekends, holidays and delays. Missing or unexpectedly
 old prices are flagged. A price is unexpectedly old when it is five or more days
-older than the run date. Initially only exchanges the chosen provider reliably
-covers are supported.
+older than the run date. Only US-listed securities the provider covers are supported.
+Mutual funds publish a day later than exchange-traded securities and carry no
+volume, so their latest price can legitimately lag.
+
+Price backfill. Registering an instrument first asks the provider for its full
+available history. If the provider does not know the ticker, the registration is
+rejected and nothing is stored, so an instrument that can never be priced is
+never created. Otherwise the instrument is registered and the history stored. If
+storing the history fails, the instrument stays registered with no prices, and the
+next refresh fetches its full history, so the gap heals without intervention.
+
+Price refresh. A refresh fetches, for each instrument, everything from the latest
+stored date onward, inclusive, and inserts or updates the records. The latest stored
+day is fetched again because the provider revises a day's figures after first
+publishing it. A refresh never reaches further back than the latest stored date;
+correcting older prices is a deliberate, separate action. When the provider throttles
+requests, the refresh stops, reports which instruments were not refreshed, and
+can be run again later. One instrument failing does not stop the others.
 
 ### Daily ingestion and snapshots
 
@@ -312,12 +332,16 @@ least once before the system is relied on. Staging and rollout order are in the 
 
 ## Open questions
 
-1. **Price backfill.** When a new instrument is registered, how much history is
-   fetched and by what trigger? Deferred to the market data spike.
-2. **Provider.** To be selected through a spike, against the criteria above.
+1. **VPS reachability and schedule.** Whether the provider is reachable from the
+   VPS cannot be confirmed from the development environment and is checked in the
+   rollout's manual refresh step. The daily schedule is set in the snapshot stage
+   from the provider's publishing times: US equities about 5:30 PM Eastern with
+   corrections possible until 8 PM, mutual funds after midnight Eastern.
 
 ## Resolved
 
+- Provider is Tiingo, selected through the market data spike.
+- Price backfill pulls the full available history when an instrument is registered; later refreshes fetch from the latest stored date inclusive.
 - Registering instruments and rebuilding snapshots are agent capabilities.
 - Chronological order follows effective date; after-hours events take the next session's date.
 - Snapshots only for days with new price data.
@@ -331,3 +355,4 @@ least once before the system is relied on. Staging and rollout order are in the 
 ## Refs
 
 - Related: mcp/bench/spc for the spec conventions used by sibling servers.
+- Related: interface doc/skills/tiingo-api, how the provider API behaves, validated live.

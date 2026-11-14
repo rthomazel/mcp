@@ -21,7 +21,7 @@ its models before code. Technical design lives in the models, not here.
 3. **Positions and valuation.** Position reconstruction, securities valuation and
    allocation.
 4. **Market data.** Provider integration behind the provider-independent boundary.
-   Starts with a provider spike, which also settles price backfill (open questions 1 and 2).
+   The provider spike is done: Tiingo, with full-history backfill on registration.
 5. **Ingestion and snapshots.** Daily job, idempotent snapshots, rebuilds and the
    updates log. Depends on stage 4.
 6. **MCP surface.** Agent-facing capabilities, including instrument registration

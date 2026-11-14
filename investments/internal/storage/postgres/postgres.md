@@ -4,6 +4,7 @@ pingAttempts = 5.
 pingBackoff = 10 seconds, the database may not be reachable immediately on startup.
 marketTimezone = "America/New_York", used to derive today's date when no date is given.
 postgresUniqueViolation = "23505".
+postgresForeignKeyViolation = "23503".
 postgresCheckViolation = "23514".
 
 # Types
@@ -14,7 +15,7 @@ postgresCheckViolation = "23514".
 2. stalePriceDays int
 3. marketLocation *Location, the loaded marketTimezone
 
-The one flat struct implementing domain.Store, with a compile-time assertion. Its methods are spread across instrument.go, transaction.go, positions.go and valuation.go by concern.
+The one flat struct implementing domain.Store, with a compile-time assertion. Its methods are spread across instrument.go, transaction.go, positions.go, valuation.go and price.go by concern.
 
 # Functions
 
@@ -47,6 +48,10 @@ Return the underlying database/sql handle, used by the migration runner so it co
 ## isUniqueViolation(err error) bool
 
 Report whether err is a Postgres error with SQLSTATE postgresUniqueViolation.
+
+## isForeignKeyViolation(err error) bool
+
+Report whether err is a Postgres error with SQLSTATE postgresForeignKeyViolation.
 
 ## isCheckViolation(err error) bool
 

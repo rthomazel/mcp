@@ -8,10 +8,12 @@
 4. ListTransactions(ctx Context, filter TransactionFilter) ([]Transaction, error)
 5. GetPositions(ctx Context, date *Date) (PositionsResult, error)
 6. GetPortfolio(ctx Context, date *Date) (Portfolio, error)
+7. UpsertPrices(ctx Context, instrumentID int, bars []PriceBar) error
+8. LatestPriceDate(ctx Context, instrumentID int) (*Date, error)
 
 The one central persistence interface. Every consumer depends on it, and tests mock it with mockery. Implemented by internal/storage/postgres.
 Each method is a self-contained unit of work in its own transaction; composing several Store calls into one transaction is not supported.
-Later stages add price, snapshot, rebuild and update-log methods here.
+Later stages add price reading, snapshot, rebuild and update-log methods here.
 
 ### RegisterInstrument(ctx Context, draft Instrument) (Instrument, error)
 
@@ -36,3 +38,11 @@ Reconstructs positions from the ledger as of date, or the whole ledger when nil.
 ### GetPortfolio(ctx Context, date *Date) (Portfolio, error)
 
 Values active positions with real closing prices as of date, or today in the market timezone when nil. A missing or stale price makes the portfolio incomplete.
+
+### UpsertPrices(ctx Context, instrumentID int, bars []PriceBar) error
+
+Inserts the bars for an instrument, replacing the stored record for any date that already has one, so a re-fetched revised day corrects the stored figures. All bars are stored or none. An empty slice does nothing. Returns ErrInvalidInput for an invalid bar or a repeated date, and ErrInstrumentNotFound for an unknown instrument.
+
+### LatestPriceDate(ctx Context, instrumentID int) (*Date, error)
+
+Returns the most recent stored price date for the instrument, or nil when it has no prices.
