@@ -1,0 +1,10 @@
+# Generated mocks are not committed: run `investments/run mocks`.
+template: testify
+packages:
+  github.com/rthomazel/mcp/investments/internal/domain:
+    interfaces:
+      Store:
+        config:
+          dir: internal/domain
+          filename: mock_store.go
+          pkgname: domain

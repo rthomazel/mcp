@@ -1,0 +1,3 @@
+bin/investments-mcp
+mock_*.go
+.env

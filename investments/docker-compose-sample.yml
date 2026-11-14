@@ -1,0 +1,17 @@
+# Runs the investments MCP on the container network only: no ports are published.
+# Reads real values from a .env next to this file, see .env.example.
+
+services:
+  investments-mcp:
+    container_name: investments-mcp
+    image: ghcr.io/rthomazel/mcp/investments:latest
+    stdin_open: true
+    tty: false
+    restart: unless-stopped
+    expose:
+      - "8001"
+    environment:
+      INVESTMENTS_MCP_TRANSPORT: mcp-proxy
+      INVESTMENTS_MCP_DSN: ${INVESTMENTS_MCP_DSN}
+      # INVESTMENTS_MCP_QUERY_TIMEOUT: 30s
+      # INVESTMENTS_MCP_STALE_PRICE_DAYS: 5

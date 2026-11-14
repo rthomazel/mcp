@@ -4,7 +4,6 @@ pingAttempts = 5.
 pingBackoff = 10 seconds, the database may not be reachable immediately on startup.
 marketTimezone = "America/New_York", used to derive today's date when no date is given.
 postgresUniqueViolation = "23505".
-postgresForeignKeyViolation = "23503".
 postgresCheckViolation = "23514".
 
 # Types
@@ -48,10 +47,6 @@ Return the underlying database/sql handle, used by the migration runner so it co
 ## isUniqueViolation(err error) bool
 
 Report whether err is a Postgres error with SQLSTATE postgresUniqueViolation.
-
-## isForeignKeyViolation(err error) bool
-
-Report whether err is a Postgres error with SQLSTATE postgresForeignKeyViolation.
 
 ## isCheckViolation(err error) bool
 

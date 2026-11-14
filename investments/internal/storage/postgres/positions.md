@@ -1,7 +1,7 @@
 # Constants
 
 positionsSQL = per instrument, sum quantity_change over transactions whose effective_date is on or before the requested date (all dates when none), keep sums above zero, join instruments for symbol and exchange, order by symbol then exchange.
-integritySQL = per instrument, order the ledger restricted to the requested date by effective date, execution time, id; compute the running sum of quantity_change; return the first row at which the running sum is below zero, with its effective date and running sum.
+integritySQL = ordered by symbol then exchange, per instrument, order the ledger restricted to the requested date by effective date, execution time, id; compute the running sum of quantity_change; return the first row at which the running sum is below zero, with its effective date and running sum.
 
 # Functions
 
