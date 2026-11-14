@@ -22,6 +22,14 @@ Returned by a PriceProvider that throttles a request. Callers stop and retry lat
 
 Matched through NegativeBalanceError.
 
+## ErrSnapshotIncomplete = "snapshot incomplete"
+
+Matched through IncompleteSnapshotError. Some active instrument has no price dated on the snapshot date. Logged where it arises, in the store and the job.
+
+## ErrSnapshotExists = "snapshot already exists"
+
+Returned when snapshot rows exist for a date that is not marked completed. The daily job never overwrites them; a rebuild replaces them. Logged at error level where it arises.
+
 # Types
 
 ## NegativeBalanceError
