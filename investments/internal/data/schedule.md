@@ -12,9 +12,13 @@ runTimes = 06:00 and 20:30 in the market timezone (America/New_York), the two da
 
 # Functions
 
-## NewScheduler(job *Job) *Scheduler
+## NewScheduler(job *Job) (*Scheduler, error)
 
-Build a Scheduler in the market timezone, loaded from the embedded tzdata, using the real clock.
+Build a Scheduler in the market timezone, loaded from the embedded tzdata, using the real clock. Returns the wrapped error when the zone cannot be loaded.
+
+## RunTimesDescription() string
+
+Render the run times for the startup log, for example the two times followed by the market timezone name.
 
 ## nextRun(now Time, location *time.Location) Time
 

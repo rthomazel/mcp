@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
@@ -44,7 +46,7 @@ ORDER BY symbol, exchange`
 func (s *Store) GetPortfolio(ctx context.Context, date *domain.Date) (domain.Portfolio, error) {
 	reference := s.referenceDate(date)
 
-	holdings, total, err := s.valuedHoldings(ctx, reference)
+	holdings, total, err := s.valuedHoldings(ctx, s.db, reference)
 	if err != nil {
 		return domain.Portfolio{}, err
 	}
@@ -96,12 +98,12 @@ func (s *Store) referenceDate(date *domain.Date) domain.Date {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
-// valuedHoldings runs valuationSQL and marks missing and stale prices. A
+// valuedHoldings runs valuationSQL on q, the store or a transaction, and marks missing and stale prices. A
 // holding with an issue keeps its price date but no price or value. The
 // allocation is set where SQL computed one; GetPortfolio withholds it when
 // the portfolio is incomplete.
-func (s *Store) valuedHoldings(ctx context.Context, reference domain.Date) ([]domain.Holding, domain.Decimal, error) {
-	rows, err := s.db.QueryxContext(ctx, valuationSQL, reference)
+func (s *Store) valuedHoldings(ctx context.Context, q sqlx.QueryerContext, reference domain.Date) ([]domain.Holding, domain.Decimal, error) {
+	rows, err := q.QueryxContext(ctx, valuationSQL, reference)
 	if err != nil {
 		return nil, "", fmt.Errorf("valuing portfolio: %w", err)
 	}
