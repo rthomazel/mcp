@@ -32,6 +32,4 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: ${{ matrix.module }}
-          # unipdf: license key expires per version; update manually when renewed
-          pinned-deps: github.com/unidoc/unipdf/v3
           pr-branch: chore/update-dependencies-go-${{ matrix.module }}
