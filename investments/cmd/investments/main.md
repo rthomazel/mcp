@@ -16,7 +16,7 @@ Run run(); on error print the fatal message to stderr and exit with status 1.
 2. Load the configuration with config.Load.
 3. Open the store with postgres.Open, defer its cleanup.
 4. Apply pending migrations with migrate.
-5. Build the Tiingo client, the refresher and the daily job, and start the scheduler in a goroutine that stops when the process shuts down.
+5. Build the Tiingo client, the refresher and the daily job, and log at info level that the daily job is enabled with its run times and provider, and start the scheduler in a goroutine that stops when the process shuts down.
 6. Build the MCP server named "investments-mcp" with version.
 7. Serve over stdio.
 

@@ -25,9 +25,9 @@ Built from the calendar date and wall clock in location, so daylight saving chan
 
 ## Scheduler.Run(ctx Context)
 
-1. Compute the next run time with nextRun.
-2. Wait until then, or return when ctx is cancelled.
-3. Run the job with a timeout, log its report at info level, or its error at error level.
+1. Compute the next run time with nextRun and log it at info level.
+2. Wait until then; if ctx is cancelled, log that the scheduler stopped at info level and return.
+3. Log the run start at info level, run the job with a timeout, then log its report at info level with the elapsed time, or its error at error level.
 4. Repeat from step 1.
 
 A failed run never stops the loop; the next slot retries. There is no run at startup: a restart does not spend provider requests, and the next slot is at most about fourteen hours away. The job is the only caller, so runs do not overlap; the store lock also guards against an agent rebuild running at the same time.
