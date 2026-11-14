@@ -139,7 +139,9 @@ COMMIT;
 - `cmd_hash` is unsalted SHA-256 of the post-normalization string. Rows with different
   `normalizer_version` values should not be grouped by `cmd_hash`. See privacy notes.
 - `normalizer_version` is an integer constant in the codebase, bumped when normalization
-  rules change, so that stale hashes can be identified in queries.
+  rules change, so that stale hashes can be identified in queries. It is currently `2`
+  (bumped from `1` when base64 redaction was added); the `stats` tool groups top commands
+  from the current version only.
 - `error_kind` is NULL when a tool call completes normally — including shell commands that
   exit nonzero. A nonzero exit is a successful execution from the handler's perspective;
   it is captured in `exit_code`. `error_kind` is set only for handler-level failures:
@@ -192,9 +194,9 @@ services:
 ```
 
 The server reads the key from `/run/secrets/bench_mcp_stats_encryption_key_v1` at startup.
-If the file is absent, full command storage is disabled and only `base_cmd` and
-`cmd_hash` are recorded. If the file exists but is empty, not valid base64, or does not decode to 32 bytes,
-stats are disabled entirely for the session and the error is logged.
+If the file is absent, empty, or contains only whitespace, full command storage is disabled and only `base_cmd` and
+`cmd_hash` are recorded; stats keep running. If the file has content that is not valid base64 or does not decode
+to 32 bytes, stats are disabled entirely for the session and the error is logged.
 
 ### encrypted storage envelope
 
@@ -267,9 +269,12 @@ applied in order; earlier matches take precedence.
 
 **tier 1 — known secret patterns**
 
+Order within this pass: environment assignments, `--flag=value`, `--flag value`, URL credentials, Bearer tokens, JWTs, PEM blocks (then tier 2, tier 3, tier 4 below).
+
 | pattern                                      | example                          | result                  |
 | -------------------------------------------- | -------------------------------- | ----------------------- |
 | env var assignment with sensitive name       | `TOKEN=abc123 cmd`               | `TOKEN=REDACTED cmd`    |
+| `--flag value` (space form) with sensitive flag name | `--password hunter2`   | `--password REDACTED`   |
 | `--flag=value` with sensitive flag name      | `--password=hunter2`             | `--password=REDACTED`   |
 | quoted value after sensitive `=`             | `KEY='abc'` or `KEY="abc"`       | `KEY=REDACTED`          |
 | URL credentials                              | `https://user:pass@host`         | `https://REDACTED@host` |
@@ -277,18 +282,29 @@ applied in order; earlier matches take precedence.
 | JWT (three base64url dot-separated segments) | `eyJ.eyJ.sig`                    | `[JWT]`                 |
 | PEM block                                    | `-----BEGIN PRIVATE KEY-----...` | `[PEM BLOCK]`           |
 
-Sensitive name list, matched at whole env-var or flag-name boundaries (case-insensitive
-word boundary match to avoid false positives like `--passthrough` or `COMPASS_URL`):
+Environment assignments are redacted wherever they appear in the command, not only as a leading prefix. A flag in the
+space form is left alone when its next token starts with `-`. Flag names are compared with `-` read as `_`.
+
+Sensitive name list, matched case-insensitively when the whole name equals a keyword or the keyword is a `_`-delimited
+prefix, suffix, or middle part (`GITHUB_TOKEN`, `API_KEY_ID`, `DB_PASSWORD_FILE`), which avoids false positives like
+`--passthrough` or `COMPASS_URL`:
 `TOKEN`, `KEY`, `SECRET`, `PASSWORD`, `PASSWD`, `PWD`, `PASS`, `AUTH`, `CRED`,
 `CREDENTIAL`, `API_KEY`, `PRIVATE`, `CERT`, `SIGNING`.
 
 **tier 2 — high-entropy patterns**
 
-| pattern       | threshold                         | result         |
-| ------------- | --------------------------------- | -------------- |
-| hex string    | ≥ 32 contiguous hex chars         | `[HEX 64B]`    |
-| base64 string | ≥ 24 chars, valid base64 alphabet | `[BASE64 44B]` |
-| UUID          | standard 8-4-4-4-12 format        | `[UUID]`       |
+Applied in the order UUID, hex, base64.
+
+| pattern       | threshold                                                         | result         |
+| ------------- | ----------------------------------------------------------------- | -------------- |
+| UUID          | standard 8-4-4-4-12 format                                        | `[UUID]`       |
+| hex string    | ≥ 32 contiguous hex chars                                         | `[HEX 64B]`    |
+| base64 string | ≥ 24 chars of `A-Z a-z 0-9 + /`, optional `=` padding, heuristics below | `[BASE64 44B]` |
+
+To avoid redacting paths and identifiers, a base64 candidate must contain at least one upper-case letter, one
+lower-case letter, and one digit, and must not start with `/`. Consequently a real base64 value that starts with `/`,
+or lacks one of the three character classes, is not redacted by this rule (pass 4 still catches tokens over 80 bytes).
+The `-`, `_`, and `.` characters are outside the base64 alphabet, so they end a candidate.
 
 The 32-char hex threshold preserves short git SHAs (≤ 12 chars) while catching
 SHA-256 outputs, HMAC values, and raw keys.
@@ -300,8 +316,8 @@ SHA-256 outputs, HMAC values, and raw keys.
 | email address                                  | `[EMAIL]`     |
 | public IP address (non-RFC-1918, non-loopback) | `[PUBLIC IP]` |
 
-RFC-1918 ranges (`10.x.x.x`, `172.16–31.x.x`, `192.168.x.x`) and loopback are retained
-as they are useful operational context (e.g. Docker service addresses).
+RFC-1918 ranges (`10.x.x.x`, `172.16–31.x.x`, `192.168.x.x`), loopback, link-local (`169.254.x.x`), and
+multicast/reserved (`224.0.0.0` and above) are retained as useful operational context (e.g. Docker service addresses).
 
 **tier 4 — user patterns**
 
@@ -332,27 +348,36 @@ content does not trigger spurious long-token matches.
 | `` `...` `` backtick substitution              | `[SUBSHELL]`       |
 | `<< 'DELIM' ... DELIM` heredoc (any delimiter) | `[HEREDOC 1247B]`  |
 | `<<- DELIM ... DELIM` heredoc                  | `[HEREDOC 1247B]`  |
+
+The count is the body size in bytes with one byte added per line for the newline. Heredoc handling is lossy by design:
+the heredoc marker and everything after it on the same line are replaced, so `cat <<EOF | grep x` becomes
+`cat [HEREDOC 5B]` and the pipe is lost. An unterminated heredoc consumes the remaining lines.
 | `<<< "..."` here-string                        | `[HERESTRING 42B]` |
 | `<(...)` process substitution                  | `[PROCESS_SUB]`    |
 
 **inline scripts**
 
-Interpreter invocations where `-c` or `-e` is followed by a quoted argument:
+An interpreter (`python`, `python3`, `perl`, `ruby`, `node`, `awk`, `sed`) followed by an optional `-c` or `-e` and a
+quoted argument. The result keeps the interpreter name and drops the flag; the number is the quoted body's byte count:
 
-| example            | result                           |
-| ------------------ | -------------------------------- |
-| `python3 -c '...'` | `python3 -c [INLINE_SCRIPT 89B]` |
-| `python -c "..."`  | `python -c [INLINE_SCRIPT 89B]`  |
-| `perl -e '...'`    | `perl -e [INLINE_SCRIPT 45B]`    |
-| `ruby -e '...'`    | `ruby -e [INLINE_SCRIPT 45B]`    |
-| `node -e '...'`    | `node -e [INLINE_SCRIPT 45B]`    |
-| `awk '{...}'`      | `awk [INLINE_SCRIPT 14B]`        |
+| example            | result                      |
+| ------------------ | --------------------------- |
+| `python3 -c '...'` | `python3 [INLINE_SCRIPT 89B]` |
+| `python -c "..."`  | `python [INLINE_SCRIPT 89B]`  |
+| `perl -e '...'`    | `perl [INLINE_SCRIPT 45B]`    |
+| `ruby -e '...'`    | `ruby [INLINE_SCRIPT 45B]`    |
+| `node -e '...'`    | `node [INLINE_SCRIPT 45B]`    |
+| `awk '{...}'`      | `awk [INLINE_SCRIPT 14B]`     |
+| `sed 's/a/b/'`     | `sed [INLINE_SCRIPT 5B]`      |
 
 **Python multiline strings** (inside a `-c` argument):
 
 | pattern                         | result                |
 | ------------------------------- | --------------------- |
 | `"""..."""` triple-quoted block | `[PYTHON_BLOCK 342B]` |
+
+Constructs are normalized in this order: inline scripts, Python blocks, heredocs, here-strings, process substitutions,
+then `$(...)` and backtick substitutions. `$(...)` matching does not handle nested parentheses.
 
 These patterns are best-effort. Complex quoting, escaping, and nesting may not be
 handled correctly. Anything that survives is handled by pass 4.
@@ -372,12 +397,16 @@ until no further progress is made:
    Use only the segment after the last leading `cd ...` navigation and before the
    first operator that begins the "real" command. Specifically: if the first segment
    begins with `cd`, discard it and take the next segment instead.
-2. **Strip leading env-var assignments.** Remove leading `WORD=value` and
-   `WORD=REDACTED` tokens. Repeat until the first token is not an assignment.
+2. **Strip leading env-var assignments.** Remove leading `WORD=value` tokens (any
+   value, redacted or not). Repeat until the first token is not an assignment.
 3. **Strip leading wrapper tokens.** If the first token is a known wrapper
    (`sudo`, `env`, `time`, `command`, `exec`, `nice`, `ionice`), consume it
-   along with any option flags it takes (`sudo -u USER`, `sudo -n`, `nice -n N`,
-   etc.). Repeat step 2 after each wrapper consumed.
+   along with the option flags that follow it (tokens starting with `-`). A flag
+   known to take a separate value consumes that value too (`sudo -u USER`,
+   `nice -n N`, `ionice -c N`, `env -u NAME`); attached forms such as `-n10` or
+   `--user=root` are a single token. The value-taking flags are listed per wrapper
+   in the code; an unlisted flag's value is left in place. Repeat step 2 after each
+   wrapper consumed.
 4. **Converge.** If neither step 2 nor step 3 made progress, stop.
 5. **First remaining token is `base_cmd`.** If none remains, `base_cmd` is NULL.
 
@@ -386,13 +415,14 @@ Examples:
 | post-pipeline command                      | base_cmd |
 | ------------------------------------------ | -------- |
 | `TOKEN=REDACTED git status`                | `git`    |
+| `sudo -n git status`                       | `git`    |
 | `sudo -u root bash -c [INLINE_SCRIPT 42B]` | `bash`   |
+| `nice -n 10 go build`                      | `go`     |
 | `cd /projects/foo && go test ./...`        | `go`     |
 | `env GOPATH=/root go build`                | `go`     |
 | `TOKEN=REDACTED`                           | NULL     |
 
-Note on `sudo -u root bash`: step 3 consumes `sudo -u root` (the `-u USER` option pair),
-leaving `bash` as the first token. Note on `env GOPATH=/root go build`: step 3 consumes
+Note on `sudo -u root bash`: step 3 consumes `sudo -u root` (the flag and its value), leaving `bash` as the first token. Note on `env GOPATH=/root go build`: step 3 consumes
 `env`, then step 2 strips `GOPATH=/root`, leaving `go`. Note on `cd ... && go test`: step 1
 discards the `cd` segment, taking `go test ./...` from the next segment.
 

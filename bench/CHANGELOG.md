@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.11.2](https://github.com/rthomazel/mcp/pull/62) fix: stats keep running with a blank encryption key; redact base64
+
+### fix
+
+- **(stats)** a blank or whitespace-only `bench_mcp_stats_encryption_key_v1` secret file now only disables full command storage, as documented; previously it disabled stats entirely. A key that is present but malformed still disables stats.
+- **(stats)** `base_cmd` now skips the values of wrapper flags such as `sudo -u root` and `nice -n 10`, so those commands are labeled `bash` and `go` instead of `root` and `10`. Rows already stored keep their old label.
+
+### feat
+
+- **(stats)** redact base64 strings of 24 or more characters as `[BASE64 NB]`. A candidate must mix upper case, lower case, and digits and must not start with `/`, so paths and identifiers are kept. Bumps `NormalizerVersion` to 2, so earlier rows are excluded from the top-commands table.
+
+### docs
+
+- **(spc/stats)** document base64 redaction, blank-key behavior, `--flag value` and anywhere-in-command redaction, retained IP ranges, inline-script and heredoc handling, and the wrapper-flag handling in `base_cmd`.
+
 ## [0.11.1](https://github.com/rthomazel/mcp/pull/60) docs: document remaining tools and fix stale spc docs
 
 ### docs

@@ -10,7 +10,7 @@ The package replaces known secret patterns with markers, collecting the byte cou
 
 1. Redact environment assignments.
 2. Redact flag values in = and space forms.
-3. Redact URL credentials, bearer tokens, JWTs, PEM blocks, UUIDs, long hex, emails, and public IPs.
+3. Redact URL credentials, bearer tokens, JWTs, PEM blocks, UUIDs, long hex, base64, emails, and public IPs.
 4. Apply each user pattern.
 
 ## redactEnvAssigns(cmd, counts) string
@@ -49,6 +49,17 @@ The package replaces known secret patterns with markers, collecting the byte cou
 ## redactLongHex(cmd, counts) string
 
 1. Replace the long hex with a byte-counted marker.
+
+## redactBase64(cmd, counts) string
+
+1. Find runs of at least 24 base64-alphabet characters with optional padding.
+2. Skip runs that start with a slash, to keep absolute and relative paths.
+3. Skip runs that do not mix upper case, lower case, and digits.
+4. Replace the rest with a byte-counted marker.
+
+#### Rationale
+
+- The slash and character-mix filters trade missed redaction of unusual base64 values for not mangling paths and identifiers.
 
 ## redactEmails(cmd, counts) string
 

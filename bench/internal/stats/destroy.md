@@ -39,7 +39,8 @@ The package destroys the raw command string, preserving only the normalized resu
 
 ## consumeWrapper(tokens) []string
 
-1. Drop the wrapper and its leading flags.
+1. Drop the wrapper.
+2. Drop the flags that follow it, also dropping the next token for flags known to take a separate value for that wrapper.
 
 #### Rationale
 
