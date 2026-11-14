@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### fix
+
+- **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcpbench` Host header (`BENCH_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers.
+
 ## [0.11.2](https://github.com/rthomazel/mcp/pull/62) fix: stats keep running with a blank encryption key; redact base64
 
 ### fix

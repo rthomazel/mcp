@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### fix
+
+- **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcppostgres` Host header (`POSTGRES_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers.
+
 ## [0.1.3](https://github.com/rthomazel/mcp/pull/60) docs: document current implementation under spc/
 
 ### docs

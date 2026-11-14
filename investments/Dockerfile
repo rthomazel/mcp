@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install mcp-proxy "mcp<2.0.0" --break-system-packages
+RUN pip install mcp-proxy==0.15.0 "mcp<2.0.0" --break-system-packages
 
 RUN groupadd -g 9999 investments && useradd -u 9999 -g 9999 -s /sbin/nologin -r investments
 
