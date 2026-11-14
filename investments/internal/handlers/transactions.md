@@ -1,8 +1,8 @@
 # Functions
 
-## Handler.HandleRecordTransaction(ctx Context, req CallToolRequest) (*CallToolResult, error)
+## Handler.HandleAddTransaction(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
-Tool record_transaction. Appends one ledger entry. There is no tool to change or delete one.
+Tool add_transaction. Appends one ledger entry through store.RecordTransaction. There is no tool to change or delete one.
 
 Description shown to the agent: Append one ledger entry for a registered instrument. Signs are enforced per event type: BUY has positive quantity_change and negative cash_amount, SELL negative quantity and positive cash, DIVIDEND zero quantity and positive cash, TAX zero quantity and negative cash, SPLIT a nonzero quantity and no cash, ADJUSTMENT a nonzero quantity with optional cash. Holdings are long-only: an entry that would make ownership negative at any point in the timeline, backdated ones included, fails and writes nothing, and the error names the instrument, date and running quantity. Entries cannot be edited or deleted. Returns the stored entry. When the entry changes history that snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots; recording never rebuilds on its own.
 

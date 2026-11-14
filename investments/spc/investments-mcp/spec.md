@@ -242,7 +242,7 @@ provider can safely serve the day's data. No exchange-specific scheduler exists.
 Through MCP the agent can: register an instrument; list instruments; list ledger
 events; record transactions of any supported type; reconstruct current or historical
 positions; read current securities valuation and allocation; read historical prices;
-read historical snapshots; trigger a market data refresh; and rebuild snapshots
+read historical snapshots; read the updates log; trigger a market data refresh; and rebuild snapshots
 over a date range with a stated reason. Registering an instrument rejects any that
 is not USD-quoted. Transaction deletion is not an agent capability. Exact tool
 contracts are defined in the models.
@@ -347,7 +347,7 @@ least once before the system is relied on. Staging and rollout order are in the 
 - The daily job snapshots only the latest date that has price data. A date missed while the server was down is not back-filled automatically; the agent fills it with a rebuild. A rebuilt date counts as completed.
 - Agents refer to instruments by symbol, with the exchange only when the symbol alone is ambiguous; internal ids are never exposed.
 - Tool results are JSON with decimals as exact strings. Recording a transaction never rebuilds snapshots; when it makes snapshots stale, the result names the date to rebuild from.
-- Stage 6 gives the agent no tool to read the updates log; refresh and rebuild results report their own outcome. A reader can be added later without changing stored data.
+- The agent can read the updates log, to check freshness and why a day has no snapshot.
 - A snapshot requires every active instrument to have a price dated exactly on the snapshot date.
 
 ## Refs

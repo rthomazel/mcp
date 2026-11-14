@@ -16,6 +16,7 @@
 12. RecordUpdate(ctx Context, update Update) error
 13. ListPrices(ctx Context, filter PriceFilter) ([]PriceBar, error)
 14. ListSnapshots(ctx Context, filter SnapshotFilter) ([]SnapshotRow, error)
+15. ListUpdates(ctx Context, filter UpdateFilter) ([]Update, error)
 
 The one central persistence interface. Every consumer depends on it, and tests mock it with mockery. Implemented by internal/storage/postgres.
 Each method is a self-contained unit of work in its own transaction; composing several Store calls into one transaction is not supported.
@@ -75,3 +76,7 @@ Returns the stored price records of one instrument matching filter, newest first
 ### ListSnapshots(ctx Context, filter SnapshotFilter) ([]SnapshotRow, error)
 
 Returns snapshot rows matching filter, newest date first then by symbol and exchange, limited. Returns ErrInvalidInput for an invalid filter.
+
+### ListUpdates(ctx Context, filter UpdateFilter) ([]Update, error)
+
+Returns updates log rows matching filter, newest first by start time, limited. Returns ErrInvalidInput for an invalid filter.

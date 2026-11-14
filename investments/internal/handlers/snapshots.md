@@ -30,7 +30,7 @@ A date appears only when snapshot rows exist for it, which means it was a sessio
 
 Tool rebuild_snapshots. Replaces the snapshots of every price date in the range from the current ledger and prices, all or nothing, and logs the rebuild with its reason.
 
-Description shown to the agent: Replace the stored snapshots for every price date in the range with values recomputed from the current ledger and prices. Use only after a correction that touches history, such as a backdated transaction or revised prices, starting at the rebuild_from date record_transaction returned. All or nothing: if any date in the range has an active holding without a price on it, the error names the first such date and the instruments, nothing changes, and the range must be narrowed or prices refreshed. Returns the range, dates rebuilt and rows written. The rebuild is logged with the reason.
+Description shown to the agent: Replace the stored snapshots for every price date in the range with values recomputed from the current ledger and prices. Use only after a correction that touches history, such as a backdated transaction or revised prices, starting at the rebuild_from date add_transaction returned. All or nothing: if any date in the range has an active holding without a price on it, the error names the first such date and the instruments, nothing changes, and the range must be narrowed or prices refreshed. Returns the range, dates rebuilt and rows written. The rebuild is logged with the reason.
 
 - from string, required YYYY-MM-DD, inclusive
 - reason string, required, why the rebuild is needed

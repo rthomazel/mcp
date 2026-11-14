@@ -1,6 +1,6 @@
 # Constants
 
-longTimeout = 10 minutes, the deadline for tools that call the provider or rewrite many rows: register_instrument, refresh_prices and rebuild_snapshots.
+longTimeout = 10 minutes, the deadline for tools that call the provider or rewrite many rows: add_instrument, refresh_prices and rebuild_snapshots.
 internalErrorText = "internal error, see the server logs".
 
 # Types
@@ -21,7 +21,7 @@ Build a Handler.
 
 ## Handler.Register(server *MCPServer)
 
-Add the ten tools to server, each with the description, parameters and hints its model gives, bound to its handler method. Descriptions follow the sibling bench server: plain dense sentences without markdown that lead with exactly what the tool does, state the return shape, say which failures leave nothing written, and point to the related tool for the next step. Parameter descriptions give the format and what absence means, start with Optional when they are, and use schema constraints such as enums and minimums instead of prose. Read tools carry the read-only hint; rebuild_snapshots carries the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
+Add the eleven tools to server, each with the description, parameters and hints its model gives, bound to its handler method. Descriptions follow the sibling bench server: plain dense sentences without markdown that lead with exactly what the tool does, state the return shape, say which failures leave nothing written, and point to the related tool for the next step. Parameter descriptions give the format and what absence means, start with Optional when they are, and use schema constraints such as enums and minimums instead of prose. Read tools, including list_updates, carry the read-only hint; rebuild_snapshots carries the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
 
 ## Handler.resolveInstrument(ctx Context, symbol string, exchange string) (domain.Instrument, error)
 

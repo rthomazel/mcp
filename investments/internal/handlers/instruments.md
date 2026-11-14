@@ -1,10 +1,10 @@
 # Functions
 
-## Handler.HandleRegisterInstrument(ctx Context, req CallToolRequest) (*CallToolResult, error)
+## Handler.HandleAddInstrument(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
-Tool register_instrument. Registers a USD-quoted instrument and backfills its full price history.
+Tool add_instrument. Registers a USD-quoted instrument and backfills its full price history, through refresher.RegisterInstrument.
 
-Description shown to the agent: Register a USD-quoted stock, ETF or fund by symbol and exchange, then download its full daily price history from the provider. Returns the instrument. Fails without registering when the symbol is not covered by the provider, the currency is not USD, or the symbol and exchange pair already exists. If the instrument registers but the price download fails, it stays registered and the error says so; refresh_prices retries the download. Call this before record_transaction for a new holding.
+Description shown to the agent: Register a USD-quoted stock, ETF or fund by symbol and exchange, then download its full daily price history from the provider. Returns the instrument. Fails without registering when the symbol is not covered by the provider, the currency is not USD, or the symbol and exchange pair already exists. If the instrument registers but the price download fails, it stays registered and the error says so; refresh_prices retries the download. Call this before add_transaction for a new holding.
 
 - currency string, optional, default "USD"; any other value is rejected
 - exchange string, required, listing exchange such as NYSE
