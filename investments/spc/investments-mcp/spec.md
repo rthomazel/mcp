@@ -332,15 +332,13 @@ least once before the system is relied on. Staging and rollout order are in the 
 
 ## Open questions
 
-1. **VPS reachability and schedule.** Whether the provider is reachable from the
-   VPS cannot be confirmed from the development environment and is checked in the
-   rollout's manual refresh step. The daily schedule is set in the snapshot stage
-   from the provider's publishing times: US equities about 5:30 PM Eastern with
-   corrections possible until 8 PM, mutual funds after midnight Eastern.
+1. **Daily schedule.** Set in the snapshot stage from the provider's publishing
+   times: US equities about 5:30 PM Eastern with corrections possible until 8 PM,
+   mutual funds after midnight Eastern.
 
 ## Resolved
 
-- Provider is Tiingo, selected through the market data spike.
+- Provider is Tiingo, selected through the market data spike. Reachability from the VPS was verified by the operator.
 - Price backfill pulls the full available history when an instrument is registered; later refreshes fetch from the latest stored date inclusive.
 - Registering instruments and rebuilding snapshots are agent capabilities.
 - Chronological order follows effective date; after-hours events take the next session's date.
