@@ -4,7 +4,7 @@
 
 ### fix
 
-- **(container)** allow the `mcpinvestments` Host header in mcp-proxy (`INVESTMENTS_MCP_ALLOWED_HOST` to override), so LiteLLM health checks stop failing with "Invalid Host header".
+- **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcpinvestments` Host header in mcp-proxy (`INVESTMENTS_MCP_ALLOWED_HOST` to override), so LiteLLM health checks stop failing with "Invalid Host header".
 
 ## [0.1.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.1.0) feat: first release
 

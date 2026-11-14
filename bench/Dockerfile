@@ -59,7 +59,7 @@ ENV PATH="/mise/shims:$PATH"
 # been updated for mcp>=2.0 yet -- this pin is temporary, not us capping mcp-proxy itself. Once
 # upstream (https://github.com/sparfenyuk/mcp-proxy) ships a release compatible with mcp 2.x,
 # drop this pin and let both float again.
-RUN pip install mcpo mcp-proxy "mcp<2.0.0" --break-system-packages
+RUN pip install mcpo mcp-proxy==0.15.0 "mcp<2.0.0" --break-system-packages
 
 COPY --from=builder /build/bench-mcp /usr/local/bin/bench-mcp
 COPY ./bin/benchmcphttp /usr/local/bin/benchmcphttp
