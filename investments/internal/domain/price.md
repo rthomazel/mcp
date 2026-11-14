@@ -12,6 +12,15 @@
 
 A provider-independent daily price record for one instrument. It carries no instrument identity; Store.UpsertPrices attaches it.
 
+## PriceFilter
+
+1. InstrumentID int
+2. From *Date, inclusive
+3. To *Date, inclusive
+4. Limit int, zero means defaultListLimit, capped at maxListLimit
+
+Selects stored price records of one instrument.
+
 # Interfaces
 
 ## PriceProvider
@@ -30,6 +39,12 @@ A short stable provider name, used by the updates log in a later stage.
 Returns daily bars for symbol, oldest first with strictly ascending dates, from the date inclusive through the latest completed session, or the full available history when from is nil. The symbol is the instrument's symbol as registered; the provider adapts it to its own format. Every bar has passed PriceBar.Validate. An empty slice means no bars in range and is not an error. Returns ErrSymbolNotFound when the provider does not cover the symbol and ErrRateLimited when it throttles the request.
 
 # Functions
+
+## PriceFilter.Validate() error
+
+1. if InstrumentID is not positive, a limit is negative, or From is after To, return ErrInvalidInput.
+2. Return nil.
+
 
 ## PriceBar.Validate() error
 

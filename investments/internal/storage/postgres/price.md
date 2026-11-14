@@ -3,6 +3,8 @@
 upsertPricesSQL = insert prices rows for one instrument from a JSON array expanded in SQL with jsonb_to_recordset, ON CONFLICT (instrument_id, date) DO UPDATE every price column.
 latestPriceDateSQL = select the maximum date from prices for one instrument, null if none.
 
+listPricesSQL = select the price columns of one instrument between the optional bounds, date descending, limited.
+
 # Functions
 
 ## Store.UpsertPrices(ctx Context, instrumentID int, bars []domain.PriceBar) error
@@ -42,3 +44,19 @@ A full history is a few thousand rows, small enough for one statement.
 - **1.** if the query fails, return the wrapped error.
 
 An unknown instrument has no prices and returns nil, not an error.
+
+## Store.ListPrices(ctx Context, filter domain.PriceFilter) ([]domain.PriceBar, error)
+
+1. Validate filter and resolve the limit.
+2. Select via listPricesSQL.
+3. Return the bars, empty when none.
+
+#### Errors
+
+- **1.** if invalid, return the domain.ErrInvalidInput error.
+
+---
+
+- **2.** log the failure at error level and return the wrapped error.
+
+Decimals are selected as text so the exact stored figures reach the caller.

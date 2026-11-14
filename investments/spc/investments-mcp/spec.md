@@ -345,6 +345,9 @@ least once before the system is relied on. Staging and rollout order are in the 
 - The daily job is a routine inside the server process.
 - Daily schedule: the job runs at 8:30 PM and again at 6:00 AM Eastern, in the market timezone so daylight saving is followed. The evening run follows the US equity close, publication and corrections window; the morning run picks up mutual funds, which publish after midnight, so a date left incomplete in the evening completes the next morning.
 - The daily job snapshots only the latest date that has price data. A date missed while the server was down is not back-filled automatically; the agent fills it with a rebuild. A rebuilt date counts as completed.
+- Agents refer to instruments by symbol, with the exchange only when the symbol alone is ambiguous; internal ids are never exposed.
+- Tool results are JSON with decimals as exact strings. Recording a transaction never rebuilds snapshots; when it makes snapshots stale, the result names the date to rebuild from.
+- Stage 6 gives the agent no tool to read the updates log; refresh and rebuild results report their own outcome. A reader can be added later without changing stored data.
 - A snapshot requires every active instrument to have a price dated exactly on the snapshot date.
 
 ## Refs
