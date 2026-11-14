@@ -84,3 +84,11 @@ These rules mirror the transactions CHECK constraint in the initial migration.
 - **1.** if the limit is negative, return ErrInvalidInput.
 - **1.1.** if From is after To, return ErrInvalidInput.
 - **1.2.** if EventType is set and not one of the Event constants, return ErrInvalidInput.
+
+## EventType.valid() bool
+
+Return whether the value is one of the Event constants.
+
+## resolveLimit(limit int) int
+
+Return limit with defaultListLimit applied when zero and maxListLimit as the cap. Shared by every list filter.

@@ -306,3 +306,108 @@ func currentDatabase(t *testing.T, store *Store) string {
 
 	return name
 }
+
+func TestListPrices(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	instrument := registerETF(t, store, "VTI")
+
+	for _, day := range []int{2, 3, 4, 5} {
+		insertPrice(t, store, instrument.ID, date(2026, 11, day), "10.50")
+	}
+
+	bars, err := store.ListPrices(ctx, domain.PriceFilter{InstrumentID: instrument.ID, From: dp(date(2026, 11, 3)), To: dp(date(2026, 11, 4))})
+
+	require.NoError(t, err)
+	require.Len(t, bars, 2)
+	assert.Equal(t, date(2026, 11, 4), bars[0].Date, "newest first")
+	assert.Equal(t, domain.Decimal("10.50"), bars[0].Close, "exact decimal text")
+
+	limited, err := store.ListPrices(ctx, domain.PriceFilter{InstrumentID: instrument.ID, Limit: 1})
+	require.NoError(t, err)
+	assert.Len(t, limited, 1)
+
+	none, err := store.ListPrices(ctx, domain.PriceFilter{InstrumentID: 999})
+	require.NoError(t, err)
+	assert.Empty(t, none, "an unknown instrument has no prices")
+
+	_, err = store.ListPrices(ctx, domain.PriceFilter{})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+func TestListSnapshotsCarriesTheDateTotalAndAllocation(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	vti := seedHolding(t, store, "VTI", "3", date(2026, 11, 2), date(2026, 11, 2), date(2026, 11, 3))
+	seedHolding(t, store, "BND", "2", date(2026, 11, 2), date(2026, 11, 2), date(2026, 11, 3))
+
+	for _, day := range []int{2, 3} {
+		_, err := store.WriteSnapshot(ctx, date(2026, 11, day))
+		require.NoError(t, err)
+	}
+
+	rows, err := store.ListSnapshots(ctx, domain.SnapshotFilter{})
+	require.NoError(t, err)
+	require.Len(t, rows, 4)
+	assert.Equal(t, date(2026, 11, 3), rows[0].Date, "newest date first")
+	assert.Equal(t, "BND", rows[0].Symbol, "then by symbol")
+	assert.Equal(t, domain.Decimal("50"), rows[0].DateTotalUSD)
+	assert.Equal(t, domain.Decimal("20"), rows[0].MarketValueUSD)
+	assert.Equal(t, "0.4000000000000000", string(rows[0].Allocation)[:18])
+
+	filtered, err := store.ListSnapshots(ctx, domain.SnapshotFilter{InstrumentID: &vti.ID})
+	require.NoError(t, err)
+	require.Len(t, filtered, 2)
+	assert.Equal(t, domain.Decimal("50"), filtered[0].DateTotalUSD, "the total ignores the instrument filter")
+
+	ranged, err := store.ListSnapshots(ctx, domain.SnapshotFilter{From: dp(date(2026, 11, 3))})
+	require.NoError(t, err)
+	assert.Len(t, ranged, 2)
+
+	limited, err := store.ListSnapshots(ctx, domain.SnapshotFilter{Limit: 3})
+	require.NoError(t, err)
+	assert.Len(t, limited, 3)
+
+	_, err = store.ListSnapshots(ctx, domain.SnapshotFilter{Limit: -1})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+func TestListUpdatesNewestFirstWithFilters(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	provider := "tiingo"
+	base := time.Date(2026, 11, 3, 1, 0, 0, 0, time.UTC)
+
+	for index, update := range []domain.Update{
+		{Provider: &provider, DataType: domain.UpdateDataPrices, Status: domain.UpdateStatusCompleted, RecordsUpdated: 4},
+		{DataType: domain.UpdateDataSnapshots, Status: domain.UpdateStatusIncomplete, ErrorMessage: "VTI missing", DateFrom: dp(date(2026, 11, 3)), DateTo: dp(date(2026, 11, 3))},
+		{DataType: domain.UpdateDataSnapshotRebuild, Status: domain.UpdateStatusFailed, Reason: "fix", DateFrom: dp(date(2026, 11, 1)), DateTo: dp(date(2026, 11, 2))},
+	} {
+		update.StartedAt = base.Add(time.Duration(index) * time.Hour)
+		update.CompletedAt = update.StartedAt.Add(time.Minute)
+
+		require.NoError(t, store.RecordUpdate(ctx, update))
+	}
+
+	all, err := store.ListUpdates(ctx, domain.UpdateFilter{})
+	require.NoError(t, err)
+	require.Len(t, all, 3)
+	assert.Equal(t, domain.UpdateDataSnapshotRebuild, all[0].DataType, "newest first")
+	assert.Equal(t, "fix", all[0].Reason)
+	assert.Equal(t, date(2026, 11, 2), *all[0].DateTo)
+	assert.Nil(t, all[0].Provider)
+	assert.Equal(t, "tiingo", *all[2].Provider)
+	assert.NotZero(t, all[0].ID)
+
+	incomplete, err := store.ListUpdates(ctx, domain.UpdateFilter{Status: domain.UpdateStatusIncomplete})
+	require.NoError(t, err)
+	require.Len(t, incomplete, 1)
+	assert.Equal(t, "VTI missing", incomplete[0].ErrorMessage)
+
+	prices, err := store.ListUpdates(ctx, domain.UpdateFilter{DataType: domain.UpdateDataPrices, Limit: 1})
+	require.NoError(t, err)
+	assert.Len(t, prices, 1)
+
+	_, err = store.ListUpdates(ctx, domain.UpdateFilter{DataType: "bogus"})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+}

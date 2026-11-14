@@ -40,4 +40,12 @@ type Store interface {
 	RebuildSnapshots(ctx context.Context, from, to Date, reason string) (RebuildResult, error)
 	// RecordUpdate appends one row to the updates log. Returns ErrInvalidInput.
 	RecordUpdate(ctx context.Context, update Update) error
+	// ListPrices returns the stored price records of one instrument, newest
+	// first, limited. Returns ErrInvalidInput.
+	ListPrices(ctx context.Context, filter PriceFilter) ([]PriceBar, error)
+	// ListSnapshots returns snapshot rows, newest date first then by symbol and
+	// exchange, limited. Returns ErrInvalidInput.
+	ListSnapshots(ctx context.Context, filter SnapshotFilter) ([]SnapshotRow, error)
+	// ListUpdates returns updates log rows, newest first, limited. Returns ErrInvalidInput.
+	ListUpdates(ctx context.Context, filter UpdateFilter) ([]Update, error)
 }

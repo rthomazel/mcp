@@ -34,7 +34,31 @@ VALUES ($1::date, $2, $3::numeric, $4::numeric, $5::date)`
 	deleteSnapshotRangeSQL = `DELETE FROM snapshots WHERE date BETWEEN $1::date AND $2::date`
 	priceDatesSQL          = `SELECT DISTINCT date FROM prices WHERE date BETWEEN $1::date AND $2::date ORDER BY date`
 	latestSessionDateSQL   = `SELECT MAX(date) FROM prices`
-	insertUpdateSQL        = `
+	// The total is taken over every row of the date before the instrument filter applies.
+	listSnapshotsSQL = `
+WITH totals AS (
+    SELECT date, SUM(market_value_usd) AS total
+    FROM snapshots
+    WHERE ($2::date IS NULL OR date >= $2) AND ($3::date IS NULL OR date <= $3)
+    GROUP BY date
+)
+SELECT s.date, s.instrument_id, i.symbol, i.exchange, s.quantity::text, s.close_price::text, s.price_date,
+       s.market_value_usd::text, t.total::text, (s.market_value_usd / t.total)::text
+FROM snapshots s
+JOIN instruments i ON i.id = s.instrument_id
+JOIN totals t ON t.date = s.date
+WHERE ($1::int IS NULL OR s.instrument_id = $1)
+  AND ($2::date IS NULL OR s.date >= $2) AND ($3::date IS NULL OR s.date <= $3)
+ORDER BY s.date DESC, i.symbol, i.exchange
+LIMIT $4`
+	listUpdatesSQL = `
+SELECT id, provider, data_type, started_at, completed_at, status, records_updated,
+       error_message, date_from, date_to, reason
+FROM updates
+WHERE ($1::text IS NULL OR data_type = $1) AND ($2::text IS NULL OR status = $2)
+ORDER BY started_at DESC, id DESC
+LIMIT $3`
+	insertUpdateSQL = `
 INSERT INTO updates (provider, data_type, started_at, completed_at, status, records_updated,
                      error_message, date_from, date_to, reason)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9::date, $10)`
@@ -319,4 +343,88 @@ func insertSnapshotRows(ctx context.Context, tx *sqlx.Tx, date domain.Date, hold
 	}
 
 	return nil
+}
+
+// ListSnapshots returns snapshot rows, newest date first, each with its date's total.
+func (s *Store) ListSnapshots(ctx context.Context, filter domain.SnapshotFilter) ([]domain.SnapshotRow, error) {
+	if err := filter.Validate(); err != nil {
+		return nil, err
+	}
+
+	snapshots := []domain.SnapshotRow{}
+
+	rows, err := s.db.QueryxContext(ctx, listSnapshotsSQL, filter.InstrumentID, filter.From, filter.To, filter.ResolvedLimit())
+	if err != nil {
+		slog.ErrorContext(ctx, "listing snapshots failed", "err", err)
+
+		return nil, fmt.Errorf("listing snapshots: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var row domain.SnapshotRow
+
+		err := rows.Scan(&row.Date, &row.InstrumentID, &row.Symbol, &row.Exchange, &row.Quantity, &row.ClosePrice,
+			&row.PriceDate, &row.MarketValueUSD, &row.DateTotalUSD, &row.Allocation)
+		if err != nil {
+			slog.ErrorContext(ctx, "scanning snapshot failed", "err", err)
+
+			return nil, fmt.Errorf("scanning snapshot: %w", err)
+		}
+
+		snapshots = append(snapshots, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "listing snapshots failed", "err", err)
+
+		return nil, fmt.Errorf("listing snapshots: %w", err)
+	}
+
+	return snapshots, nil
+}
+
+// ListUpdates returns updates log rows, newest first.
+func (s *Store) ListUpdates(ctx context.Context, filter domain.UpdateFilter) ([]domain.Update, error) {
+	if err := filter.Validate(); err != nil {
+		return nil, err
+	}
+
+	updates := []domain.Update{}
+
+	rows, err := s.db.QueryxContext(ctx, listUpdatesSQL,
+		nullIfEmpty(filter.DataType), nullIfEmpty(filter.Status), filter.ResolvedLimit())
+	if err != nil {
+		slog.ErrorContext(ctx, "listing updates failed", "err", err)
+
+		return nil, fmt.Errorf("listing updates: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var (
+			update          domain.Update
+			completed       sql.NullTime
+			message, reason sql.NullString
+		)
+
+		err := rows.Scan(&update.ID, &update.Provider, &update.DataType, &update.StartedAt, &completed, &update.Status,
+			&update.RecordsUpdated, &message, &update.DateFrom, &update.DateTo, &reason)
+		if err != nil {
+			slog.ErrorContext(ctx, "scanning update failed", "err", err)
+
+			return nil, fmt.Errorf("scanning update: %w", err)
+		}
+
+		update.CompletedAt, update.ErrorMessage, update.Reason = completed.Time, message.String, reason.String
+		updates = append(updates, update)
+	}
+
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "listing updates failed", "err", err)
+
+		return nil, fmt.Errorf("listing updates: %w", err)
+	}
+
+	return updates, nil
 }

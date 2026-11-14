@@ -40,9 +40,21 @@ Add the eleven tools to server, each with the description, parameters and hints 
 
 The registry is small, so resolving in memory avoids a new store method. Callers refer to instruments by symbol, never by internal id.
 
-## Handler.resolveOptional(ctx Context, symbol string, exchange string) (*int, error)
+## findInstrument(instruments []domain.Instrument, symbol string, exchange string) (domain.Instrument, error)
 
-Return nil when symbol is empty, otherwise the id of resolveInstrument. Used by the list tools, where the instrument is a filter.
+Match the normalized symbol, and the normalized exchange when one is given, among instruments, as in steps 2 and 3 of resolveInstrument.
+
+## optionalInstrumentID(instruments []domain.Instrument, symbol string, exchange string) (*int, error)
+
+Return nil when symbol is empty, otherwise the id of findInstrument. Used by the list tools, where the instrument is a filter and the instruments are already listed.
+
+## indexInstruments(instruments []domain.Instrument) map[int]domain.Instrument
+
+Index the instruments by id, so views can name an id's symbol, name and type.
+
+## requireString(req CallToolRequest, name string) (string, error)
+
+Return the trimmed parameter, or ErrInvalidInput naming it when missing or blank. requireDate and optionalDate read a YYYY-MM-DD parameter the same way, through parseDate.
 
 ## parseDate(name string, value string) (*domain.Date, error)
 

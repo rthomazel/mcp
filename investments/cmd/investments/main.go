@@ -12,6 +12,7 @@ import (
 
 	"github.com/rthomazel/mcp/investments/internal/config"
 	"github.com/rthomazel/mcp/investments/internal/data"
+	"github.com/rthomazel/mcp/investments/internal/handlers"
 	"github.com/rthomazel/mcp/investments/internal/marketdata"
 	"github.com/rthomazel/mcp/investments/internal/provider/tiingo"
 	"github.com/rthomazel/mcp/investments/internal/storage/postgres"
@@ -46,7 +47,8 @@ func run() error {
 	}
 
 	provider := tiingo.NewClient(cfg.TiingoAPIKey, "")
-	job := data.NewJob(store, marketdata.NewRefresher(store, provider), provider.Name())
+	refresher := marketdata.NewRefresher(store, provider)
+	job := data.NewJob(store, refresher, provider.Name())
 
 	scheduler, err := data.NewScheduler(job)
 	if err != nil {
@@ -67,6 +69,7 @@ func run() error {
 	}()
 
 	mcpServer := server.NewMCPServer("investments-mcp", version)
+	handlers.New(store, refresher, cfg.QueryTimeout).Register(mcpServer)
 
 	return server.ServeStdio(mcpServer)
 }

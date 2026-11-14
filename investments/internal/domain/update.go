@@ -21,6 +21,7 @@ const (
 // DateTo as the same date; a completed one is the idempotency marker for that
 // date. A rebuild records its range and reason.
 type Update struct {
+	ID             int64   // zero for an update not yet stored
 	Provider       *string // nil for runs that call no provider
 	DataType       string
 	StartedAt      time.Time
@@ -33,17 +34,44 @@ type Update struct {
 	Reason         string
 }
 
+// UpdateFilter selects updates log rows.
+type UpdateFilter struct {
+	DataType string // empty for any
+	Status   string // empty for any
+	Limit    int    // zero means defaultListLimit, capped at maxListLimit
+}
+
+// Validate checks the data type, status and limit.
+func (f UpdateFilter) Validate() error {
+	if f.DataType != "" && !validUpdateDataType(f.DataType) {
+		return fmt.Errorf("%w: unknown update data type %q", ErrInvalidInput, f.DataType)
+	}
+
+	if f.Status != "" && !validUpdateStatus(f.Status) {
+		return fmt.Errorf("%w: unknown update status %q", ErrInvalidInput, f.Status)
+	}
+
+	return validateListFilter(f.Limit, nil, nil)
+}
+
+// ResolvedLimit applies the default and the cap to Limit.
+func (f UpdateFilter) ResolvedLimit() int { return resolveLimit(f.Limit) }
+
+func validUpdateDataType(value string) bool {
+	return value == UpdateDataPrices || value == UpdateDataSnapshots || value == UpdateDataSnapshotRebuild
+}
+
+func validUpdateStatus(value string) bool {
+	return value == UpdateStatusCompleted || value == UpdateStatusIncomplete || value == UpdateStatusFailed
+}
+
 // Validate mirrors the updates table checks.
 func (u Update) Validate() error {
-	switch u.DataType {
-	case UpdateDataPrices, UpdateDataSnapshots, UpdateDataSnapshotRebuild:
-	default:
+	if !validUpdateDataType(u.DataType) {
 		return fmt.Errorf("%w: unknown update data type %q", ErrInvalidInput, u.DataType)
 	}
 
-	switch u.Status {
-	case UpdateStatusCompleted, UpdateStatusIncomplete, UpdateStatusFailed:
-	default:
+	if !validUpdateStatus(u.Status) {
 		return fmt.Errorf("%w: unknown update status %q", ErrInvalidInput, u.Status)
 	}
 
