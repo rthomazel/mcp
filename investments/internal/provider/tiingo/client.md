@@ -13,13 +13,13 @@ priceColumns = "date,open,high,low,close,adjClose,volume".
 
 1. httpClient *http.Client
 2. baseURL string
-3. token string
+3. apiKey string
 
-Implements domain.PriceProvider, with a compile-time assertion. The token travels only in the Authorization header and never appears in a URL, log or error.
+Implements domain.PriceProvider, with a compile-time assertion. The API key travels only in the Authorization header and never appears in a URL, log or error.
 
 # Functions
 
-## NewClient(token string, baseURL string) *Client
+## NewClient(apiKey string, baseURL string) *Client
 
 Build a Client with an HTTP client using requestTimeout. An empty baseURL means defaultBaseURL; tests point it at a local server.
 
@@ -31,7 +31,7 @@ Return providerName.
 
 1. Convert the symbol to Tiingo's format by replacing periods with dashes.
 2. Build GET {baseURL}/tiingo/daily/{symbol}/prices with the symbol path-escaped, startDate set to from or earliestDate, format csv and columns priceColumns.
-3. Send it with the headers Authorization: Token {token} and Content-Type: application/json.
+3. Send it with the headers Authorization: Token {apiKey} and Content-Type: application/json.
 4. Read the response body.
 5. Check the response for failure.
 6. Parse the body with parseBars.
