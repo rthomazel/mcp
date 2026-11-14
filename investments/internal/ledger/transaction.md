@@ -25,7 +25,7 @@ listTransactionsSQL = select transactions matching the optional filters, newest 
 
 # Functions
 
-## Store.RecordTransaction(ctx Context, in NewTransaction) (RecordResult, error)
+## PostgresStore.RecordTransaction(ctx Context, in NewTransaction) (RecordResult, error)
 
 1. Validate in.
 2. Run inside storage.WithTx:
@@ -66,7 +66,7 @@ The check costs a scan of the one instrument's ledger per write, acceptable for 
 Cash-only events never set RebuildFrom, since snapshots exclude cash.
 Rebuild is never triggered here; the caller decides.
 
-## Store.ListTransactions(ctx Context, f TransactionFilter) ([]Transaction, error)
+## PostgresStore.ListTransactions(ctx Context, f TransactionFilter) ([]Transaction, error)
 
 1. Apply the default and the cap to the limit.
 2. Select via listTransactionsSQL with the filters.

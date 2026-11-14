@@ -63,6 +63,10 @@ A string, one of the Event constants.
 4. Currency string
 5. InstrumentType string
 
+The New types are caller input; the others are stored rows returned to callers.
+Input is normalized and validated before it touches the database, carries no server-assigned fields, and for transactions allows an empty cash amount meaning zero, which a stored row never has.
+NewInstrument differs from Instrument only by the ID, so the split is kept mainly for symmetry with Transaction. It can be collapsed if that is judged not worth it.
+
 ## Transaction
 
 1. ID int64

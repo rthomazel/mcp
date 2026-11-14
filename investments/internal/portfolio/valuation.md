@@ -28,11 +28,11 @@ valuationSQL = for each active position as of the reference date (positionsSQL),
 
 # Functions
 
-## Store.GetPortfolio(ctx Context, asOf *Date) (Portfolio, error)
+## PostgresStore.GetPortfolio(ctx Context, asOf *Date) (Portfolio, error)
 
-1. Derive the reference date: asOf, or today in marketTimezone.
+1. Derive the reference date: asOf, or today in the store's market location.
 2. Run valuationSQL for the reference date.
-3. Mark each holding unusable when it has no price row ("missing") or its price is Store.stalePriceDays or more older than the reference date ("stale").
+3. Mark each holding unusable when it has no price row ("missing") or its price is PostgresStore.stalePriceDays or more older than the reference date ("stale").
 4. Select integrity errors via integritySQL for the reference date.
 5. if no holding is unusable, set Complete, SecuritiesValueUSD to the total, and each holding's allocation.
 6. otherwise leave Complete false and SecuritiesValueUSD and every Allocation nil; holdings that are usable keep their price and value.
@@ -52,4 +52,4 @@ Valuation always uses close, never adjusted close.
 Cash is excluded: only quantity times price counts.
 The value, total and allocation arithmetic is done in SQL; Go only decides what to expose. Allocations are exact to NUMERIC division precision and sum to one within that rounding.
 Stage 5 reuses valuationSQL with the snapshot date as the reference date and requires the price date to equal it.
-The stale price threshold is Store.stalePriceDays, set from the configuration at construction.
+The stale price threshold is PostgresStore.stalePriceDays, set from the configuration at construction.

@@ -3,21 +3,9 @@
 insertInstrumentSQL = insert an instruments row returning the full row.
 listInstrumentsSQL = select all instruments ordered by symbol, then exchange.
 
-# Types
-
-## Store
-
-1. pool *pgxpool.Pool
-
-Owns the instrument registry and the transaction ledger. Shared by instrument.go and transaction.go.
-
 # Functions
 
-## NewStore(pool *pgxpool.Pool) *Store
-
-Build a Store around the pool.
-
-## Store.RegisterInstrument(ctx Context, in NewInstrument) (Instrument, error)
+## PostgresStore.RegisterInstrument(ctx Context, in NewInstrument) (Instrument, error)
 
 1. Normalize and validate in.
 2. Insert via insertInstrumentSQL and scan the result.
@@ -34,6 +22,6 @@ Build a Store around the pool.
 - **2.1.** if the currency check fires despite validation, return ErrInvalidInput.
 - **2.2.** otherwise return the wrapped error.
 
-## Store.ListInstruments(ctx Context) ([]Instrument, error)
+## PostgresStore.ListInstruments(ctx Context) ([]Instrument, error)
 
 Select via listInstrumentsSQL and return all rows; an empty registry returns an empty slice, not nil.

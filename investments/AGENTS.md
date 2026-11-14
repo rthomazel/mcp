@@ -58,4 +58,5 @@ Personal investment monitoring server, Go and PostgreSQL. Spec-driven: read `spc
 Specifications live under `spc/`. Software models are colocated with the code they describe, same path with a `.md` extension (`main.go` → `main.md`).
 Models are approved before code is written, and are updated in the same change as the code they cover.
 Money and quantities are PostgreSQL NUMERIC. Go carries them as decimal strings and never does decimal arithmetic; calculations run in SQL.
+Store interfaces are mocked with mockery; generate mocks before running tests.
 Configuration, SQL migrations, Dockerfile, run script and `bin/` scripts are not modelled; migrations are reviewed as SQL, with rationale in comments.

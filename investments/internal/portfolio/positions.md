@@ -5,11 +5,6 @@ integritySQL = per instrument, order the ledger restricted to the as-of date by 
 
 # Types
 
-## Store
-
-1. pool *pgxpool.Pool
-2. stalePriceDays int
-
 ## Position
 
 1. InstrumentID int
@@ -33,11 +28,7 @@ integritySQL = per instrument, order the ledger restricted to the as-of date by 
 
 # Functions
 
-## NewStore(pool *pgxpool.Pool, stalePriceDays int) *Store
-
-Build a Store around the pool and the stale price threshold.
-
-## Store.GetPositions(ctx Context, asOf *Date) (PositionsResult, error)
+## PostgresStore.GetPositions(ctx Context, asOf *Date) (PositionsResult, error)
 
 1. Select active positions via positionsSQL.
 2. Select ledger integrity errors via integritySQL.

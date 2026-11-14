@@ -34,3 +34,4 @@ defaultStalePriceDays = 5, from the spec: a price five or more days older than t
 
 The DSN points at the dedicated investments database on LGA Postgres, using the role that has no access to other databases.
 Later stages add the provider key and the schedule.
+Every variable is listed in .env.example, which is configuration and not modelled; the compose service reads the real values from a .env next to it.
