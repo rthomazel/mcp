@@ -38,6 +38,6 @@ defaultStalePriceDays = 5, from the spec: a price five or more days older than t
 
 - **4.** if the API key is empty, return an error naming the variable.
 
-The DSN points at the dedicated investments database on LGA Postgres, using the role that has no access to other databases.
+The DSN points at the dedicated mcpinvestments database on LGA Postgres, using the role that has no access to other databases.
 The API key is never logged, never put in a URL and never returned to a client. It supports rotation by restarting the server with a new value. A later stage adds the schedule.
 Every variable is listed in .env.example, which is configuration and not modelled; the compose service reads the real values from a .env next to it.

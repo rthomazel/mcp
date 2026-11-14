@@ -273,7 +273,7 @@ market-trends workflow.
 ## Deployment
 
 LGA gets one PostgreSQL server, called LGA Postgres, hosting multiple databases.
-The Investments MCP uses a dedicated investments database on it, with its own role
+The Investments MCP uses a dedicated mcpinvestments database on it, with its own role
 that has no access to other databases. Future systems get their own databases on
 the same server rather than their own servers. This is the first database for the
 operator's own services; the databases behind other LGA services belong to
@@ -291,7 +291,7 @@ least once before the system is relied on. Staging and rollout order are in the 
 
 - One Go service and five tables; no separate API backend.
 - One shared PostgreSQL server on LGA with a database per system; this server owns
-  only the investments database.
+  only the mcpinvestments database.
 - PostgreSQL numeric types for all money and quantities.
 - Ownership history comes from the ledger; portfolio history from daily
   instrument-level snapshots.
@@ -326,7 +326,7 @@ least once before the system is relied on. Staging and rollout order are in the 
 - The provider credential never appears in any response or log.
 - The server is unreachable from outside the container and Tailscale networks, and
   through LiteLLM rejects requests without a valid key.
-- A daily backup of the investments database runs, and a restore from it has been
+- A daily backup of the mcpinvestments database runs, and a restore from it has been
   verified.
 - Swapping the market data provider requires no change to stored data or agent contracts.
 

@@ -32,7 +32,7 @@ its models before code. Technical design lives in the models, not here.
 ## LGA rollout
 
 1. Add the shared LGA Postgres server with persistent storage and
-   secrets, create the investments database and its dedicated role, set up the
+   secrets, create the mcpinvestments database and its dedicated role, set up the
    daily per-database backup service, and verify them independently, including a
    test restore.
 2. Publish the server image from the mcp repository.
