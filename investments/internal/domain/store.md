@@ -21,6 +21,7 @@
 17. ListCashTransactions(ctx Context, filter CashTransactionFilter) ([]CashTransaction, error)
 18. GetCash(ctx Context, date *Date) (CashBalance, error)
 19. GetStatus(ctx Context) (Status, error)
+20. GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
 
 The one central persistence interface. Every consumer depends on it, and tests mock it with mockery. Implemented by internal/storage/postgres.
 Each method is a self-contained unit of work in its own transaction; composing several Store calls into one transaction is not supported.
@@ -100,3 +101,7 @@ Computes the cash balance as of date, or today in the market timezone when nil, 
 ### GetStatus(ctx Context) (Status, error)
 
 Reports freshness and health as of today in the market timezone: per held instrument the latest price date and whether it is missing or stale, the latest price date and latest completed snapshot date, whether the latest price date has no completed snapshot, and the failed or incomplete runs no later run has resolved. Healthy only when none of those is a problem.
+
+### GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
+
+Returns the securities value, and cash and account equity where cash snapshots exist, over the range at the requested spacing, with summary measures: latest value, all-time high, drawdown from it, change from the baseline, range high and low and maximum drawdown. Returns ErrInvalidInput for an unknown granularity, an inverted range or a series over the point limit. Changes in value, not returns.

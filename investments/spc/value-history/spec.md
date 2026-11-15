@@ -12,7 +12,7 @@ agents: claude
 ## Intent
 
 Answer what the securities value was, whether it fell from its previous peak and where the peak was.
-The all-time high scope is every stored snapshot since the earliest one.
+The all-time high scope is every stored snapshot from the earliest one through the end of the range.
 
 ## Behavior
 
@@ -24,8 +24,8 @@ When a cash snapshot exists for the point, the point also carries cash and accou
 Summary measures cover the requested range, except the all-time high:
 
 - latest value and date;
-- all-time high and its date, over every stored snapshot since the earliest one, whatever the range;
-  the earliest date wins a tie;
+- all-time high and its date, over every stored snapshot from the earliest one through the end of the range,
+  whatever the range start; the earliest date wins a tie;
 - dollar and percentage drawdown of the latest value from the all-time high;
 - change over the range, dollar and percent, from the baseline to the latest point. The baseline is the
   last snapshot on or before the range start, so a range starting on a weekend or holiday keeps the first
@@ -44,7 +44,7 @@ or a new purchase raises value without being a gain, and results say so.
 
 ## Acceptance criteria
 
-- Value history returns one point per interval at the last snapshot date, skips non-snapshot dates, and the all-time high and drawdown cover every stored snapshot regardless of the range.
+- Value history returns one point per interval at the last snapshot date, skips non-snapshot dates, and the all-time high and drawdown cover every stored snapshot through the range end regardless of the range start.
 - Change over the range uses the last snapshot on or before the start as baseline and names its date.
 - The range high, low and maximum drawdown, with their dates and a recovered flag, match hand-calculated values; a range that only rises has zero maximum drawdown.
 - When cash snapshots exist, points carry cash and account equity, and equity measures and net contributions are reported; see the cash feature.
