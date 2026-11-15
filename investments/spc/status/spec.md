@@ -20,8 +20,7 @@ A status view answers whether the data is healthy, beyond the raw updates log. I
 for each held instrument, its latest stored price date and whether it is missing or unexpectedly
 old; the latest completed snapshot date and whether the latest price date has no completed
 snapshot; and the failed or incomplete runs that still need attention. A run needs
-attention until a later completed run of the same kind, for a snapshot run the same date,
-supersedes it. The view gives one overall verdict, healthy or needs attention, with reasons.
+attention until a later completed run of the same kind supersedes it: for a snapshot run, a completed run for the same date; for a rebuild, a later completed rebuild whose range covers it. The view gives one overall verdict, healthy or needs attention, with reasons.
 The raw updates log stays available.
 
 ## Acceptance criteria

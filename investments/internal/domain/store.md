@@ -20,6 +20,7 @@
 16. RecordCashTransaction(ctx Context, draft CashTransaction) (CashRecordResult, error)
 17. ListCashTransactions(ctx Context, filter CashTransactionFilter) ([]CashTransaction, error)
 18. GetCash(ctx Context, date *Date) (CashBalance, error)
+19. GetStatus(ctx Context) (Status, error)
 
 The one central persistence interface. Every consumer depends on it, and tests mock it with mockery. Implemented by internal/storage/postgres.
 Each method is a self-contained unit of work in its own transaction; composing several Store calls into one transaction is not supported.
@@ -95,3 +96,7 @@ Returns cash transactions matching filter, newest first by effective date, limit
 ### GetCash(ctx Context, date *Date) (CashBalance, error)
 
 Computes the cash balance as of date, or today in the market timezone when nil, from the cash ledger. Not initialized without an opening balance on or before the date. Negative running balances are returned as integrity errors, never omitted.
+
+### GetStatus(ctx Context) (Status, error)
+
+Reports freshness and health as of today in the market timezone: per held instrument the latest price date and whether it is missing or stale, the latest price date and latest completed snapshot date, whether the latest price date has no completed snapshot, and the failed or incomplete runs no later run has resolved. Healthy only when none of those is a problem.

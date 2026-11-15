@@ -2,7 +2,7 @@
 
 ## Views
 
-Each tool result is a JSON object built from small view types, one per domain type returned: Instrument, Transaction, ClosedPosition, PnLTotals, CashTransaction, CashBalance, CashIntegrityError, Position, IntegrityError, Holding, Portfolio, PriceBar, SnapshotRow, SnapshotDay, RefreshResult, RebuildResult, SnapshotIssue and Update.
+Each tool result is a JSON object built from small view types, one per domain type returned: Instrument, Transaction, InstrumentStatus, Status, ClosedPosition, PnLTotals, CashTransaction, CashBalance, CashIntegrityError, Position, IntegrityError, Holding, Portfolio, PriceBar, SnapshotRow, SnapshotDay, RefreshResult, RebuildResult, SnapshotIssue and Update.
 
 Conventions shared by every view:
 
