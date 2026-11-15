@@ -98,6 +98,7 @@ func parseDraftTransaction(req mcp.CallToolRequest) (domain.DraftTransaction, st
 	draft.EventType = domain.EventType(strings.ToUpper(eventType))
 	draft.QuantityChange = domain.Decimal(quantity)
 	draft.CashAmount = domain.Decimal(strings.TrimSpace(req.GetString("cash_amount", "")))
+	draft.Fee = domain.Decimal(strings.TrimSpace(req.GetString("fee", "")))
 
 	if notes := req.GetString("notes", ""); notes != "" {
 		draft.Notes = &notes

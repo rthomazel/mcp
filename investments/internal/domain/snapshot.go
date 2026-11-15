@@ -21,7 +21,9 @@ type SnapshotResult struct {
 	Skipped  bool // the date was already completed and nothing was done
 	Complete bool
 	Rows     int // complete with zero rows means no active positions
-	Issues   []SnapshotIssue
+	// CashWritten is true when the date's cash snapshot was written.
+	CashWritten bool
+	Issues      []SnapshotIssue
 }
 
 // SnapshotRow is one stored snapshot row with its date's total and its share.
@@ -58,6 +60,8 @@ type RebuildResult struct {
 	To    Date
 	Dates int
 	Rows  int
+	// CashDates is the number of dates with a cash snapshot written.
+	CashDates int
 }
 
 // IncompleteSnapshotError reports the first date a rebuild could not value.

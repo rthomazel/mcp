@@ -137,3 +137,11 @@ The total is computed before the instrument filter applies, so a filtered row st
 A null error message, reason, provider or date becomes the empty value or nil.
 
 Every unexpected failure in these methods (query, statement, transaction, lock, marshalling) is logged at error level with the operation name and the dates involved before the wrapped error is returned. Validation failures and the sentinel errors that are not listed above as logged are the caller's mistakes, not faults, and are not logged.
+
+## insertCashSnapshot(ctx Context, tx *sqlx.Tx, date domain.Date) (bool, error)
+
+Compute cashBalance for date through tx. Not initialized writes nothing and returns false. Otherwise insert via insertCashSnapshotSQL and return true; an existing row returns ErrSnapshotExists. Shared by WriteSnapshot and RebuildSnapshots.
+
+## Store.queryUpdates(ctx Context, query string, args ...any) ([]domain.Update, error)
+
+Run a query that selects the updates columns in listUpdatesSQL order and scan the rows; shared by ListUpdates and GetStatus.

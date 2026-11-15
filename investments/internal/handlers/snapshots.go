@@ -73,5 +73,5 @@ func (h *Handler) HandleRebuildSnapshots(ctx context.Context, req mcp.CallToolRe
 		return h.failure(ctx, tool, err), nil
 	}
 
-	return jsonResult(rebuildView{From: formatDate(result.From), To: formatDate(result.To), Dates: result.Dates, Rows: result.Rows})
+	return jsonResult(rebuildView{From: formatDate(result.From), To: formatDate(result.To), Dates: result.Dates, Rows: result.Rows, CashDates: result.CashDates})
 }

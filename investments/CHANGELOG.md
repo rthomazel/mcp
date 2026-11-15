@@ -1,6 +1,13 @@
 # CHANGELOG
 
-## Unreleased
+## [0.2.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.2.0) feat: cash, position P&L, status and value history
+
+### feat
+
+- **(cash)** explicit cash: `add_cash_transaction`, `list_cash_transactions` and `get_cash`, daily cash snapshots written with the securities snapshot, and account equity and buying power in `get_portfolio`. Record an opening balance first; cash is reported only from its date. Migration `cash`.
+- **(pnl)** average-cost position P&L in `get_portfolio`: cost, unrealized and realized P&L, dividends, tax and fees, closed positions and totals. `add_transaction` takes an optional `fee`. Migration `trade_fee`.
+- **(status)** `get_status` aggregates price freshness of held instruments, snapshot coverage and unresolved failed runs into one verdict.
+- **(history)** `get_value_history` returns the securities value and account equity over a date range with `window_days` spacing, all-time high, drawdown, change over the range and net contributions. Changes in value, not returns.
 
 ### fix
 

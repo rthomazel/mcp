@@ -1,6 +1,7 @@
 # Constants
 
 accountEquitySQL = select the sum of two NUMERIC parameters, the securities value and the cash balance.
+
 valuationSQL = for each active position as of the reference date (positionsSQL), take the latest prices row with date on or before the reference date (lateral join, newest first, one row); return quantity, close, price date, days between the reference date and the price date, market value as quantity times close, the sum of market values over the rows that have a price, and each row's market value divided by that sum.
 
 # Functions
@@ -37,3 +38,15 @@ The value, total and allocation arithmetic is done in SQL; Go only decides what 
 The cost and P&L rules are in costbasis.go; closed positions are the instruments with ledger rows and no shares, and an instrument whose ledger goes negative appears only as an integrity error.
 valuedHoldings runs valuationSQL alone and takes the query handle, so snapshots run it inside their transaction without the cost walk, and a snapshot treats any holding whose price date differs from the reference date as an issue.
 The stale price threshold is Store.stalePriceDays, set from the configuration when the store is opened.
+
+## Store.priceIssue(priceDate, ageDays) (string, *Date)
+
+Return "missing" without a price date, "stale" when the age is Store.stalePriceDays or more, otherwise empty; the price date is returned whenever a price row exists. Shared by valuedHoldings, portfolioPnL and GetStatus, so the threshold has one definition.
+
+## Store.withholdPrices(portfolio *domain.Portfolio)
+
+Clear every allocation and the unrealized and total return totals, the figures that would mislead over a partial set of prices.
+
+## Store.accountEquity(ctx Context, securities Decimal, cash Decimal) (*Decimal, error)
+
+Add the two through accountEquitySQL.
