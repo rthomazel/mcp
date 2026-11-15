@@ -17,7 +17,7 @@
 13. ListPrices(ctx Context, filter PriceFilter) ([]PriceBar, error)
 14. ListSnapshots(ctx Context, filter SnapshotFilter) ([]SnapshotRow, error)
 15. ListUpdates(ctx Context, filter UpdateFilter) ([]Update, error)
-16. RecordCashTransaction(ctx Context, draft DraftCashTransaction) (CashRecordResult, error)
+16. RecordCashTransaction(ctx Context, draft CashTransaction) (CashRecordResult, error)
 17. ListCashTransactions(ctx Context, filter CashTransactionFilter) ([]CashTransaction, error)
 18. GetCash(ctx Context, date *Date) (CashBalance, error)
 
@@ -84,7 +84,7 @@ Returns snapshot rows matching filter, newest date first then by symbol and exch
 
 Returns updates log rows matching filter, newest first by start time, limited. Returns ErrInvalidInput for an invalid filter.
 
-### RecordCashTransaction(ctx Context, draft DraftCashTransaction) (CashRecordResult, error)
+### RecordCashTransaction(ctx Context, draft CashTransaction) (CashRecordResult, error)
 
 Validates draft and inserts it. Returns ErrInvalidInput, including when a second opening balance is recorded. A balance that would go negative is not rejected. CashRecordResult.RebuildFrom reports stale cash snapshots; it never rebuilds.
 

@@ -14,24 +14,14 @@ A string, one of the Cash constants.
 
 ## CashTransaction
 
-1. ID int64
+1. ID int64, zero for an entry not yet stored
 2. Kind CashKind
 3. Amount Decimal, signed: positive adds cash, negative removes it
 4. ExecutedAt Time
 5. EffectiveDate Date
 6. Notes *string
 
-An account-level cash event that belongs to no instrument. Distinct from Transaction, the instrument ledger; the cash ledger is both together.
-
-## DraftCashTransaction
-
-1. Kind CashKind
-2. Amount Decimal, required
-3. ExecutedAt Time
-4. EffectiveDate Date, required
-5. Notes *string
-
-Caller input that is not yet saved. Normalized and validated before it touches the database.
+An account-level cash event that belongs to no instrument. Distinct from Transaction, the instrument ledger; the cash ledger is both together. Also the caller's input to Store.RecordCashTransaction, with ID zero; it is normalized and validated before it touches the database.
 
 ## CashRecordResult
 
@@ -72,7 +62,7 @@ A stored daily cash balance, one per snapshot date. Written with the securities 
 
 # Functions
 
-## DraftCashTransaction.Validate() error
+## CashTransaction.Validate() error
 
 1. if kind is not one of the Cash constants, return ErrInvalidInput.
 2. if amount is empty or does not parse, return ErrInvalidInput.

@@ -11,9 +11,9 @@ listCashTransactionsSQL = select cash_transactions matching the optional kind an
 
 # Functions
 
-## Store.RecordCashTransaction(ctx Context, draft domain.DraftCashTransaction) (domain.CashRecordResult, error)
+## Store.RecordCashTransaction(ctx Context, draft domain.CashTransaction) (domain.CashRecordResult, error)
 
-1. Validate draft with DraftCashTransaction.Validate.
+1. Validate draft with CashTransaction.Validate.
 2. Run inside withTx:
    1. Insert via insertCashTransactionSQL and scan the result.
    2. Work out the stale date with staleCashFrom, passing whether the kind is the opening balance.
