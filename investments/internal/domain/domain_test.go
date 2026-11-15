@@ -173,3 +173,125 @@ func TestPriceBarValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestCashTransactionValidate(t *testing.T) {
+	at := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	entry := func(kind CashKind, amount string) CashTransaction {
+		return CashTransaction{Kind: kind, Amount: Decimal(amount), ExecutedAt: at, EffectiveDate: at}
+	}
+
+	tests := map[string]struct {
+		entry CashTransaction
+		valid bool
+	}{
+		"opening positive":      {entry(CashOpeningBalance, "10"), true},
+		"opening negative":      {entry(CashOpeningBalance, "-10"), true},
+		"opening zero":          {entry(CashOpeningBalance, "0"), true},
+		"deposit positive":      {entry(CashDeposit, "10"), true},
+		"deposit zero":          {entry(CashDeposit, "0"), false},
+		"deposit negative":      {entry(CashDeposit, "-1"), false},
+		"interest negative":     {entry(CashInterest, "-1"), false},
+		"withdrawal negative":   {entry(CashWithdrawal, "-1"), true},
+		"withdrawal positive":   {entry(CashWithdrawal, "1"), false},
+		"fee positive":          {entry(CashFee, "1"), false},
+		"unknown kind":          {entry("BONUS", "1"), false},
+		"amount not a decimal":  {entry(CashDeposit, "ten"), false},
+		"missing effective":     {CashTransaction{Kind: CashDeposit, Amount: "1", ExecutedAt: at}, false},
+		"notes over the limit":  {CashTransaction{Kind: CashDeposit, Amount: "1", ExecutedAt: at, EffectiveDate: at, Notes: ptr(strings.Repeat("x", 1001))}, false},
+		"notes at the limit ok": {CashTransaction{Kind: CashDeposit, Amount: "1", ExecutedAt: at, EffectiveDate: at, Notes: ptr(strings.Repeat("x", 1000))}, true},
+	}
+
+	for name, test := range tests {
+		err := test.entry.Validate()
+		if test.valid {
+			assert.NoError(t, err, name)
+		} else {
+			assert.ErrorIs(t, err, ErrInvalidInput, name)
+		}
+	}
+}
+
+func TestCashTransactionFilterNormalize(t *testing.T) {
+	early := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	late := early.AddDate(0, 0, 1)
+
+	filter, err := CashTransactionFilter{Limit: 9999}.Normalize()
+	require.NoError(t, err)
+	assert.Equal(t, maxListLimit, filter.Limit)
+
+	filter, err = CashTransactionFilter{}.Normalize()
+	require.NoError(t, err)
+	assert.Equal(t, defaultListLimit, filter.Limit)
+
+	for name, bad := range map[string]CashTransactionFilter{
+		"negative limit": {Limit: -1}, "inverted range": {From: &late, To: &early}, "unknown kind": {Kind: "BONUS"},
+	} {
+		_, err := bad.Normalize()
+		assert.ErrorIs(t, err, ErrInvalidInput, name)
+	}
+}
+
+func TestDraftTransactionFeeValidation(t *testing.T) {
+	at := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	draft := func(event EventType, quantity, cash, fee string) DraftTransaction {
+		return DraftTransaction{
+			InstrumentID: 1, EventType: event, QuantityChange: Decimal(quantity), CashAmount: Decimal(cash),
+			Fee: Decimal(fee), ExecutedAt: at, EffectiveDate: at,
+		}
+	}
+
+	assert.NoError(t, draft(EventBuy, "1", "-10", "1").Validate())
+	assert.NoError(t, draft(EventSell, "-1", "10", "0").Validate(), "a zero fee is no fee")
+	assert.NoError(t, draft(EventDividend, "0", "10", "").Validate())
+	assert.ErrorIs(t, draft(EventBuy, "1", "-10", "-1").Validate(), ErrInvalidInput)
+	assert.ErrorIs(t, draft(EventBuy, "1", "-10", "abc").Validate(), ErrInvalidInput)
+	assert.ErrorIs(t, draft(EventDividend, "0", "10", "1").Validate(), ErrInvalidInput, "fees only on BUY and SELL")
+}
+
+func TestStatusSummarize(t *testing.T) {
+	latest := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
+
+	healthy := Status{LatestPriceDate: &latest, Instruments: []InstrumentStatus{{Symbol: "VTI"}}}
+	healthy.Summarize()
+	assert.True(t, healthy.Healthy)
+	assert.Empty(t, healthy.Reasons)
+
+	unhealthy := Status{
+		LatestPriceDate: &latest, SnapshotMissing: true,
+		Instruments: []InstrumentStatus{
+			{Symbol: "VTI", PriceIssue: PriceIssueStale, LatestPriceDate: &latest},
+			{Symbol: "BND", PriceIssue: PriceIssueMissing},
+		},
+		NeedsAttention: []Update{{ID: 1}, {ID: 2}},
+	}
+	unhealthy.Summarize()
+
+	assert.False(t, unhealthy.Healthy)
+	assert.Equal(t, []string{
+		"VTI price stale (latest 2026-11-03)",
+		"BND price missing",
+		"no completed snapshot for 2026-11-03",
+		"2 failed or incomplete runs not yet superseded",
+	}, unhealthy.Reasons)
+}
+
+func TestHistoryFilterNormalize(t *testing.T) {
+	early := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	late := early.AddDate(0, 0, 1)
+
+	filter, err := HistoryFilter{}.Normalize()
+	require.NoError(t, err)
+	assert.Equal(t, 1, filter.WindowDays)
+
+	filter, err = HistoryFilter{WindowDays: 7}.Normalize()
+	require.NoError(t, err)
+	assert.Equal(t, 7, filter.WindowDays)
+
+	_, err = HistoryFilter{WindowDays: -1}.Normalize()
+	assert.ErrorIs(t, err, ErrInvalidInput)
+
+	_, err = HistoryFilter{From: &late, To: &early}.Normalize()
+	assert.ErrorIs(t, err, ErrInvalidInput)
+}
+
+func ptr(value string) *string { return &value }

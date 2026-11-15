@@ -39,7 +39,7 @@ func New(store domain.Store, refresher *marketdata.Refresher, queryTimeout time.
 	return &Handler{store: store, refresher: refresher, queryTimeout: queryTimeout}
 }
 
-// Register adds the eleven tools to the server.
+// Register adds the tools to the server.
 func (h *Handler) Register(s *server.MCPServer) {
 	s.AddTool(mcp.NewTool("add_instrument",
 		mcp.WithDescription("Register a USD-quoted stock, ETF or fund by symbol and exchange, then download its full daily price history from the provider. Returns the instrument. Fails without registering when the symbol is not covered by the provider, the currency is not USD, or the symbol and exchange pair already exists. If the instrument registers but the price download fails, it stays registered and the error says so; refresh_prices retries the download. Call this before add_transaction for a new holding."),
@@ -58,7 +58,7 @@ func (h *Handler) Register(s *server.MCPServer) {
 	), h.HandleListInstruments)
 
 	s.AddTool(mcp.NewTool("add_transaction",
-		mcp.WithDescription("Append one ledger entry for a registered instrument. Signs are enforced per event type: BUY has positive quantity_change and negative cash_amount, SELL negative quantity and positive cash, DIVIDEND zero quantity and positive cash, TAX zero quantity and negative cash, SPLIT a nonzero quantity and no cash, ADJUSTMENT a nonzero quantity with optional cash. Holdings are long-only: an entry that would make ownership negative at any point in the timeline, backdated ones included, fails and writes nothing, and the error names the instrument, date and running quantity. Entries cannot be edited or deleted. Returns the stored entry. A buy or other entry that adds quantity to an instrument that was not held also fetches that instrument's prices from its latest stored date through today, so a new or re-opened position is valued right away; the result reports how many bars were stored, or the error text when that fetch failed, in which case the entry is still recorded and refresh_prices retries. When the entry changes history that snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots; recording never rebuilds on its own."),
+		mcp.WithDescription("Append one ledger entry for a registered instrument. Signs are enforced per event type, and only BUY and SELL may carry a fee: BUY has positive quantity_change and negative cash_amount, SELL negative quantity and positive cash, DIVIDEND zero quantity and positive cash, TAX zero quantity and negative cash, SPLIT a nonzero quantity and no cash, ADJUSTMENT a nonzero quantity with optional cash. Holdings are long-only: an entry that would make ownership negative at any point in the timeline, backdated ones included, fails and writes nothing, and the error names the instrument, date and running quantity. Entries cannot be edited or deleted. Returns the stored entry. A buy or other entry that adds quantity to an instrument that was not held also fetches that instrument's prices from its latest stored date through today, so a new or re-opened position is valued right away; the result reports how many bars were stored, or the error text when that fetch failed, in which case the entry is still recorded and refresh_prices retries. When the entry changes history that snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots; recording never rebuilds on its own."),
 		mcp.WithString("symbol", mcp.Required(), mcp.Description("Ticker symbol of a registered instrument.")),
 		mcp.WithString("exchange", mcp.Description(exchangeText)),
 		mcp.WithString("event_type", mcp.Required(), mcp.Enum("BUY", "SELL", "DIVIDEND", "TAX", "SPLIT", "ADJUSTMENT"), mcp.Description("Kind of event.")),
@@ -66,6 +66,7 @@ func (h *Handler) Register(s *server.MCPServer) {
 		mcp.WithString("cash_amount", mcp.Description("Optional. Decimal USD cash impact, signed per the event type; 0 when absent.")),
 		mcp.WithString("executed_at", mcp.Required(), mcp.Description("When the event happened, RFC 3339.")),
 		mcp.WithString("effective_date", mcp.Required(), mcp.Description("Date the event economically applies to, "+dateDescription+" After-hours events carry the next session's date.")),
+		mcp.WithString("fee", mcp.Description("Optional. Non-negative decimal USD trade fee, BUY and SELL only; the part of cash_amount that was a fee, never in addition to it. Zero when absent.")),
 		mcp.WithString("notes", mcp.Description("Optional. Free text, up to 1000 characters.")),
 		mcp.WithReadOnlyHintAnnotation(false),
 		mcp.WithDestructiveHintAnnotation(false),
@@ -89,7 +90,7 @@ func (h *Handler) Register(s *server.MCPServer) {
 	), h.HandleGetPositions)
 
 	s.AddTool(mcp.NewTool("get_portfolio",
-		mcp.WithDescription("Value active positions at real closing prices for a date, default today in the New York market timezone. Securities only, cash excluded. Returns per-holding name, type, quantity, close, price date and market value, plus the total and each allocation. A holding with no price, or a price five or more days older than the date, makes the portfolio incomplete: the total and allocations are withheld and the affected holdings are flagged missing or stale. Fix that with refresh_prices. Use get_positions when only quantities are needed, or to see holdings on a past date regardless of prices."),
+		mcp.WithDescription("Value active positions at real closing prices for a date, default today in the New York market timezone. The securities value excludes cash. Returns per-holding name, type, quantity, close, price date and market value, plus the total and each allocation, which are over securities only. Each holding also carries total cost, average cost, unrealized P&L in dollars and as a percent of cost, and cumulative realized P&L, dividends received, tax withheld and trade fees paid, each separate, plus a total return summing unrealized and realized P&L plus dividends minus tax. Fees are already inside cost and sale proceeds, so they are shown for information and never subtracted again. Fully sold positions are listed separately with their realized P&L and dividends. P&L totals add up every position, open and closed. Total return is a position total, not a time-weighted or money-weighted return. Beside them it returns the cash balance and buying power, and account equity, securities value plus cash; cash is null when no opening balance exists yet, and equity is withheld when the portfolio is incomplete or cash is not initialized. A holding with no price, or a price five or more days older than the date, makes the portfolio incomplete: the total, allocations, market value and unrealized P&L figures that need a price are withheld and the affected holdings are flagged missing or stale. Fix that with refresh_prices. Use get_positions when only quantities are needed, or to see holdings on a past date regardless of prices."),
 		mcp.WithString("date", mcp.Description("Optional. Valuation date, "+dateDescription+" Today in New York when absent.")),
 		mcp.WithReadOnlyHintAnnotation(true),
 	), h.HandleGetPortfolio)
@@ -125,7 +126,7 @@ func (h *Handler) Register(s *server.MCPServer) {
 	), h.HandleGetSnapshots)
 
 	s.AddTool(mcp.NewTool("rebuild_snapshots",
-		mcp.WithDescription("Replace the stored snapshots for every price date in the range with values recomputed from the current ledger and prices. Use only after a correction that touches history, such as a backdated transaction or revised prices, starting at the rebuild_from date add_transaction returned. All or nothing: if any date in the range has an active holding without a price on it, the error names the first such date and the instruments, nothing changes, and the range must be narrowed or prices refreshed. Also fills price dates in the range that have no snapshot yet, such as a missed day. Returns the range, dates rebuilt and rows written. The rebuild is logged with the reason."),
+		mcp.WithDescription("Replace the stored snapshots for every price date in the range with values recomputed from the current ledger and prices. Use only after a correction that touches history, such as a backdated transaction or revised prices, starting at the rebuild_from date add_transaction or add_cash_transaction returned. Cash snapshots are replaced with the securities snapshots. All or nothing: if any date in the range has an active holding without a price on it, the error names the first such date and the instruments, nothing changes, and the range must be narrowed or prices refreshed. Also fills price dates in the range that have no snapshot yet, such as a missed day. Returns the range, dates rebuilt, rows written and dates with a cash snapshot. The rebuild is logged with the reason."),
 		mcp.WithString("from", mcp.Required(), mcp.Description("Inclusive start date, "+dateDescription)),
 		mcp.WithString("to", mcp.Required(), mcp.Description("Inclusive end date, "+dateDescription)),
 		mcp.WithString("reason", mcp.Required(), mcp.Description("Why the rebuild is needed; recorded in the updates log.")),
@@ -141,6 +142,44 @@ func (h *Handler) Register(s *server.MCPServer) {
 		mcp.WithInteger("limit", mcp.Min(1), mcp.Max(500), mcp.Description(limitText)),
 		mcp.WithReadOnlyHintAnnotation(true),
 	), h.HandleListUpdates)
+	s.AddTool(mcp.NewTool("add_cash_transaction",
+		mcp.WithDescription("Append one cash entry that belongs to no instrument: the opening balance, a deposit, a withdrawal, interest or an account fee. Signs are enforced per kind: OPENING_BALANCE any sign, DEPOSIT and INTEREST positive, WITHDRAWAL and FEE negative. Only one opening balance can exist, and cash is reported only from its effective date onward, so record it first. Trades, dividends and taxes are not entered here; their cash impact is counted from add_transaction. Entries cannot be edited or deleted. A balance that goes negative is recorded and reported as an integrity error, never rejected. Returns the stored entry. When the entry changes a balance that cash snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots; recording never rebuilds on its own."),
+		mcp.WithString("kind", mcp.Required(), mcp.Enum("OPENING_BALANCE", "DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE"), mcp.Description("Kind of cash entry.")),
+		mcp.WithString("amount", mcp.Required(), mcp.Description("Decimal USD amount, signed per the kind.")),
+		mcp.WithString("executed_at", mcp.Required(), mcp.Description("When the event happened, RFC 3339.")),
+		mcp.WithString("effective_date", mcp.Required(), mcp.Description("Date the event economically applies to, "+dateDescription)),
+		mcp.WithString("notes", mcp.Description("Optional. Free text, up to 1000 characters.")),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+	), h.HandleAddCashTransaction)
+
+	s.AddTool(mcp.NewTool("list_cash_transactions",
+		mcp.WithDescription("List cash entries, not trades, dividends or taxes, newest first by effective date, optionally for one kind and an inclusive effective-date range. Use list_transactions for the instrument ledger."),
+		mcp.WithString("kind", mcp.Enum("OPENING_BALANCE", "DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE"), mcp.Description("Optional. Restrict to one kind.")),
+		mcp.WithString("from", mcp.Description("Optional. Inclusive effective date, "+dateDescription)),
+		mcp.WithString("to", mcp.Description("Optional. Inclusive effective date, "+dateDescription)),
+		mcp.WithInteger("limit", mcp.Min(1), mcp.Max(500), mcp.Description(limitText)),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), h.HandleListCashTransactions)
+
+	s.AddTool(mcp.NewTool("get_cash",
+		mcp.WithDescription("Report the cash balance and buying power as of a date, default today in the New York market timezone. Cash is the opening balance plus cash entries and the cash impact of trades, dividends and taxes from the opening balance date onward; buying power is the balance floored at zero, there is no margin. Without an opening balance on or before the date, cash is reported as not initialized, with no balance or buying power, and the opening date when one exists later: record one with add_cash_transaction first. Integrity errors list any date the running balance went negative; report those to the user, they are never omitted. Securities value and account equity are in get_portfolio."),
+		mcp.WithString("date", mcp.Description("Optional. Balance as of this date, "+dateDescription+" Today in New York when absent.")),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), h.HandleGetCash)
+
+	s.AddTool(mcp.NewTool("get_status",
+		mcp.WithDescription("Check whether the portfolio data is healthy, as of today in the New York market timezone. Returns one verdict, healthy or needs attention, with a reason for each problem, and the facts behind it: for every held instrument its latest stored price date and whether that price is missing or stale, the latest price date overall, the latest price date covered by a completed snapshot, whether the latest price date still has no completed snapshot, and the failed or incomplete runs that no later run has resolved. A snapshot missing for a price date just fetched is expected until the next daily run or a rebuild_snapshots. Sold instruments are not checked. Use refresh_prices for missing or stale prices and rebuild_snapshots for missing snapshots; use list_updates for the raw run log."),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), h.HandleGetStatus)
+
+	s.AddTool(mcp.NewTool("get_value_history",
+		mcp.WithDescription("Report portfolio value over a date range with one point per window of window_days days, from the stored daily snapshots; 1 is daily, 7 about weekly, 30 about monthly, and windows are counted from the range start. Each point is the value on the last snapshot date within its window, so weekends and holidays never appear and dates without a snapshot are absent, never interpolated; points carry cash and account equity when a cash snapshot exists for the date. The summary, for securities value and again for account equity when cash snapshots exist, gives the latest value, the all-time high and its date measured from the earliest snapshot through the range end, the drawdown of the latest value from that high, the change from the baseline, which is the last snapshot on or before the range start and is named in the result, the high and low within the range, and the maximum drawdown within the range with its peak and trough dates and whether it has recovered. Net contributions, deposits minus withdrawals over the same span, are given with the equity summary. These are changes in value, not investment return: a deposit or a purchase raises securities value without being a gain, so read the equity figures against the net contributions. To look at a window such as the past six months since the all-time high, call once to get the high's date, then again from that date. A series over 1000 points is rejected; use a larger window_days or a narrower range."),
+		mcp.WithString("from", mcp.Description("Optional. Inclusive start date, "+dateDescription+" The earliest snapshot when absent.")),
+		mcp.WithString("to", mcp.Description("Optional. Inclusive end date, "+dateDescription+" The latest snapshot when absent.")),
+		mcp.WithInteger("window_days", mcp.Min(1), mcp.Description("Optional. Days each point covers, default 1.")),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), h.HandleGetValueHistory)
 }
 
 // withTimeout derives ctx with the long timeout when long, the query timeout otherwise.

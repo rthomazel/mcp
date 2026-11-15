@@ -17,9 +17,9 @@ const (
 
 	// Empty cash is stored as zero.
 	insertTransactionSQL = `
-INSERT INTO transactions (instrument_id, event_type, quantity_change, cash_amount, executed_at, effective_date, notes)
-VALUES ($1, $2, $3::numeric, COALESCE(NULLIF($4, '')::numeric, 0), $5, $6, $7)
-RETURNING id, instrument_id, event_type, quantity_change::text, cash_amount::text, executed_at, effective_date, notes`
+INSERT INTO transactions (instrument_id, event_type, quantity_change, cash_amount, executed_at, effective_date, notes, fee)
+VALUES ($1, $2, $3::numeric, COALESCE(NULLIF($4, '')::numeric, 0), $5, $6, $7, COALESCE(NULLIF($8, '')::numeric, 0))
+RETURNING id, instrument_id, event_type, quantity_change::text, cash_amount::text, executed_at, effective_date, notes, fee::text`
 
 	firstNegativeSQL = `
 SELECT effective_date, running::text
@@ -36,7 +36,7 @@ LIMIT 1`
 	latestSnapshotDateSQL = `SELECT max(date) FROM snapshots`
 
 	listTransactionsSQL = `
-SELECT id, instrument_id, event_type, quantity_change::text, cash_amount::text, executed_at, effective_date, notes
+SELECT id, instrument_id, event_type, quantity_change::text, cash_amount::text, executed_at, effective_date, notes, fee::text
 FROM transactions
 WHERE ($1::int IS NULL OR instrument_id = $1)
   AND ($2::date IS NULL OR effective_date >= $2)
@@ -74,20 +74,11 @@ func (s *Store) RecordTransaction(ctx context.Context, draft domain.DraftTransac
 			return err
 		}
 
-		var latestSnapshot sql.NullTime
-		if err := tx.QueryRowxContext(ctx, latestSnapshotDateSQL).Scan(&latestSnapshot); err != nil {
-			return fmt.Errorf("reading latest snapshot date: %w", err)
-		}
-
 		result.Transaction = inserted
 
-		changesQuantity := inserted.QuantityChange.Sign() != 0
-		if changesQuantity && latestSnapshot.Valid && !inserted.EffectiveDate.After(latestSnapshot.Time) {
-			rebuildFrom := inserted.EffectiveDate
-			result.RebuildFrom = &rebuildFrom
-		}
+		result.RebuildFrom, err = staleFromTransaction(ctx, tx, inserted)
 
-		return nil
+		return err
 	})
 	if err != nil {
 		return domain.RecordResult{}, err
@@ -99,14 +90,36 @@ func (s *Store) RecordTransaction(ctx context.Context, draft domain.DraftTransac
 	return result, nil
 }
 
+// staleFromTransaction returns the date from which snapshots go stale after
+// inserted: a quantity change on or before the latest snapshot, or a cash
+// movement that changes a stored cash balance.
+func staleFromTransaction(ctx context.Context, tx *sqlx.Tx, inserted domain.Transaction) (*domain.Date, error) {
+	var latestSnapshot sql.NullTime
+	if err := tx.QueryRowxContext(ctx, latestSnapshotDateSQL).Scan(&latestSnapshot); err != nil {
+		return nil, fmt.Errorf("reading latest snapshot date: %w", err)
+	}
+
+	if inserted.QuantityChange.Sign() != 0 && latestSnapshot.Valid && !inserted.EffectiveDate.After(latestSnapshot.Time) {
+		rebuildFrom := inserted.EffectiveDate
+
+		return &rebuildFrom, nil
+	}
+
+	if inserted.CashAmount.Sign() == 0 {
+		return nil, nil //nolint:nilnil // nothing is stale
+	}
+
+	return staleCashFrom(ctx, tx, inserted.EffectiveDate, false)
+}
+
 func insertTransaction(ctx context.Context, tx *sqlx.Tx, draft domain.DraftTransaction) (domain.Transaction, error) {
 	var inserted domain.Transaction
 
 	err := tx.QueryRowxContext(ctx, insertTransactionSQL,
 		draft.InstrumentID, string(draft.EventType), string(draft.QuantityChange), string(draft.CashAmount),
-		draft.ExecutedAt, draft.EffectiveDate, draft.Notes,
+		draft.ExecutedAt, draft.EffectiveDate, draft.Notes, string(draft.Fee),
 	).Scan(&inserted.ID, &inserted.InstrumentID, &inserted.EventType, &inserted.QuantityChange,
-		&inserted.CashAmount, &inserted.ExecutedAt, &inserted.EffectiveDate, &inserted.Notes)
+		&inserted.CashAmount, &inserted.ExecutedAt, &inserted.EffectiveDate, &inserted.Notes, &inserted.Fee)
 	if err != nil {
 		if isCheckViolation(err) {
 			return domain.Transaction{}, fmt.Errorf("%w: rejected by database check: %w", domain.ErrInvalidInput, err)
@@ -157,7 +170,7 @@ func (s *Store) ListTransactions(ctx context.Context, filter domain.TransactionF
 	for rows.Next() {
 		var entry domain.Transaction
 		if err := rows.Scan(&entry.ID, &entry.InstrumentID, &entry.EventType, &entry.QuantityChange,
-			&entry.CashAmount, &entry.ExecutedAt, &entry.EffectiveDate, &entry.Notes); err != nil {
+			&entry.CashAmount, &entry.ExecutedAt, &entry.EffectiveDate, &entry.Notes, &entry.Fee); err != nil {
 			return nil, fmt.Errorf("scanning transaction: %w", err)
 		}
 

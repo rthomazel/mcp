@@ -41,12 +41,15 @@ SELECT id, symbol, exchange, quantity::text, close::text, price_date,
 FROM valued
 ORDER BY symbol, exchange`
 
+// accountEquitySQL adds the securities value and the cash balance in SQL.
+const accountEquitySQL = `SELECT ($1::numeric + $2::numeric)::text`
+
 // GetPortfolio values active positions at real closes as of date, or today
-// in the market timezone when nil.
+// in the market timezone when nil, with average-cost P&L and cash.
 func (s *Store) GetPortfolio(ctx context.Context, date *domain.Date) (domain.Portfolio, error) {
 	reference := s.referenceDate(date)
 
-	holdings, total, err := s.valuedHoldings(ctx, s.db, reference)
+	pnl, err := s.portfolioPnL(ctx, reference)
 	if err != nil {
 		return domain.Portfolio{}, err
 	}
@@ -56,36 +59,57 @@ func (s *Store) GetPortfolio(ctx context.Context, date *domain.Date) (domain.Por
 		return domain.Portfolio{}, err
 	}
 
-	portfolio := domain.Portfolio{Date: reference, Holdings: holdings, IntegrityErrors: integrity}
-
-	complete := true
-
-	for _, holding := range holdings {
-		if holding.PriceIssue != "" {
-			complete = false
-		}
+	cash, err := cashBalance(ctx, s.db, reference)
+	if err != nil {
+		return domain.Portfolio{}, err
 	}
 
-	if !complete {
-		for i := range holdings {
-			holdings[i].Allocation = nil
-		}
+	portfolio := domain.Portfolio{
+		Date: reference, Holdings: pnl.Holdings, IntegrityErrors: integrity,
+		Cash: cash, ClosedPositions: pnl.Closed, PnL: pnl.Totals,
+	}
 
-		return portfolio, nil
+	for _, holding := range pnl.Holdings {
+		if holding.PriceIssue != "" {
+			s.withholdPrices(&portfolio)
+
+			return portfolio, nil
+		}
 	}
 
 	portfolio.Complete = true
 
-	if len(holdings) == 0 {
+	value := pnl.Securities
+	if value == nil {
 		zero := domain.Decimal("0")
-		portfolio.SecuritiesValueUSD = &zero
-
-		return portfolio, nil
+		value = &zero
 	}
 
-	portfolio.SecuritiesValueUSD = &total
+	portfolio.SecuritiesValueUSD = value
 
-	return portfolio, nil
+	if cash.Initialized {
+		portfolio.AccountEquityUSD, err = s.accountEquity(ctx, *value, *cash.BalanceUSD)
+	}
+
+	return portfolio, err
+}
+
+// withholdPrices removes the figures that would mislead over a partial set of prices.
+func (s *Store) withholdPrices(portfolio *domain.Portfolio) {
+	for i := range portfolio.Holdings {
+		portfolio.Holdings[i].Allocation = nil
+	}
+
+	portfolio.PnL.UnrealizedPnLUSD, portfolio.PnL.TotalReturnUSD = nil, nil
+}
+
+func (s *Store) accountEquity(ctx context.Context, securities, cash domain.Decimal) (*domain.Decimal, error) {
+	var equity domain.Decimal
+	if err := s.db.GetContext(ctx, &equity, accountEquitySQL, securities, cash); err != nil {
+		return nil, fmt.Errorf("computing account equity: %w", err)
+	}
+
+	return &equity, nil
 }
 
 func (s *Store) referenceDate(date *domain.Date) domain.Date {
@@ -96,6 +120,23 @@ func (s *Store) referenceDate(date *domain.Date) domain.Date {
 	year, month, day := time.Now().In(s.marketLocation).Date()
 
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+}
+
+// priceIssue classifies a holding's latest price: missing when there is none,
+// stale when it is stalePriceDays or more older than the reference date. The
+// price date is returned whenever a price row exists.
+func (s *Store) priceIssue(priceDate sql.NullTime, ageDays sql.NullInt64) (string, *domain.Date) {
+	if !priceDate.Valid {
+		return domain.PriceIssueMissing, nil
+	}
+
+	date := priceDate.Time
+
+	if int(ageDays.Int64) >= s.stalePriceDays {
+		return domain.PriceIssueStale, &date
+	}
+
+	return "", &date
 }
 
 // valuedHoldings runs valuationSQL on q, the store or a transaction, and marks missing and stale prices. A
@@ -127,17 +168,7 @@ func (s *Store) valuedHoldings(ctx context.Context, q sqlx.QueryerContext, refer
 			return nil, "", fmt.Errorf("scanning holding: %w", err)
 		}
 
-		switch {
-		case !priceDate.Valid:
-			holding.PriceIssue = domain.PriceIssueMissing
-		case int(ageDays.Int64) >= s.stalePriceDays:
-			holding.PriceIssue = domain.PriceIssueStale
-		}
-
-		if priceDate.Valid {
-			date := priceDate.Time
-			holding.PriceDate = &date
-		}
+		holding.PriceIssue, holding.PriceDate = s.priceIssue(priceDate, ageDays)
 
 		if holding.PriceIssue == "" {
 			price, value := domain.Decimal(closePrice.String), domain.Decimal(marketValue.String)

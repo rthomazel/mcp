@@ -16,10 +16,26 @@ type Store interface {
 	RecordTransaction(ctx context.Context, draft DraftTransaction) (RecordResult, error)
 	// ListTransactions returns ledger entries matching filter, newest first by ledger order.
 	ListTransactions(ctx context.Context, filter TransactionFilter) ([]Transaction, error)
+	// RecordCashTransaction validates draft and inserts it. Returns
+	// ErrInvalidInput, including for a second opening balance. A balance that
+	// goes negative is not rejected. RebuildFrom reports stale cash snapshots.
+	RecordCashTransaction(ctx context.Context, draft CashTransaction) (CashRecordResult, error)
+	// ListCashTransactions returns cash transactions matching filter, newest first.
+	ListCashTransactions(ctx context.Context, filter CashTransactionFilter) ([]CashTransaction, error)
+	// GetCash returns the cash balance as of date, or today in the market
+	// timezone when nil; not initialized without an opening balance.
+	GetCash(ctx context.Context, date *Date) (CashBalance, error)
+	// GetStatus aggregates price freshness of held instruments, snapshot
+	// coverage and unresolved failed runs into a health view.
+	GetStatus(ctx context.Context) (Status, error)
+	// GetValueHistory returns the securities value and account equity series
+	// with summary measures. Returns ErrInvalidInput, including for a series
+	// over MaxHistoryPoints.
+	GetValueHistory(ctx context.Context, filter HistoryFilter) (ValueHistory, error)
 	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
 	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
 	// GetPortfolio values active positions at real closes as of date, or today
-	// in the market timezone when nil.
+	// in the market timezone when nil, with average-cost P&L and cash.
 	GetPortfolio(ctx context.Context, date *Date) (Portfolio, error)
 	// UpsertPrices stores the bars for an instrument, replacing the record of
 	// any date already stored. All bars are stored or none. Returns

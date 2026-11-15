@@ -31,9 +31,10 @@ SELECT EXISTS (
 	insertSnapshotSQL    = `
 INSERT INTO snapshots (date, instrument_id, quantity, close_price, price_date)
 VALUES ($1::date, $2, $3::numeric, $4::numeric, $5::date)`
-	deleteSnapshotRangeSQL = `DELETE FROM snapshots WHERE date BETWEEN $1::date AND $2::date`
-	priceDatesSQL          = `SELECT DISTINCT date FROM prices WHERE date BETWEEN $1::date AND $2::date ORDER BY date`
-	latestSessionDateSQL   = `SELECT MAX(date) FROM prices`
+	deleteSnapshotRangeSQL     = `DELETE FROM snapshots WHERE date BETWEEN $1::date AND $2::date`
+	deleteCashSnapshotRangeSQL = `DELETE FROM cash_snapshots WHERE date BETWEEN $1::date AND $2::date`
+	priceDatesSQL              = `SELECT DISTINCT date FROM prices WHERE date BETWEEN $1::date AND $2::date ORDER BY date`
+	latestSessionDateSQL       = `SELECT MAX(date) FROM prices`
 	// The total is taken over every row of the date before the instrument filter applies.
 	listSnapshotsSQL = `
 WITH totals AS (
@@ -178,6 +179,11 @@ func (s *Store) WriteSnapshot(ctx context.Context, date domain.Date) (domain.Sna
 				return fail("inserting rows", err)
 			}
 
+			result.CashWritten, err = insertCashSnapshot(ctx, tx, date)
+			if err != nil {
+				return err
+			}
+
 			result.Complete, result.Rows = true, len(holdings)
 			update.Status, update.RecordsUpdated = domain.UpdateStatusCompleted, result.Rows
 		}
@@ -231,6 +237,10 @@ func (s *Store) RebuildSnapshots(ctx context.Context, from, to domain.Date, reas
 			return fail("deleting range", err)
 		}
 
+		if _, err := tx.ExecContext(ctx, deleteCashSnapshotRangeSQL, from, to); err != nil {
+			return fail("deleting cash range", err)
+		}
+
 		var dates []time.Time
 		if err := tx.SelectContext(ctx, &dates, priceDatesSQL, from, to); err != nil {
 			return fail("selecting price dates", err)
@@ -248,6 +258,15 @@ func (s *Store) RebuildSnapshots(ctx context.Context, from, to domain.Date, reas
 
 			if err := insertSnapshotRows(ctx, tx, day, holdings); err != nil {
 				return fail("inserting rows", err)
+			}
+
+			written, err := insertCashSnapshot(ctx, tx, day)
+			if err != nil {
+				return err
+			}
+
+			if written {
+				result.CashDates++
 			}
 
 			result.Rows += len(holdings)
@@ -345,6 +364,29 @@ func insertSnapshotRows(ctx context.Context, tx *sqlx.Tx, date domain.Date, hold
 	return nil
 }
 
+// insertCashSnapshot stores the date's cash balance when cash is initialized on
+// it, reporting whether it did. An existing row returns ErrSnapshotExists.
+func insertCashSnapshot(ctx context.Context, tx *sqlx.Tx, date domain.Date) (bool, error) {
+	balance, err := cashBalance(ctx, tx, date)
+	if err != nil {
+		return false, fmt.Errorf("computing cash balance: %w", err)
+	}
+
+	if !balance.Initialized {
+		return false, nil
+	}
+
+	if _, err := tx.ExecContext(ctx, insertCashSnapshotSQL, date, *balance.BalanceUSD); err != nil {
+		if isUniqueViolation(err) {
+			return false, fmt.Errorf("%w: cash %s", domain.ErrSnapshotExists, date.Format(time.DateOnly))
+		}
+
+		return false, fmt.Errorf("inserting cash snapshot: %w", err)
+	}
+
+	return true, nil
+}
+
 // ListSnapshots returns snapshot rows, newest date first, each with its date's total.
 func (s *Store) ListSnapshots(ctx context.Context, filter domain.SnapshotFilter) ([]domain.SnapshotRow, error) {
 	if err := filter.Validate(); err != nil {
@@ -390,10 +432,14 @@ func (s *Store) ListUpdates(ctx context.Context, filter domain.UpdateFilter) ([]
 		return nil, err
 	}
 
+	return s.queryUpdates(ctx, listUpdatesSQL, nullIfEmpty(filter.DataType), nullIfEmpty(filter.Status), filter.ResolvedLimit())
+}
+
+// queryUpdates runs a query selecting the updates columns in listUpdatesSQL order.
+func (s *Store) queryUpdates(ctx context.Context, query string, args ...any) ([]domain.Update, error) {
 	updates := []domain.Update{}
 
-	rows, err := s.db.QueryxContext(ctx, listUpdatesSQL,
-		nullIfEmpty(filter.DataType), nullIfEmpty(filter.Status), filter.ResolvedLimit())
+	rows, err := s.db.QueryxContext(ctx, query, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "listing updates failed", "err", err)
 

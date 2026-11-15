@@ -210,7 +210,7 @@ func toolError(t *testing.T, result *mcp.CallToolResult, err error) string {
 	return text(t, result)
 }
 
-func TestRegisterAddsTheElevenTools(t *testing.T) {
+func TestRegisterAddsTheTools(t *testing.T) {
 	s := server.NewMCPServer("test", "0")
 	newHandler(&fakeStore{}, &fakeProvider{}).Register(s)
 
@@ -222,6 +222,7 @@ func TestRegisterAddsTheElevenTools(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"add_instrument", "list_instruments", "add_transaction", "list_transactions", "get_positions",
 		"get_portfolio", "get_prices", "refresh_prices", "get_snapshots", "rebuild_snapshots", "list_updates",
+		"add_cash_transaction", "list_cash_transactions", "get_cash", "get_status", "get_value_history",
 	}, names)
 
 	for name, tool := range s.ListTools() {
@@ -677,11 +678,15 @@ func TestRebuildSnapshots(t *testing.T) {
 func TestListUpdates(t *testing.T) {
 	provider := "tiingo"
 	store := &fakeStore{updates: []domain.Update{
-		{ID: 7, Provider: &provider, DataType: domain.UpdateDataPrices, Status: domain.UpdateStatusIncomplete,
+		{
+			ID: 7, Provider: &provider, DataType: domain.UpdateDataPrices, Status: domain.UpdateStatusIncomplete,
 			StartedAt: time.Date(2026, 11, 3, 1, 0, 0, 0, time.UTC), CompletedAt: time.Date(2026, 11, 3, 1, 1, 0, 0, time.UTC),
-			RecordsUpdated: 4, ErrorMessage: "not refreshed: VTI"},
-		{ID: 6, DataType: domain.UpdateDataSnapshotRebuild, Status: domain.UpdateStatusCompleted,
-			StartedAt: time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC), DateFrom: new(day(1)), DateTo: new(day(2)), Reason: "fix"},
+			RecordsUpdated: 4, ErrorMessage: "not refreshed: VTI",
+		},
+		{
+			ID: 6, DataType: domain.UpdateDataSnapshotRebuild, Status: domain.UpdateStatusCompleted,
+			StartedAt: time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC), DateFrom: new(day(1)), DateTo: new(day(2)), Reason: "fix",
+		},
 	}}
 
 	result, err := newHandler(store, &fakeProvider{}).HandleListUpdates(context.Background(), request(map[string]any{

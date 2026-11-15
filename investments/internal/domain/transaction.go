@@ -32,6 +32,7 @@ type Transaction struct {
 	ExecutedAt     time.Time
 	EffectiveDate  Date
 	Notes          *string
+	Fee            Decimal // zero when none; part of CashAmount, BUY and SELL only
 }
 
 // DraftTransaction is caller input that is not yet saved. An empty cash
@@ -45,13 +46,15 @@ type DraftTransaction struct {
 	ExecutedAt     time.Time
 	EffectiveDate  Date
 	Notes          *string
+	Fee            Decimal // empty means zero; part of CashAmount, never additional
 }
 
 // RecordResult is the outcome of recording a transaction.
 type RecordResult struct {
 	Transaction Transaction
-	// RebuildFrom is set when the entry changed quantity on or before the
-	// latest snapshot date; snapshots from that date onward are stale.
+	// RebuildFrom is set when the entry changed quantity, or cash from an
+	// opening balance onward, on or before the latest snapshot date;
+	// snapshots from that date onward are stale.
 	RebuildFrom *Date
 }
 
@@ -90,7 +93,32 @@ func (d DraftTransaction) Validate() error {
 		return fmt.Errorf("%w: notes exceed %d characters", ErrInvalidInput, maxNotesLength)
 	}
 
-	return validateSigns(d.EventType, quantity.Sign(), cash.Sign())
+	if err := validateSigns(d.EventType, quantity.Sign(), cash.Sign()); err != nil {
+		return err
+	}
+
+	return d.validateFee()
+}
+
+func (d DraftTransaction) validateFee() error {
+	if d.Fee == "" {
+		return nil
+	}
+
+	fee, err := ParseDecimal(string(d.Fee))
+	if err != nil {
+		return fmt.Errorf("fee: %w", err)
+	}
+
+	if fee.Sign() < 0 {
+		return fmt.Errorf("%w: fee must not be negative", ErrInvalidInput)
+	}
+
+	if fee.Sign() > 0 && d.EventType != EventBuy && d.EventType != EventSell {
+		return fmt.Errorf("%w: fee only applies to BUY and SELL", ErrInvalidInput)
+	}
+
+	return nil
 }
 
 func validateSigns(event EventType, quantity, cash int) error {
