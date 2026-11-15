@@ -11,7 +11,7 @@ agents: claude
 
 ## Status
 
-Idea only, not part of v1. The Investments MCP spec values securities only and
+Partly promoted: explicit cash, account equity, buying power, average-cost position P&L and dividend reporting are now specified in the Investments MCP spec. Still ideas: portfolio returns, T-bills, the net recorded cash flow stopgap. Originally: idea only, not part of v1. The Investments MCP spec values securities only and
 excludes cash from valuation, allocation and snapshots. This captures the
 follow-ups that decision leaves open. Everything below is to be decided.
 
