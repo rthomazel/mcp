@@ -36,15 +36,15 @@ per instrument. There are no tax lots.
   quantity decrease realizes like a sell using its cash, if any.
 - Dividends and taxes do not touch cost basis.
 
-For each position as of a date the backend reports quantity, total cost, average cost, market value,
+P&L is part of the portfolio valuation read, not a separate report. For each holding as of a date the portfolio reports quantity, total cost, average cost, market value,
 unrealized P&L in dollars and percent of cost, and cumulative realized P&L, dividends received,
 tax withheld and fees paid, each separately. Fees are already inside cost and sale proceeds,
 so they are reported for information and are never subtracted again. An optional total-return view sums
 unrealized and realized P&L plus dividends minus taxes. It is a position
 total, not a time-weighted or money-weighted return. A position that is fully sold stays
-visible with its realized P&L, dividends and tax. Positions with
-no usable price withhold market value and unrealized P&L, and portfolio totals are withheld likewise, as in
-valuation. Realized P&L is cumulative since the first ledger entry up to the date.
+visible as a closed position with its realized P&L, dividends and tax. Holdings with
+no usable price withhold market value and unrealized P&L, and the totals that need a price are withheld likewise, as the securities total is.
+The totals add up every open and closed position. Realized P&L is cumulative since the first ledger entry up to the date.
 
 ## Non-goals
 
