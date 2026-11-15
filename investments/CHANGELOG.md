@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## [0.2.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.2.0) feat: cash, position P&L, status and value history
 
 ### feat
 
