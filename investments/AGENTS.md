@@ -54,7 +54,7 @@ go: mock\_\*.go files can be ignored entirely while working, if there are test e
 **Dependencies:** Use the standard library where possible, discuss to include 3rd party.
 ## Investments MCP
 
-Personal investment monitoring server, Go and PostgreSQL. Spec-driven: read `spc/investments-mcp/spec.md` and `plan.md` first.
+Personal investment monitoring server, Go and PostgreSQL. Spec-driven: read `spc/spec.md` and `plan.md` first.
 Specifications live under `spc/`. Software models are colocated with the code they describe, same path with a `.md` extension (`main.go` → `main.md`).
 Models are approved before code is written, and are updated in the same change as the code they cover.
 Money and quantities are PostgreSQL NUMERIC. Go carries them as decimal strings and never does decimal arithmetic; calculations run in SQL.
