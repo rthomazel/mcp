@@ -1,28 +1,20 @@
 # Constants
 
-GranularityDaily = "daily"
-GranularityWeekly = "weekly"
-GranularityMonthly = "monthly"
-
-maxHistoryPoints = 1000, the most points one query returns. A longer series is rejected with a hint to use a coarser granularity or a narrower range, never silently truncated.
+maxHistoryPoints = 1000, the most points one query returns. A longer series is rejected with a hint to use a larger window or a narrower range, never silently truncated.
 
 # Types
-
-## Granularity
-
-A string, one of the Granularity constants. Weekly intervals start on Monday.
 
 ## HistoryFilter
 
 1. From *Date, inclusive, nil means the earliest stored snapshot
 2. To *Date, inclusive, nil means the latest stored snapshot
-3. Granularity Granularity, empty means daily
+3. WindowDays int, the number of days one point covers, zero means one
 
-Selects the range and the spacing of the returned points. The summary measures never depend on the granularity.
+Selects the range and the spacing of the returned points. Windows are counted from the resolved range start, so the last may be shorter. The summary measures never depend on the window.
 
 ## ValuePoint
 
-1. Date Date, the last snapshot date within the interval and the range
+1. Date Date, the last snapshot date within the window and the range
 2. SecuritiesValueUSD Decimal, the sum of the date's snapshot market values, zero when the date has only a cash snapshot
 3. CashUSD *Decimal, nil without a cash snapshot for the date
 4. AccountEquityUSD *Decimal, securities value plus cash, nil without a cash snapshot for the date
@@ -65,7 +57,7 @@ Measures over one series, securities value or account equity. A change in value,
 
 1. From Date, the resolved range start
 2. To Date, the resolved range end
-3. Granularity Granularity
+3. WindowDays int
 4. Points []ValuePoint, ordered by date ascending
 5. Securities *SeriesSummary, nil when the range has no points
 6. Equity *SeriesSummary, over dates with a cash snapshot, nil when the range has none
@@ -75,10 +67,10 @@ Measures over one series, securities value or account equity. A change in value,
 
 ## HistoryFilter.Normalize() (HistoryFilter, error)
 
-1. if the granularity is empty, set it to daily.
+1. if the window is zero, set it to one.
 2. Return the filter.
 
 #### Errors
 
-- **1.** if the granularity is set and not one of the constants, return ErrInvalidInput.
+- **1.** if the window is negative, return ErrInvalidInput.
 - **1.1.** if From is after To, return ErrInvalidInput.

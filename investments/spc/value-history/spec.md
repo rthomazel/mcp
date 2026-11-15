@@ -1,7 +1,7 @@
 ---
 id: 2026-11-15-value-history
 type: spec
-summary: Portfolio value history query with granularity, all-time high, drawdown and change over a range.
+summary: Portfolio value history query with a day window, all-time high, drawdown and change over a range.
 author: Thom
 created: 2026-11-15
 agents: claude
@@ -16,9 +16,10 @@ The all-time high scope is every stored snapshot from the earliest one through t
 
 ## Behavior
 
-A value history query returns the securities value over a date range at daily, weekly or monthly
-granularity. Each point is the value on the last snapshot date within its interval, so weekends and
-holidays never appear. Dates without a completed snapshot are absent, never interpolated.
+A value history query returns the securities value over a date range, one point per window of a
+given number of days, one day by default; 7 or 30 give weekly or monthly spacing. Windows are counted from the
+range start, so the last may be shorter. Each point is the value on the last snapshot date within its window,
+so weekends and holidays never appear. Dates without a completed snapshot are absent, never interpolated.
 When a cash snapshot exists for the point, the point also carries cash and account equity beside it.
 
 Summary measures cover the requested range, except the all-time high:

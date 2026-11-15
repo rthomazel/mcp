@@ -104,4 +104,4 @@ Reports freshness and health as of today in the market timezone: per held instru
 
 ### GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
 
-Returns the securities value, and cash and account equity where cash snapshots exist, over the range at the requested spacing, with summary measures: latest value, all-time high, drawdown from it, change from the baseline, range high and low and maximum drawdown. Returns ErrInvalidInput for an unknown granularity, an inverted range or a series over the point limit. Changes in value, not returns.
+Returns the securities value, and cash and account equity where cash snapshots exist, over the range with one point per window of days, with summary measures: latest value, all-time high, drawdown from it, change from the baseline, range high and low and maximum drawdown. Returns ErrInvalidInput for a negative window, an inverted range or a series over the point limit. Changes in value, not returns.

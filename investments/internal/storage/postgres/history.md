@@ -2,8 +2,8 @@
 
 historyBoundsSQL = select the earliest and latest dates over snapshots and cash_snapshots together, null when both are empty.
 dailySeriesSQL = the daily series as one relation: every distinct date in snapshots or cash_snapshots, with securities value as the sum of snapshots market values for the date (zero when it has none), the cash balance from cash_snapshots (null when absent) and account equity as their sum when cash exists. Shared by every history query, so the point set and the summaries cannot disagree.
-historyPointsSQL = from dailySeriesSQL within the range, group dates into intervals by granularity (each date itself for daily, date_trunc week or month otherwise) and keep the last date of each interval, ordered by date ascending.
-seriesSummarySQL = over one value column of dailySeriesSQL, null values excluded: the latest row in the range; the maximum over all rows on or before the range end with the earliest date winning a tie; latest minus that maximum, absolute and as a percent; the baseline, the last row on or before the range start, else the first row in the range; change from the baseline, absolute and as a percent; the highest and lowest rows in the range; and the largest peak-to-trough fall within the range from a running maximum, with its peak and trough dates and whether a later row reaches the peak again. All arithmetic in SQL, always over daily rows whatever the granularity.
+historyPointsSQL = from dailySeriesSQL within the range, group dates into windows of the filter's day count, the window number being the whole days from the range start divided by it, and keep the last date of each window, ordered by date ascending.
+seriesSummarySQL = over one value column of dailySeriesSQL, null values excluded: the latest row in the range; the maximum over all rows on or before the range end with the earliest date winning a tie; latest minus that maximum, absolute and as a percent; the baseline, the last row on or before the range start, else the first row in the range; change from the baseline, absolute and as a percent; the highest and lowest rows in the range; and the largest peak-to-trough fall within the range from a running maximum, with its peak and trough dates and whether a later row reaches the peak again. All arithmetic in SQL, always over daily rows whatever the window.
 netContributionsSQL = sum the amounts of DEPOSIT and WITHDRAWAL cash_transactions whose effective date is after the equity baseline date through the latest equity date, zero when there are none.
 
 # Functions
@@ -12,7 +12,7 @@ netContributionsSQL = sum the amounts of DEPOSIT and WITHDRAWAL cash_transaction
 
 1. Normalize filter with HistoryFilter.Normalize.
 2. Read the earliest and latest dates via historyBoundsSQL.
-3. if there are none, return an empty history with the granularity and no summaries.
+3. if there are none, return an empty history with the window and no summaries.
 4. Resolve From to the earliest date and To to the latest date when absent.
 5. Select the points via historyPointsSQL.
 6. if there are more than maxHistoryPoints, reject.
@@ -35,7 +35,7 @@ netContributionsSQL = sum the amounts of DEPOSIT and WITHDRAWAL cash_transaction
 
 ---
 
-- **6.** return domain.ErrInvalidInput saying the series has too many points and to use weekly or monthly granularity or a narrower range.
+- **6.** return domain.ErrInvalidInput saying the series has too many points and to use a larger window or a narrower range.
 
 ---
 
