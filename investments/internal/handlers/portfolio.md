@@ -22,15 +22,15 @@ Description shown to the agent: Reconstruct active positions, instruments with a
 
 ## Handler.HandleGetPortfolio(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
-Tool get_portfolio. Values active positions at real closing prices. Results name the valuation as securities, excluding cash.
+Tool get_portfolio. Values active positions at real closing prices. Results name the valuation as securities, excluding cash, and carry the cash balance and account equity beside it.
 
-Description shown to the agent: Value active positions at real closing prices for a date, default today in the New York market timezone. Securities only, cash excluded. Returns per-holding name, type, quantity, close, price date and market value, plus the total and each allocation. A holding with no price, or a price five or more days older than the date, makes the portfolio incomplete: the total and allocations are withheld and the affected holdings are flagged missing or stale. Fix that with refresh_prices. Use get_positions when only quantities are needed, or to see holdings on a past date regardless of prices.
+Description shown to the agent: Value active positions at real closing prices for a date, default today in the New York market timezone. The securities value excludes cash. Returns per-holding name, type, quantity, close, price date and market value, plus the total and each allocation, which are over securities only. Beside them it returns the cash balance and buying power, and account equity, securities value plus cash; cash is null when no opening balance exists yet, and equity is withheld when the portfolio is incomplete or cash is not initialized. A holding with no price, or a price five or more days older than the date, makes the portfolio incomplete: the total and allocations are withheld and the affected holdings are flagged missing or stale. Fix that with refresh_prices. Use get_positions when only quantities are needed, or to see holdings on a past date regardless of prices.
 
 - date string, optional YYYY-MM-DD; today in the market timezone when absent
 
 1. Parse date.
 2. Read through store.GetPortfolio and list the instruments through store.ListInstruments for their names and types.
-3. Return the portfolio, each holding with its name and type. An incomplete portfolio carries no total or allocations and lists the holdings with a missing or stale price.
+3. Return the portfolio, each holding with its name and type, and the cash balance with account equity. An incomplete portfolio carries no total, allocations or equity and lists the holdings with a missing or stale price.
 
 #### Errors
 

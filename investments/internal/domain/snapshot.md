@@ -16,7 +16,8 @@ An active instrument that blocks a snapshot.
 2. Skipped bool, true when the date was already completed and nothing was done
 3. Complete bool
 4. Rows int, snapshot rows written
-5. Issues []SnapshotIssue, empty when complete
+5. CashWritten bool, true when the date's cash snapshot was written
+6. Issues []SnapshotIssue, empty when complete
 
 Complete with zero rows means no active positions on the date.
 
@@ -26,6 +27,7 @@ Complete with zero rows means no active positions on the date.
 2. To Date
 3. Dates int, the number of dates rebuilt
 4. Rows int, snapshot rows written
+5. CashDates int, the number of dates with a cash snapshot written
 
 ## IncompleteSnapshotError
 

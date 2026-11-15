@@ -19,5 +19,7 @@
 3. Complete bool
 4. Holdings []Holding
 5. IntegrityErrors []IntegrityError
+6. Cash CashBalance, as of the reference date
+7. AccountEquityUSD *Decimal, securities value plus cash balance; nil when the portfolio is incomplete or cash is not initialized
 
-A portfolio is incomplete when any active holding has no usable price. The total and allocations are then withheld, because a share computed over only some holdings would mislead.
+A portfolio is incomplete when any active holding has no usable price. The total and allocations are then withheld, because a share computed over only some holdings would mislead. Allocation stays over securities only; cash and equity sit beside the securities value and never replace it.

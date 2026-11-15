@@ -44,7 +44,7 @@ Effective date is supplied by the caller. There is no market calendar, so an eve
 ## RecordResult
 
 1. Transaction Transaction
-2. RebuildFrom *Date, set when the new entry changed quantity on or before the latest existing snapshot date; snapshots from that date onward are now stale and need an explicit rebuild.
+2. RebuildFrom *Date, set when the new entry changed quantity, or changed cash from an opening balance onward, on or before the latest existing snapshot date; snapshots from that date onward are now stale and need an explicit rebuild.
 
 ## TransactionFilter
 
