@@ -4,6 +4,7 @@ type: spec
 summary: Personal investment monitoring MCP server with ledger-based positions, daily prices and valuation snapshots.
 author: Thom
 created: 2026-11-13
+updated: 2026-11-15
 agents: claude
 ---
 
@@ -12,8 +13,9 @@ agents: claude
 ## Status
 
 Draft v1, design agreed with Thom in a prior session, restructured to SDD format.
-Plan stages 1 to 3 (foundations, ledger, positions and valuation) are implemented.
-The market data provider is selected and stage 4 is being modelled; the later stages are not.
+Plan stages 1 to 7 are implemented and v1 is deployed and in operator testing.
+Operator feedback from the deployed v1 is specified as separate features, which extend this spec: cash, position-pnl, status and
+value-history. Where they conflict with the exclusions below, the feature specs win.
 Remaining open questions are at the end.
 
 ## Intent
@@ -49,8 +51,8 @@ Included:
 
 - Brazilian assets and any non-USD instrument; FX conversion.
 - Brokerage or Interactive Brokers integration; automated trading.
-- Portfolio-level return calculations.
-- Tax-lot accounting and cost basis.
+- Portfolio-level return calculations; position P&L and value history are not returns.
+- Tax-lot accounting. Cost basis, where specified, is average cost.
 - Automatic corporate-action ingestion.
 - Fundamentals, news and broad market research. A separate market-trends
   workflow covers these.
@@ -151,7 +153,7 @@ holdings.
 ### Cash
 
 Cash movements are recorded in the ledger but excluded from valuation, allocation
-and snapshots. Valuation represents securities only, and results name it securities
+and snapshots; explicit cash and account equity are specified in the cash feature, beside valuation, never inside it. Valuation represents securities only, and results name it securities
 value in USD so it is not mistaken for brokerage account equity. Dividends and
 withholding taxes are entered through the ledger; there is no distributions table
 and no automatic dividend ingestion.
@@ -352,5 +354,6 @@ least once before the system is relied on. Staging and rollout order are in the 
 
 ## Refs
 
+- Related: cash, position-pnl, status and value-history, the follow-up features under spc/.
 - Related: mcp/bench/spc for the spec conventions used by sibling servers.
 - Related: interface doc/skills/tiingo-api, how the provider API behaves, validated live.

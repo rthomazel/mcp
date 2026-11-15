@@ -1,4 +1,4 @@
--- Initial schema for the Investments MCP. See spc/investments-mcp/spec.md.
+-- Initial schema for the Investments MCP. See spc/spec.md.
 --
 -- Conventions:
 --   * Money and quantities are NUMERIC without precision limits.

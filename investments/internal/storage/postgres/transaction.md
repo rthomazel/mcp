@@ -1,7 +1,7 @@
 # Constants
 
 lockInstrumentSQL = select the instrument id with FOR UPDATE.
-insertTransactionSQL = insert a transactions row returning the full row.
+insertTransactionSQL = insert a transactions row, fee included, returning the full row.
 firstNegativeSQL = for one instrument, order its ledger by effective date, execution time, id; compute the running sum of quantity_change; return the first row whose running sum is below zero, with its effective date and running sum.
 latestSnapshotDateSQL = select the maximum date in snapshots, null if none.
 listTransactionsSQL = select transactions matching the optional instrument, date range and event type filters, newest first by ledger order, limited.
@@ -16,7 +16,7 @@ listTransactionsSQL = select transactions matching the optional instrument, date
    2. Insert via insertTransactionSQL and scan the result.
    3. Check the whole instrument ledger with firstNegativeSQL.
    4. Read the latest snapshot date via latestSnapshotDateSQL.
-   5. if the entry changes quantity and its effective date is on or before the latest snapshot date, set RebuildFrom to the effective date.
+   5. if the entry changes quantity and its effective date is on or before the latest snapshot date, set RebuildFrom to the effective date; otherwise if its cash amount is not zero, set RebuildFrom through staleCashFrom.
 3. Log the write at info level with the transaction id, instrument id and event type.
 4. Return the result.
 
@@ -31,7 +31,7 @@ listTransactionsSQL = select transactions matching the optional instrument, date
 
 ---
 
-- **2.2.** if the insert fails a check constraint, return domain.ErrInvalidInput.
+- **2.2.** if the insert fails a check constraint, return domain.ErrInvalidInput; this includes a fee larger than the absolute cash amount.
 - **2.2.1.** if it fails otherwise, return the wrapped error.
 
 ---
@@ -46,7 +46,7 @@ listTransactionsSQL = select transactions matching the optional instrument, date
 Writers for the same instrument serialize on the instrument row lock, taken before the ledger is read. Two concurrent sales therefore cannot both validate against the same balance.
 Inserting first and then verifying keeps the ordering logic in one SQL query instead of reasoning about where the candidate falls in the timeline. It checks every prefix of the ledger, so a backdated sale that would make a later point negative is rejected too.
 The check costs a scan of the one instrument's ledger per write, acceptable for a personal ledger.
-Cash-only events never set RebuildFrom, since snapshots exclude cash.
+A cash-only entry, such as a dividend, sets RebuildFrom only when it moves a stored cash balance, that is when an opening balance exists on or before its effective date.
 Rebuild is never triggered here; the caller decides.
 
 ## Store.ListTransactions(ctx Context, filter domain.TransactionFilter) ([]domain.Transaction, error)

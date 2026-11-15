@@ -17,6 +17,11 @@
 13. ListPrices(ctx Context, filter PriceFilter) ([]PriceBar, error)
 14. ListSnapshots(ctx Context, filter SnapshotFilter) ([]SnapshotRow, error)
 15. ListUpdates(ctx Context, filter UpdateFilter) ([]Update, error)
+16. RecordCashTransaction(ctx Context, draft CashTransaction) (CashRecordResult, error)
+17. ListCashTransactions(ctx Context, filter CashTransactionFilter) ([]CashTransaction, error)
+18. GetCash(ctx Context, date *Date) (CashBalance, error)
+19. GetStatus(ctx Context) (Status, error)
+20. GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
 
 The one central persistence interface. Every consumer depends on it, and tests mock it with mockery. Implemented by internal/storage/postgres.
 Each method is a self-contained unit of work in its own transaction; composing several Store calls into one transaction is not supported.
@@ -31,7 +36,7 @@ Returns every instrument ordered by symbol, then exchange; an empty registry is 
 
 ### RecordTransaction(ctx Context, draft DraftTransaction) (RecordResult, error)
 
-Validates draft, serializes with other writers of the same instrument, inserts it, and verifies the whole instrument ledger stays long-only. Returns ErrInvalidInput, ErrInstrumentNotFound, or a NegativeBalanceError, in which case nothing is written. RecordResult.RebuildFrom reports stale snapshots; it never rebuilds.
+Validates draft, including an optional fee on buys and sells, serializes with other writers of the same instrument, inserts it, and verifies the whole instrument ledger stays long-only. Returns ErrInvalidInput, ErrInstrumentNotFound, or a NegativeBalanceError, in which case nothing is written. RecordResult.RebuildFrom reports stale snapshots, securities or cash; it never rebuilds.
 
 ### ListTransactions(ctx Context, filter TransactionFilter) ([]Transaction, error)
 
@@ -43,7 +48,7 @@ Reconstructs positions from the ledger as of date, or the whole ledger when nil.
 
 ### GetPortfolio(ctx Context, date *Date) (Portfolio, error)
 
-Values active positions with real closing prices as of date, or today in the market timezone when nil. A missing or stale price makes the portfolio incomplete.
+Values active positions with real closing prices as of date, or today in the market timezone when nil, and reports each holding's average-cost P&L, closed positions, P&L totals, the cash balance and account equity beside the securities value. A missing or stale price makes the portfolio incomplete.
 
 ### UpsertPrices(ctx Context, instrumentID int, bars []PriceBar) error
 
@@ -59,11 +64,11 @@ Returns the most recent price date across all instruments, or nil when no prices
 
 ### WriteSnapshot(ctx Context, date Date) (SnapshotResult, error)
 
-Writes the snapshot rows for one date and records the outcome in the updates log, all in one transaction. Does nothing when the date is already completed. Writes no rows and records an incomplete run when an active instrument lacks a price dated exactly on date. Returns ErrInvalidInput for a date after today in the market timezone, and ErrSnapshotExists when unmarked rows exist for the date.
+Writes the snapshot rows for one date, and the date's cash snapshot when cash is initialized, and records the outcome in the updates log, all in one transaction. Does nothing when the date is already completed. Writes no rows and records an incomplete run when an active instrument lacks a price dated exactly on date. Returns ErrInvalidInput for a date after today in the market timezone, and ErrSnapshotExists when unmarked rows exist for the date.
 
 ### RebuildSnapshots(ctx Context, from Date, to Date, reason string) (RebuildResult, error)
 
-Replaces the snapshots for every price date in the range from the current ledger and prices, all or nothing, and records the rebuild with its reason and range. Returns ErrInvalidInput for an empty reason, an inverted range or a date after today, and an IncompleteSnapshotError when any date cannot be valued, in which case nothing changes and a failed rebuild is still logged.
+Replaces the securities and cash snapshots for every price date in the range from the current ledger and prices, all or nothing, and records the rebuild with its reason and range. Returns ErrInvalidInput for an empty reason, an inverted range or a date after today, and an IncompleteSnapshotError when any date cannot be valued, in which case nothing changes and a failed rebuild is still logged.
 
 ### RecordUpdate(ctx Context, update Update) error
 
@@ -80,3 +85,23 @@ Returns snapshot rows matching filter, newest date first then by symbol and exch
 ### ListUpdates(ctx Context, filter UpdateFilter) ([]Update, error)
 
 Returns updates log rows matching filter, newest first by start time, limited. Returns ErrInvalidInput for an invalid filter.
+
+### RecordCashTransaction(ctx Context, draft CashTransaction) (CashRecordResult, error)
+
+Validates draft and inserts it. Returns ErrInvalidInput, including when a second opening balance is recorded. A balance that would go negative is not rejected. CashRecordResult.RebuildFrom reports stale cash snapshots; it never rebuilds.
+
+### ListCashTransactions(ctx Context, filter CashTransactionFilter) ([]CashTransaction, error)
+
+Returns cash transactions matching filter, newest first by effective date, limited. Returns ErrInvalidInput for a negative limit, an inverted range or an unknown kind.
+
+### GetCash(ctx Context, date *Date) (CashBalance, error)
+
+Computes the cash balance as of date, or today in the market timezone when nil, from the cash ledger. Not initialized without an opening balance on or before the date. Negative running balances are returned as integrity errors, never omitted.
+
+### GetStatus(ctx Context) (Status, error)
+
+Reports freshness and health as of today in the market timezone: per held instrument the latest price date and whether it is missing or stale, the latest price date and latest completed snapshot date, whether the latest price date has no completed snapshot, and the failed or incomplete runs no later run has resolved. Healthy only when none of those is a problem.
+
+### GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
+
+Returns the securities value, and cash and account equity where cash snapshots exist, over the range with one point per window of days, with summary measures: latest value, all-time high, drawdown from it, change from the baseline, range high and low and maximum drawdown. Returns ErrInvalidInput for a negative window, an inverted range or a series over the point limit. Changes in value, not returns.
