@@ -27,7 +27,15 @@ Summary measures cover the requested range, except the all-time high:
 - all-time high and its date, over every stored snapshot since the earliest one, whatever the range;
   the earliest date wins a tie;
 - dollar and percentage drawdown of the latest value from the all-time high;
-- change over the range, dollar and percent, from the first point to the last.
+- change over the range, dollar and percent, from the baseline to the latest point. The baseline is the
+  last snapshot on or before the range start, so a range starting on a weekend or holiday keeps the first
+  day's move; when no snapshot exists that early, it is the first point in the range;
+- the high and the low within the range, each with its date;
+- the maximum drawdown within the range, peak to trough, in dollars and percent, with the peak and trough
+  dates, and whether the value has since recovered to the peak.
+
+A longer window such as the past six months since the all-time high takes two queries: the first reports the
+all-time high date, the second starts from it. Results always name the baseline date used.
 
 The same measures are also reported on account equity, over the dates that have a cash snapshot, together with the net contributions in the range, deposits minus withdrawals, so a change in equity can be read against money added or removed.
 
@@ -37,6 +45,8 @@ or a new purchase raises value without being a gain, and results say so.
 ## Acceptance criteria
 
 - Value history returns one point per interval at the last snapshot date, skips non-snapshot dates, and the all-time high and drawdown cover every stored snapshot regardless of the range.
+- Change over the range uses the last snapshot on or before the start as baseline and names its date.
+- The range high, low and maximum drawdown, with their dates and a recovered flag, match hand-calculated values; a range that only rises has zero maximum drawdown.
 - When cash snapshots exist, points carry cash and account equity, and equity measures and net contributions are reported; see the cash feature.
 
 
