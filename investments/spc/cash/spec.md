@@ -48,8 +48,9 @@ securities snapshots over the same range, atomically, and the snapshot run's com
 cash snapshot is never merged into the securities snapshot rows: those stay one row per instrument and
 allocation stays over securities only.
 
-Cash-like holdings such as T-bills are not cash. They are out of scope for now; when added they
-will be instruments with their own valuation in the securities snapshots, and cash snapshots stay unchanged.
+Cash-like holdings such as T-bills are securities, not cash. They may be added soon, as a feature of their own: they
+will be instruments with their own valuation in the securities snapshots, and cash and cash snapshots stay unchanged.
+They need pricing and maturity handling that this feature does not cover.
 
 Account equity is securities value plus cash. It is shown beside securities value and
 never replaces it, and is withheld when the portfolio is incomplete or cash is not
@@ -65,7 +66,8 @@ distributions table and no automatic dividend ingestion.
 
 ## Non-goals
 
-- Margin, multiple accounts and cash-like instruments such as T-bills.
+- Margin and multiple accounts.
+- T-bills and other cash-like instruments; they are securities and get their own feature.
 - Returns; see the portfolio returns idea.
 
 ## Acceptance criteria
