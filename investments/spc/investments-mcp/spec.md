@@ -79,9 +79,13 @@ type, the change in share quantity, the cash impact in USD, when it was executed
 the date it economically applies to, and an optional note. Quantity and cash are
 independent of each other. A buy or sell may also record the fee it contained.
 
-**Cash movements** are account-level cash events that belong to no instrument: an
-opening balance, deposits, withdrawals, interest and account fees. Together with
-the cash impact of transactions they make up the cash ledger.
+**Cash transactions** are account-level cash events that belong to no instrument: an
+opening balance, deposits, withdrawals, interest and account fees. They are distinct from
+transactions, the instrument ledger. Together with the cash impact of transactions they
+make up the cash ledger.
+
+**Cash snapshots** are daily cash balances, one record per snapshot date, so account
+equity has a history that is preserved like the securities snapshots.
 
 **Prices** are daily historical market prices per instrument: open, high, low,
 close, adjusted close and volume.
@@ -162,18 +166,29 @@ holdings.
 
 ### Cash and account equity
 
-Cash is modelled explicitly and never treated as a security. Cash movements are a
+Cash is modelled explicitly and never treated as a security. Cash transactions are a
 separate record of five kinds, each with a sign convention: an opening balance
 (any sign, at most one), deposit and interest (positive), withdrawal and fee (negative).
 Dividends, taxes and trades keep entering through the transaction ledger, and their
 cash impact counts toward cash from there. Nothing is entered twice.
 
-The cash balance on a date is the sum of the opening balance, all cash movements
+The cash balance on a date is the sum of the opening balance, all cash transactions
 and all transaction cash amounts on or after the opening balance date and on or
 before the date. Entries dated before the opening balance are not part of cash. With no opening balance, or a date
 before it, cash is reported as not initialized and no balance, equity or buying power is
-shown; the agent is told to record an opening balance. Cash is derived from the ledger on demand
-and has no snapshots of its own, since prices do not change it.
+shown; the agent is told to record an opening balance. The current balance and the balance on any
+requested date are computed from the cash ledger.
+
+Cash snapshots preserve history. The same unit of work that writes a date's securities
+snapshot also writes that date's cash snapshot, the balance computed as above, whenever cash is
+initialized on that date. A date with no active positions still gets a cash snapshot, so
+a portfolio that is entirely cash keeps an equity history. A rebuild replaces cash snapshots with the
+securities snapshots over the same range, atomically, and the snapshot run's completion marker covers both. A
+cash snapshot is never merged into the securities snapshot rows: those stay one row per instrument and
+allocation stays over securities only.
+
+Cash-like holdings such as T-bills are not cash. They are out of scope for now; when added they
+will be instruments with their own valuation in the securities snapshots, and cash snapshots stay unchanged.
 
 Account equity is securities value plus cash. It is shown beside securities value and
 never replaces it, and is withheld when the portfolio is incomplete or cash is not
@@ -297,7 +312,7 @@ provider can safely serve the day's data. No exchange-specific scheduler exists.
 Through MCP the agent can: register an instrument; list instruments; list ledger
 events; record transactions of any supported type; reconstruct current or historical
 positions; read current securities valuation and allocation; read historical prices;
-read historical snapshots; read the updates log; record cash movements and read the cash balance, account equity and buying power; read position P&L; read the status view and the value history; trigger a market data refresh; and rebuild snapshots
+read historical snapshots; read the updates log; record cash transactions and read the cash balance, account equity and buying power; read position P&L; read the status view and the value history; trigger a market data refresh; and rebuild snapshots
 over a date range with a stated reason. Registering an instrument rejects any that
 is not USD-quoted. Transaction deletion is not an agent capability. Exact tool
 contracts are defined in the models.
@@ -331,7 +346,7 @@ The raw updates log stays available.
 A value history query returns the securities value over a date range at daily, weekly or monthly
 granularity. Each point is the value on the last snapshot date within its interval, so weekends and
 holidays never appear. Dates without a completed snapshot are absent, never interpolated.
-When cash is initialized as of a point, the point also carries cash and account equity beside it.
+When a cash snapshot exists for the point, the point also carries cash and account equity beside it.
 
 Summary measures cover the requested range, except the all-time high:
 
@@ -341,7 +356,9 @@ Summary measures cover the requested range, except the all-time high:
 - dollar and percentage drawdown of the latest value from the all-time high;
 - change over the range, dollar and percent, from the first point to the last.
 
-All measures are on securities value. They are changes in value, not investment return: a deposit
+The same measures are also reported on account equity, over the dates that have a cash snapshot, together with the net contributions in the range, deposits minus withdrawals, so a change in equity can be read against money added or removed.
+
+All measures are changes in value, not investment return: a deposit
 or a new purchase raises value without being a gain, and results say so.
 
 ### Weekly review
@@ -379,7 +396,7 @@ least once before the system is relied on. Staging and rollout order are in the 
 - Ownership history comes from the ledger; portfolio history from daily
   instrument-level snapshots.
 - Valuation basis is securities market value only, in USD; account equity is shown beside it, not merged.
-- Cash is a separate explicit record, derived on demand, with an opening balance as its anchor.
+- Cash is a separate explicit record of cash transactions, with an opening balance as its anchor and daily cash snapshots for history.
 - Cost basis is average cost. Trade fees are a field on buys and sells, included in cost and proceeds.
 - Value history and position P&L are not returns.
 - Corrections are administrative, not an agent feature.
@@ -415,7 +432,8 @@ least once before the system is relied on. Staging and rollout order are in the 
 - A daily backup of the investments database runs, and a restore from it has been
   verified.
 - Swapping the market data provider requires no change to stored data or agent contracts.
-- Cash: with no opening balance, cash, equity and buying power are reported as not initialized. With one, the balance equals the opening balance plus cash movements and transaction cash from its date, a trade's cash is counted once, and a negative balance is reported as an integrity error and never rejected.
+- Cash: with no opening balance, cash, equity and buying power are reported as not initialized. With one, the balance equals the opening balance plus cash transactions and transaction cash from its date, a trade's cash is counted once, and a negative balance is reported as an integrity error and never rejected.
+- A snapshot run writes the cash snapshot with the securities snapshot when cash is initialized, including on a date with no active positions; a rebuild replaces both atomically; value history reports equity and net contributions from cash snapshots.
 - Account equity equals securities value plus cash, is shown beside securities value, and is withheld when the portfolio is incomplete.
 - Average cost: after two buys and a partial sell, realized P&L, remaining cost and average cost match hand-calculated values; a split changes quantity and average cost but not total cost and realizes nothing; a reinvested dividend adds to cost.
 - A trade fee is within the recorded cash amount, counted once in cash, in cost on a buy and in net proceeds on a sell, and reported separately.
@@ -441,7 +459,7 @@ least once before the system is relied on. Staging and rollout order are in the 
 - Agents refer to instruments by symbol, with the exchange only when the symbol alone is ambiguous; internal ids are never exposed.
 - Tool results are JSON with decimals as exact strings. Recording a transaction never rebuilds snapshots; when it makes snapshots stale, the result names the date to rebuild from.
 - The agent can read the updates log, to check freshness and why a day has no snapshot.
-- Follow-up round decisions (operator feedback, 2026-11-15): cash is a separate cash movements record; cost basis is average cost; trades carry an optional fee field; all four items are specified together, with cash then P&L implemented first.
+- Follow-up round decisions (operator feedback, 2026-11-15): cash is a separate cash transactions record with daily cash snapshots; cost basis is average cost; trades carry an optional fee field; all four items are specified together, with cash then P&L implemented first.
 - A snapshot requires every active instrument to have a price dated exactly on the snapshot date.
 
 ## Refs
