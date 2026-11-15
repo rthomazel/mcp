@@ -20,6 +20,7 @@
 16. RecordCashTransaction(ctx Context, draft CashTransaction) (CashRecordResult, error)
 17. ListCashTransactions(ctx Context, filter CashTransactionFilter) ([]CashTransaction, error)
 18. GetCash(ctx Context, date *Date) (CashBalance, error)
+19. GetPnL(ctx Context, date *Date) (PnLResult, error)
 
 The one central persistence interface. Every consumer depends on it, and tests mock it with mockery. Implemented by internal/storage/postgres.
 Each method is a self-contained unit of work in its own transaction; composing several Store calls into one transaction is not supported.
@@ -34,7 +35,7 @@ Returns every instrument ordered by symbol, then exchange; an empty registry is 
 
 ### RecordTransaction(ctx Context, draft DraftTransaction) (RecordResult, error)
 
-Validates draft, serializes with other writers of the same instrument, inserts it, and verifies the whole instrument ledger stays long-only. Returns ErrInvalidInput, ErrInstrumentNotFound, or a NegativeBalanceError, in which case nothing is written. RecordResult.RebuildFrom reports stale snapshots, securities or cash; it never rebuilds.
+Validates draft, including an optional fee on buys and sells, serializes with other writers of the same instrument, inserts it, and verifies the whole instrument ledger stays long-only. Returns ErrInvalidInput, ErrInstrumentNotFound, or a NegativeBalanceError, in which case nothing is written. RecordResult.RebuildFrom reports stale snapshots, securities or cash; it never rebuilds.
 
 ### ListTransactions(ctx Context, filter TransactionFilter) ([]Transaction, error)
 
@@ -95,3 +96,7 @@ Returns cash transactions matching filter, newest first by effective date, limit
 ### GetCash(ctx Context, date *Date) (CashBalance, error)
 
 Computes the cash balance as of date, or today in the market timezone when nil, from the cash ledger. Not initialized without an opening balance on or before the date. Negative running balances are returned as integrity errors, never omitted.
+
+### GetPnL(ctx Context, date *Date) (PnLResult, error)
+
+Computes average-cost P&L per instrument from the ledger as of date, or today in the market timezone when nil, valued at real closes. A missing or stale price withholds that position's market value and unrealized P&L and the totals that need them; realized figures are never withheld. Instruments with a negative ledger are reported as integrity errors and left out.

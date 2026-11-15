@@ -27,6 +27,7 @@ A string, one of the Event constants.
 6. ExecutedAt Time
 7. EffectiveDate Date
 8. Notes *string
+9. Fee Decimal, zero when none, only on BUY and SELL; the part of the cash amount that was a fee
 
 ## DraftTransaction
 
@@ -37,6 +38,7 @@ A string, one of the Event constants.
 5. ExecutedAt Time
 6. EffectiveDate Date, required
 7. Notes *string
+8. Fee Decimal, empty means zero
 
 A draft is caller input that is not yet saved. It carries no server-assigned fields and, unlike a stored Transaction, allows an empty cash amount meaning zero. It is normalized and validated before it touches the database.
 Effective date is supplied by the caller. There is no market calendar, so an event executed after the close must be given the next session's date by whoever records it.
@@ -69,10 +71,12 @@ Effective date is supplied by the caller. There is no market calendar, so an eve
    4. TAX: quantity zero, cash negative.
    5. SPLIT: quantity non-zero, cash zero.
    6. ADJUSTMENT: quantity non-zero, cash any.
-6. Return nil.
+6. if a fee is given and does not parse, or is negative, return ErrInvalidInput.
+7. if a fee is non-zero and the event type is not BUY or SELL, return ErrInvalidInput.
+8. Return nil.
 
 An empty cash amount counts as zero, so it fails events that require a non-zero cash amount.
-These rules mirror the transactions CHECK constraint in the initial migration.
+These rules mirror the transactions CHECK constraints. That a fee does not exceed the absolute cash amount is enforced only by the database, since Go does no decimal arithmetic; a violation surfaces as ErrInvalidInput.
 
 ## TransactionFilter.Normalize() (TransactionFilter, error)
 
