@@ -1,13 +1,13 @@
 ---
-id: 2026-11-15-money-weighted-returns
+id: 2026-11-15-portfolio-returns
 type: idea
-summary: Follow-up idea for a money-weighted portfolio return (internal rate of return) built on cash transactions and account equity snapshots.
+summary: Follow-up idea for money-weighted and time-weighted portfolio returns built on cash transactions and account equity snapshots, the latter for benchmark comparison.
 author: Thom
 created: 2026-11-15
 agents: claude
 ---
 
-# Money-weighted returns
+# Money-weighted and time-weighted returns
 
 ## Status
 
@@ -20,6 +20,22 @@ Report the portfolio's return over a period as a money-weighted return: the sing
 that makes the dated external cash flows and the ending account equity equal the starting equity.
 It answers "how did my money do" while accounting for when deposits and withdrawals happened,
 which the value history deliberately does not.
+
+Also report a time-weighted return, which removes the effect of deposit and withdrawal timing
+and so measures the investments themselves. It is the one to compare with a benchmark, such as an
+index fund over the same period. Money-weighted answers "how did I do", time-weighted answers "how did
+the portfolio do".
+
+## Time-weighted specifics
+
+- Method: chain the returns of the sub-periods between external flows, each measured on account equity
+  with the flow taken out. Daily equity snapshots make daily sub-periods possible, so no extra valuation
+  is needed; a flow on a non-trading day is applied at the next snapshot date.
+- Benchmark: needs benchmark prices over the same dates. An index ETF registered as an instrument would
+  already be priced by the existing provider, but the base spec places benchmarks with the separate
+  market-trends workflow, so ownership has to be settled.
+- The same gaps apply: securities moved in without cash, snapshot gaps, and the start of history.
+- Result reported as a period return, and annualized only for periods longer than a year.
 
 ## What the cash design already provides
 
@@ -54,6 +70,6 @@ So the inputs exist once cash is initialized. No schema change is needed for a b
 - Period choices: since inception, year to date, trailing windows, or arbitrary dates.
 - Annualized rate only, or also the plain period return for short periods.
 - Whether a simpler approximation, such as a Modified Dietz return, is enough for a personal system.
-- Whether time-weighted returns are also wanted for comparison with benchmarks, which the
-  separate market-trends workflow would use.
+- Which benchmarks, and whether benchmark data lives in this server or in the market-trends workflow.
+- Whether both returns ship together or time-weighted first, since it needs no iterative solve.
 - How this relates to the Brazil portfolio idea, which raises the same performance questions with currency.
