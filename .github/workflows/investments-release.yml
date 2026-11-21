@@ -40,7 +40,9 @@ jobs:
           context: investments
           push: true
           platforms: linux/amd64,linux/arm64
-          build-args: VERSION=${{ steps.version.outputs.value }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
+            REVISION=${{ github.sha }}
           tags: |
             ghcr.io/rthomazel/mcp/investments:${{ steps.version.outputs.value }}
             ghcr.io/rthomazel/mcp/investments:latest

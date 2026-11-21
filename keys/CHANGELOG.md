@@ -19,6 +19,12 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## Unreleased
+
+### build
+
+- **(container)** add OCI image labels (`org.opencontainers.image.title`, `source`, `version`, `revision`) to the runtime image. The release workflow passes `VERSION` and `REVISION` (commit SHA) as build args, so `docker image inspect` shows which release is running; local builds report `local` / `unknown`.
+
 ## [0.1.4](https://github.com/rthomazel/mcp/releases/tag/keys/v0.1.4) build: Go 1.27.4 and weekly dependency update
 
 ### build
