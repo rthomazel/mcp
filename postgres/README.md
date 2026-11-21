@@ -104,9 +104,6 @@ Set `POSTGRES_MCP_TRANSPORT=mcpo` (OpenAI-compatible) or `POSTGRES_MCP_TRANSPORT
 # tests
 ./run test
 
-# lint
-./run lint
-
 # format
 ./run format
 ```
