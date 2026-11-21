@@ -19,10 +19,23 @@ jobs:
         module: [bench, keys, postgres]
 
     steps:
+      # GITHUB_TOKEN cannot push changes under .github/workflows, which the golangci-lint bump
+      # edits, so the update runs with a token minted from the rthomazel-actions GitHub App
+      - uses: actions/create-github-app-token@v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.ACTIONS_APP_ID }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
       - uses: actions/checkout@v6.0.2
         with:
           # Full history needed so the update-go action can diff against origin/main
           fetch-depth: 0
+          # update-go pushes with the credential checkout stores
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: actions/setup-go@v6.3.0
         with:
@@ -30,6 +43,8 @@ jobs:
 
       - uses: eleanorhealth/actions/update-go@update-go/v1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token }}
+          bump-golangci-lint: "true"
+          golangci-lint-files: .github/workflows/${{ matrix.module }}-pr.yml
           working-directory: ${{ matrix.module }}
           pr-branch: chore/update-dependencies-go-${{ matrix.module }}
