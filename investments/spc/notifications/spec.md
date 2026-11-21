@@ -14,7 +14,7 @@ agents: claude
 
 Draft. This specifies a generic event outbox, the worker that drains it, a
 channel-independent notification interface with Telegram as its first adapter,
-scheduled monitors that record events from observed state, and the first monitor, a daily run that left the latest price date without a snapshot. Daily equity and
+scheduled monitors that record events from observed state, and the first monitor, specified in spc/monitors. Daily equity and
 valuation monitors, tied to price fluctuations and portfolio equity, are separate
 follow-up specs that add their own monitors and event kinds.
 
@@ -227,27 +227,9 @@ Monitors exist because an event should follow observed state, not which run happ
 to execute. A monitor also catches what a producer cannot, such as a daily job that never
 ran.
 
-### First monitor: latest price date without a snapshot
-
-The first monitor runs at 7:00 AM Eastern, an hour after the last daily run of the day
-at 6:00 AM, which leaves time for that run to finish. It judges the latest date that
-has price data, using the same definition as the status view: the date is unresolved
-when it has no completed snapshot. A date with no active positions that was recorded
-complete is resolved.
-
-- If the date is unresolved, the monitor records a snapshot-incomplete event for that
-  date, unless one already exists for it.
-- If the date is resolved, or no price data exists yet, it records nothing.
-
-Because the monitor judges state at 7:00 AM, the evening run alone never triggers it:
-an evening run that is incomplete and is completed by the 6 AM run records nothing.
-A date that stays unresolved is announced once, however many times it is judged.
-An agent refresh or rebuild that completes the date before 7:00 AM also resolves it.
-
-The notification handler for the event names the date. When the updates log has an
-incomplete entry for it, the message names which instruments had which issue, with
-symbols, dates and counts only. When it has none, the message says no run was recorded
-for the date, which covers a daily job that did not run.
+Each monitor has its own spec under spc/monitors, one file per monitor. The first is
+the latest price date without a snapshot, in its own spec; it records the
+snapshot-incomplete event and names its portfolio destination.
 
 ## Non-goals
 
@@ -287,8 +269,8 @@ for the date, which covers a daily job that did not run.
   adapter is active at a time.
 - Destinations separate investment notifications from system messages. Delivery
   failures go to the system destination, which never falls back to the portfolio one.
-- Events follow observed state: a scheduled monitor at 7:00 AM Eastern, not the daily
-  job, records the snapshot-incomplete event, so it does not depend on there being two
+- Events can follow observed state: a scheduled monitor, not the daily job, records the
+  snapshot-incomplete event, so it does not depend on there being two
   daily runs and also covers a run that never happened.
 - A monitor announces each subject at most once.
 
@@ -324,15 +306,8 @@ for the date, which covers a daily job that did not run.
 - The Telegram credential appears in no log, tool result or event payload.
 - The cleanup deletes fully handled events older than a year and no others.
 - A restart of the server does not lose pending events.
-- At 7:00 AM Eastern, when the latest price date has no completed snapshot, one
-  snapshot-incomplete event is recorded for it, and a Telegram message names the date
-  and the affected instruments, or says no run was recorded.
-- The monitor records nothing when the date has a completed snapshot, including a date
-  with no active positions, or when no price data exists; and an incomplete evening run
-  completed by the 6 AM run produces no event.
-- Running the monitor again for the same unresolved date records no second event; after
-  the operator removes that event, a still unresolved date is announced again.
-- A daily job that never ran is caught by the monitor.
+- Repeating a monitor for a subject it already announced records no second event; after
+  the operator removes that event, a still unresolved subject is announced again.
 - A failing monitor is logged and does not stop other monitors or its next run, and the
   monitor does not run at startup.
 
@@ -345,4 +320,5 @@ for the date, which covers a daily job that did not run.
 - Related: 2026-11-13-investments-mcp, the base spec this extends.
 - Related: 2026-11-15-status, which lists given-up and expired events.
 - Related: 2026-09-17-core-event-bus, the walk-in service's outbox this follows.
+- Related: 2026-11-21-monitor-snapshot-incomplete, the first monitor.
 - Related: 2026-11-13-investments-mcp-plan, the daily schedule the first monitor follows.
