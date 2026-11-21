@@ -1,11 +1,10 @@
 # CHANGELOG
 
-## Unreleased
+## [0.12.0](https://github.com/rthomazel/mcp/releases/tag/bench/v0.12.0) build: mise from the official image; remove jj and local lint
 
-### misc
+### build
 
-- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
-- **(go.mod)** drop the `golangci-lint` tool dependency, and the `go install godotenv` CI step, since `./run test` already uses the `godotenv` tool from `go.mod`.
+- **(container)** take `mise` from the official `ghcr.io/jdx/mise` image (`COPY --from`) instead of downloading the release binary with `ARG MISE_VERSION`, so Dependabot can bump it. v2026.3.6 -> 2026.11.8: the version tags before 2026.9.11 are a different, source-built image.
 
 ### fix
 
@@ -13,6 +12,8 @@
 
 ### misc
 
+- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
+- **(go.mod)** drop the `golangci-lint` tool dependency, and the `go install godotenv` CI step, since `./run test` already uses the `godotenv` tool from `go.mod`.
 - **(container)** remove the `jj` (Jujutsu) binary from the image; agents use `git`, and nothing in bench called `jj`. The `context` tool no longer reports a `jujutsu` version.
 
 ## [0.11.2](https://github.com/rthomazel/mcp/pull/62) fix: stats keep running with a blank encryption key; redact base64

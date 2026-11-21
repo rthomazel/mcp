@@ -11,7 +11,11 @@ RUN CGO_ENABLED=0 go build \
     -ldflags="-s -w -X main.version=${VERSION:-local}" \
     -o bench-mcp .
 
-# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+# ── Stage 2: mise ─────────────────────────────────────────────────────────────
+# official release image, a single static binary; a FROM line so Dependabot bumps the version
+FROM ghcr.io/jdx/mise:2026.11.8 AS mise
+
+# ── Stage 3: runtime ──────────────────────────────────────────────────────────
 FROM ubuntu:24.04
 
 # skip prompts from apt
@@ -34,12 +38,7 @@ RUN apt-get update && apt-get install -y \
     dnsutils iputils-ping netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-ARG MISE_VERSION=v2026.3.6
-RUN ARCH=$(dpkg --print-architecture) && \
-    MISE_ARCH=$([ "$ARCH" = "arm64" ] && echo "arm64" || echo "x64") && \
-    curl -fsSL "https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-${MISE_ARCH}" \
-    -o /usr/local/bin/mise && \
-    chmod +x /usr/local/bin/mise
+COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
 
 ENV MISE_DATA_DIR=/mise
 ENV MISE_CONFIG_DIR=/mise
