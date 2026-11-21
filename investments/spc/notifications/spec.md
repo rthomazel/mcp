@@ -13,7 +13,7 @@ agents: claude
 ## Status
 
 Draft. This specifies a generic event outbox, the worker that drains it, a
-generic notification handling over a channel interface with destinations, with Telegram as the first channel implementation,
+generic notification handling over a channel interface with categories, with Telegram as the first channel implementation,
 scheduled monitors that record events from observed state, and the first monitor, specified in spc/monitors. Daily equity and
 valuation monitors, tied to price fluctuations and portfolio equity, are separate
 follow-up specs that add their own monitors and event kinds.
@@ -51,27 +51,27 @@ notification message. A handler has a stable name, which is stored with the even
 **Registry.** The mapping from each event type to the handlers that run for it.
 
 **Channel interface.** The contract every way of delivering a notification meets: one
-operation that sends a plain-text message to a destination and reports whether it was
+operation that sends a plain-text message to a category and reports whether it was
 delivered. Notification handlers depend only on it.
 
 **Channel implementation.** The code that delivers through one particular service, such
 as Telegram, or the stub that sends nothing. Channel implementations are the only code
 that knows about a service. One is configured with its own settings, for example the
-Telegram bot credential, and with one or more destinations.
+Telegram bot credential, and with one or more categories.
 
-**Destination.** A named place within a channel implementation, with its own settings,
-so one implementation can reach different places for different purposes. The Telegram
-channel implementation has two: portfolio, a chat for what the operator wants to know
-about the investments, and system, a chat for the few messages about the system's own
-health.
+**Category.** The named purpose a notification serves, set up within a channel
+implementation with its own settings, so one implementation can reach different places
+for different purposes. The Telegram channel implementation has two: portfolio, a chat
+for what the operator wants to know about the investments, and system, a chat for the
+few messages about the system's own health.
 
 **Notification handler.** The generic handler for events that notify. There is one for
 each notifying event type, configured with a message format for that type and the
 targets the event goes to, each target being a channel implementation and one of its
-destinations. It renders the message text from the event and sends it to every target.
+categories. It renders the message text from the event and sends it to every target.
 
 **Configuration.** The notifications configuration declares the channel implementations
-in use, their destinations, and for each notifying event type the targets it goes to.
+in use, their categories, and for each notifying event type the targets it goes to.
 
 **Monitor.** A job that runs on a schedule, judges a condition on the system's
 current state, and records an event when the condition holds. A monitor names the
@@ -134,7 +134,7 @@ silent. It does three things:
    The log is the dependable record, because the notification below needs the channel
    implementation that may be the very thing failing.
 2. It records a delivery-failed event, which a notification handler announces to the
-   operator on the system destination, naming the type of the event that failed and
+   operator on the system category, naming the type of the event that failed and
    when it was recorded.
 3. The event shows up in the status view, as described below.
 
@@ -173,7 +173,7 @@ Notifying is generic. Each event type that notifies has one notification handler
 same handler, configured with a message format for the type and a list of targets. The
 message format turns the event's data into plain, channel-neutral text, with no
 markup, and may look at current system state to do so, for example the updates log.
-The handler knows channel implementations and destinations only by name and through
+The handler knows channel implementations and categories only by name and through
 the channel interface, never a particular service, so no handler is written for one service's
 formatting, and content cannot be rejected for formatting reasons.
 
@@ -184,43 +184,43 @@ formatting, and content cannot be rejected for formatting reasons.
 - A failure on any target is a failure of the handler for that event, counted toward
   the ten per event as described above.
 - Each target is tracked on the event under a stable name derived from the handler, the
-  channel implementation and the destination. Like handler names, these names are never reused for a
+  channel implementation and the category. Like handler names, these names are never reused for a
   different purpose and never removed while events that reference them may still be in
   flight.
 - An event type that notifies but has no target configured logs a warning and is
   treated as delivered, since there is nothing to send to.
 - Targets never fall back to one another: a message reaches only the targets its
   handler names.
-- Each target uses one channel implementation. Adding an implementation or a destination
+- Each target uses one channel implementation. Adding an implementation or a category
   needs no change to any handler or producer, only the implementation, if new, and
   configuration.
 
 The stub channel implementation sends nothing and always succeeds, logging a warning each time it
 handles a message, so an unconfigured system is visible in the logs. It is used until a
-real channel implementation is configured, and a destination with nothing configured behind
+real channel implementation is configured, and a category with nothing configured behind
 it behaves the same way, so the system runs without Telegram and events are still
 recorded and handled.
 
-Destinations keep different kinds of message apart. Investment notifications go to the
-portfolio destination and messages about the system itself go to the system
-destination, so the operator can read, mute or route them separately. The two are in
+Categories keep different kinds of message apart. Investment notifications go to the
+portfolio category and messages about the system itself go to the system
+category, so the operator can read, mute or route them separately. The two are in
 the same place only when the operator configures them to be.
 
-The system destination is for the occasional message about the system, not a place for
+The system category is for the occasional message about the system, not a place for
 logs or alerts. Logs and system failures are observed through infrastructure-level
 observability, which this does not replace.
 
 ### Telegram channel implementation
 
 The Telegram channel implementation sends through the Telegram Bot API from the operator's bot. Each
-Telegram destination is configured with its own chat, which can be a direct chat with
-the operator, a group or a broadcast channel; two destinations can use different chats, and can be set to
+Telegram category is configured with its own chat, which can be a direct chat with
+the operator, a group or a broadcast channel; two categories can use different chats, and can be set to
 the same one if the operator wants.
 
 - A non-success response from Telegram, or a failure to reach it, is reported to
   the interface as a failure to deliver.
 - The Telegram channel implementation is active when the bot credential is configured, and a
-  destination when its chat is; otherwise the stub behavior above applies.
+  category when its chat is; otherwise the stub behavior above applies.
 - The bot credential is a server-side secret. It never appears in tool results, logs
   or event payloads, and configuration allows replacing it without a code change.
 - The operator verifies delivery to Telegram themself; the system provides no test
@@ -255,7 +255,7 @@ ran.
 
 Each monitor has its own spec under spc/monitors, one file per monitor. The first is
 the latest price date without a snapshot, in its own spec; it records the
-snapshot-incomplete event and its portfolio destination.
+snapshot-incomplete event and its portfolio category.
 
 ## Non-goals
 
@@ -263,7 +263,7 @@ snapshot-incomplete event and its portfolio destination.
   valuation monitors come with their own specs.
 - Channel implementations other than Telegram and the stub.
 - Replacing logging or infrastructure-level observability of system failures.
-- Destinations beyond portfolio and system, which the operator may add by configuration.
+- Categories beyond portfolio and system, which the operator may add by configuration.
 - Replies, commands or any inbound Telegram interaction, and a test-message feature.
 - Exactly-once delivery.
 - Agent tools to create, edit or retry events, or to read the outbox beyond what
@@ -292,11 +292,11 @@ snapshot-incomplete event and its portfolio destination.
   stuck event never blocks newer ones.
 - Notifying is generic: one notification handler per notifying event type, configured
   with a message format and a list of targets, each a channel implementation and one of
-  its destinations. Handlers depend only on the channel interface. Telegram is the first
+  its categories. Handlers depend only on the channel interface. Telegram is the first
   channel implementation, with plain text, and the stub behavior applies when an
-  implementation or destination is unconfigured.
-- Destinations separate investment notifications from system messages. Delivery failures
-  go to the system destination, which never falls back to the portfolio one.
+  implementation or category is unconfigured.
+- Categories separate investment notifications from system messages. Delivery failures
+  go to the system category, which never falls back to the portfolio one.
 - Events can follow observed state: a scheduled monitor, not the daily job, records the
   snapshot-incomplete event, so it does not depend on there being two
   daily runs and also covers a run that never happened.
@@ -328,14 +328,14 @@ snapshot-incomplete event and its portfolio destination.
   implementation changes no handler and no producer.
 - An event configured for two targets is delivered to both; if one fails, the one that
   delivered is not sent the message again on retry and the failing one is retried.
-- A channel implementation can have more than one destination, set in the notifications configuration,
-  and a message reaches only the destinations its targets name.
-- A message reaches the chat configured for its destination when the credential and
+- A channel implementation can have more than one category, set in the notifications configuration,
+  and a message reaches only the categories its targets name.
+- A message reaches the chat configured for its category when the credential and
   that chat are set; when they are not, nothing is sent, a warning is logged and the
   handler succeeds. An event type with no target configured logs a warning and is
   treated as delivered.
-- A delivery-failed event goes to the system destination and the snapshot-incomplete
-  event to the portfolio destination; a destination never falls back to the other.
+- A delivery-failed event goes to the system category and the snapshot-incomplete
+  event to the portfolio category; a category never falls back to the other.
 - The Telegram credential appears in no log, tool result or event payload.
 - The cleanup deletes fully handled events older than a year and no others.
 - A restart of the server does not lose pending events.
