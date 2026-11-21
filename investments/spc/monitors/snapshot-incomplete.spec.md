@@ -12,7 +12,7 @@ agents: claude
 ## Description
 
 The first monitor, built on the monitor mechanism in the notifications spec. It
-tells the operator, on the portfolio destination, when the daily job has not
+tells the operator, on the portfolio channel, when the daily job has not
 produced a completed snapshot for the latest date that has price data.
 
 ## Behavior
