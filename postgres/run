@@ -25,10 +25,6 @@ build_arch() {
 }
 
 case "$cmd" in
-# -- run golangci-lint
-lint)
-  go tool golangci-lint run ./...
-  ;;
 # -- start the server
 dev)
   go run main.go

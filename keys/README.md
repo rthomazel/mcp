@@ -63,7 +63,4 @@ The default config file is `config.yaml` in the working directory. In the Docker
 
 # run tests
 ./run test
-
-# lint
-./run lint
 ```
