@@ -12,6 +12,8 @@
 
 ### misc
 
+- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
+- **(go.mod)** drop the `golangci-lint` tool dependency, and the `go install godotenv` CI step, since `./run test` already uses the `godotenv` tool from `go.mod`.
 - **(container)** remove the `jj` (Jujutsu) binary from the image; agents use `git`, and nothing in bench called `jj`. The `context` tool no longer reports a `jujutsu` version.
 
 ## [0.11.2](https://github.com/rthomazel/mcp/pull/62) fix: stats keep running with a blank encryption key; redact base64

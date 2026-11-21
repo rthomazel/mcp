@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-go@v5.0.2
         with:
-          go-version: "1.26"
+          go-version-file: bench/go.mod
 
       - run: ./run bench:build:go
 
@@ -29,9 +29,8 @@ jobs:
 
       - uses: actions/setup-go@v5.0.2
         with:
-          go-version: "1.26"
+          go-version-file: bench/go.mod
 
-      - run: go install github.com/joho/godotenv/cmd/godotenv@v1.5.1
       - run: cp bench/.env-default bench/.env && ./run bench:test
 
   lint:
@@ -42,11 +41,11 @@ jobs:
 
       - uses: actions/setup-go@v5.0.2
         with:
-          go-version: "1.26"
+          go-version-file: bench/go.mod
 
       - uses: golangci/golangci-lint-action@v9.3.0
         with:
-          version: v2.10
+          version: v2.15
           working-directory: bench
 
   go-mod:
@@ -57,7 +56,7 @@ jobs:
 
       - uses: actions/setup-go@v5.0.2
         with:
-          go-version: "1.26"
+          go-version-file: bench/go.mod
 
       - uses: j0hnsmith/go-mod-check@v1.0.0
         with:

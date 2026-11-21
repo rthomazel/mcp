@@ -26,10 +26,6 @@ build_arch() {
 }
 
 case "$cmd" in
-# -- run golangci-lint
-lint)
-  go tool golangci-lint run ./...
-  ;;
 # -- start the server with godotenv
 dev)
   go tool godotenv -f .env go run main.go

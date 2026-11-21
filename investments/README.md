@@ -8,7 +8,7 @@ Specification and plan: [`spc/`](./spc/spec.md). Models sit next to the code the
 
 ```bash
 investments/run dev     # reads .env, see .env.example
-investments/run mocks   # generate mocks before test and lint
+investments/run mocks   # generate mocks before test
 investments/run test    # set INVESTMENTS_MCP_TEST_DSN to include the database tests
 ```
 
