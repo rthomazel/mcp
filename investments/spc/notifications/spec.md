@@ -1,7 +1,7 @@
 ---
 id: 2026-11-21-notifications
 type: spec
-summary: Generic event outbox with a retrying in-process worker and scheduled checks, delivering to the operator over Telegram, starting with a check for a missing daily snapshot.
+summary: Generic event outbox with a retrying in-process worker and scheduled monitors, delivering to the operator over Telegram, starting with a monitor for a missing daily snapshot.
 author: Thom
 created: 2026-11-21
 updated: 2026-11-21
@@ -14,9 +14,9 @@ agents: claude
 
 Draft. This specifies a generic event outbox, the worker that drains it, a
 channel-independent notification interface with Telegram as its first adapter,
-scheduled checks that record events from observed state, and the first check, a daily run that left the latest price date without a snapshot. Daily equity and
-valuation checks, tied to price fluctuations and portfolio equity, are separate
-follow-up specs that add their own checks and event kinds.
+scheduled monitors that record events from observed state, and the first monitor, a daily run that left the latest price date without a snapshot. Daily equity and
+valuation monitors, tied to price fluctuations and portfolio equity, are separate
+follow-up specs that add their own monitors and event kinds.
 
 ## Intent
 
@@ -56,12 +56,12 @@ depend only on this interface, never on any particular service. Telegram is its 
 adapter, and a stub that sends nothing is another. Which adapter is active is decided
 by configuration.
 
-**Check.** A routine that runs on a schedule, judges a condition on the system's
-current state, and records an event when the condition holds. A check names the
+**Monitor.** A job that runs on a schedule, judges a condition on the system's
+current state, and records an event when the condition holds. A monitor names the
 subject it judges, for example a date, so it announces each subject at most once.
 
 The outbox does not replace or duplicate the updates log, which stays the record of
-ingestion outcomes. A check may read the updates log, as status does, to judge its
+ingestion outcomes. A monitor may read the updates log, as status does, to judge its
 condition, but an event is never a copy of an updates entry.
 
 ## Behavior
@@ -70,7 +70,7 @@ condition, but an event is never a copy of an updates entry.
 
 There are two kinds of producer. A change records its event in the same unit of work
 as the change itself, so the event exists if and only if the change was committed. A
-scheduled check records its event from the state it observed, as described below.
+scheduled monitor records its event from the state it observed, as described below.
 Recording an event never changes the outcome of what it reports, and no producer waits
 for handling. Nothing is recorded on a read.
 
@@ -177,41 +177,41 @@ worker. Events that are not fully handled are never deleted by the cleanup, no m
 how old, and neither are events that were given up on: those leave only when the
 operator removes them.
 
-### Scheduled checks
+### Scheduled monitors
 
-A scheduler runs inside the server process, like the daily job, and runs each check
+A scheduler runs inside the server process, like the daily job, and runs each monitor
 at its own time in the market timezone, so daylight saving changes keep the same local
-times. Checks are independent of the daily job and of each other: a check does not know
-how or when the job ran, only what state it left. A check does not run at startup; if
+times. Monitors are independent of the daily job and of each other: a monitor does not know
+how or when the job ran, only what state it left. A monitor does not run at startup; if
 the server was down at its time, the next scheduled time judges the state then.
 
-- A check records an event only for a subject that has no event of that check in the
-  outbox yet, so repeating the check, or a later check seeing the same unresolved
+- A monitor records an event only for a subject that has no event of that monitor in the
+  outbox yet, so repeating the monitor, or a later monitor seeing the same unresolved
   subject, never announces it twice. An event the operator removed no longer counts,
   so a subject that is still unresolved can be announced again.
-- A check that fails is logged at error level and does not stop other checks or the
+- A monitor that fails is logged at error level and does not stop other monitors or the
   next scheduled time.
-- Checks hold no state of their own beyond the outbox.
+- Monitors hold no state of their own beyond the outbox.
 
-Checks exist because an event should follow observed state, not which run happened
-to execute. A check also catches what a producer cannot, such as a daily job that never
+Monitors exist because an event should follow observed state, not which run happened
+to execute. A monitor also catches what a producer cannot, such as a daily job that never
 ran.
 
-### First check: latest price date without a snapshot
+### First monitor: latest price date without a snapshot
 
-The first check runs at 7:00 AM Eastern, an hour after the last daily run of the day
+The first monitor runs at 7:00 AM Eastern, an hour after the last daily run of the day
 at 6:00 AM, which leaves time for that run to finish. It judges the latest date that
 has price data, using the same definition as the status view: the date is unresolved
 when it has no completed snapshot. A date with no active positions that was recorded
 complete is resolved.
 
-- If the date is unresolved, the check records a snapshot-incomplete event for that
+- If the date is unresolved, the monitor records a snapshot-incomplete event for that
   date, unless one already exists for it.
 - If the date is resolved, or no price data exists yet, it records nothing.
 
-Because the check judges state at 7:00 AM, the evening run alone never triggers it:
+Because the monitor judges state at 7:00 AM, the evening run alone never triggers it:
 an evening run that is incomplete and is completed by the 6 AM run records nothing.
-A date that stays unresolved is announced once, however many times it is checked.
+A date that stays unresolved is announced once, however many times it is judged.
 An agent refresh or rebuild that completes the date before 7:00 AM also resolves it.
 
 The notification handler for the event names the date. When the updates log has an
@@ -221,8 +221,8 @@ for the date, which covers a daily job that did not run.
 
 ## Non-goals
 
-- Event kinds and checks beyond the snapshot check and delivery failures. Equity and
-  valuation checks come with their own specs.
+- Event kinds and monitors beyond the snapshot monitor and delivery failures. Equity and
+  valuation monitors come with their own specs.
 - Adapters other than Telegram and the stub, and sending to several at once.
 - Replies, commands or any inbound Telegram interaction, and a test-message feature.
 - Exactly-once delivery.
@@ -251,10 +251,10 @@ for the date, which covers a daily job that did not run.
 - Notifying goes through a channel interface that handlers depend on; Telegram is the
   first adapter, with one direct chat and plain text, and the stub is active when it is
   unconfigured. One adapter is active at a time.
-- Events follow observed state: a scheduled check at 7:00 AM Eastern, not the daily
+- Events follow observed state: a scheduled monitor at 7:00 AM Eastern, not the daily
   job, records the snapshot-incomplete event, so it does not depend on there being two
   daily runs and also covers a run that never happened.
-- A check announces each subject at most once.
+- A monitor announces each subject at most once.
 
 ## Acceptance criteria
 
@@ -286,22 +286,22 @@ for the date, which covers a daily job that did not run.
 - At 7:00 AM Eastern, when the latest price date has no completed snapshot, one
   snapshot-incomplete event is recorded for it, and a Telegram message names the date
   and the affected instruments, or says no run was recorded.
-- The check records nothing when the date has a completed snapshot, including a date
+- The monitor records nothing when the date has a completed snapshot, including a date
   with no active positions, or when no price data exists; and an incomplete evening run
   completed by the 6 AM run produces no event.
-- Running the check again for the same unresolved date records no second event; after
+- Running the monitor again for the same unresolved date records no second event; after
   the operator removes that event, a still unresolved date is announced again.
-- A daily job that never ran is caught by the check.
-- A failing check is logged and does not stop other checks or its next run, and the
-  check does not run at startup.
+- A daily job that never ran is caught by the monitor.
+- A failing monitor is logged and does not stop other monitors or its next run, and the
+  monitor does not run at startup.
 
 ## Open questions
 
-- Which equity and valuation checks to notify on, in the follow-up specs.
+- Which equity and valuation monitors to notify on, in the follow-up specs.
 
 ## Refs
 
 - Related: 2026-11-13-investments-mcp, the base spec this extends.
 - Related: 2026-11-15-status, which lists given-up events.
 - Related: 2026-09-17-core-event-bus, the walk-in service's outbox this follows.
-- Related: 2026-11-13-investments-mcp-plan, the daily schedule the first check follows.
+- Related: 2026-11-13-investments-mcp-plan, the daily schedule the first monitor follows.
