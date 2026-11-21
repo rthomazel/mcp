@@ -19,7 +19,13 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
-## Unreleased
+## [0.1.4](https://github.com/rthomazel/mcp/releases/tag/keys/v0.1.4) build: Go 1.27.4 and weekly dependency update
+
+### build
+
+- [`c8b52ee`](https://github.com/rthomazel/mcp/commit/c8b52ee) **(go.mod)** Go 1.26.5 -> 1.27.4, with `.tool-versions` and the `golang:` builder image in the Dockerfile — no source changes required.
+- [`c8b52ee`](https://github.com/rthomazel/mcp/commit/c8b52ee) **(go.mod)** `github.com/mark3labs/mcp-go` v0.58.0 -> v1.5.0 — a major version bump; no source changes were needed, build, tests and lint pass.
+- [`c8b52ee`](https://github.com/rthomazel/mcp/commit/c8b52ee) **(go.mod)** `github.com/stretchr/testify` v1.12.0 -> v1.12.1, `go.yaml.in/yaml/v3` v3.0.5 -> v3.0.6 — patch bumps.
 
 ### misc
 

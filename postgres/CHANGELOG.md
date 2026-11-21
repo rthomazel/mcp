@@ -1,14 +1,20 @@
 # CHANGELOG
 
-## Unreleased
+## [0.1.5](https://github.com/rthomazel/mcp/releases/tag/postgres/v0.1.5) build: Go 1.27.4 and weekly dependency update; mcp-proxy Host header
 
-### misc
+### build
 
-- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
+- [`4f176e6`](https://github.com/rthomazel/mcp/commit/4f176e6) **(go.mod)** Go 1.26.5 -> 1.27.4, with `.tool-versions` and the `golang:` builder image in the Dockerfile — no source changes required.
+- [`4f176e6`](https://github.com/rthomazel/mcp/commit/4f176e6) **(go.mod)** `github.com/mark3labs/mcp-go` v0.58.0 -> v1.5.0 — a major version bump; no source changes were needed, build, tests and lint pass.
+- [`4f176e6`](https://github.com/rthomazel/mcp/commit/4f176e6) **(go.mod)** `github.com/jackc/pgx/v5` v5.10.0 -> v5.13.0.
 
 ### fix
 
 - **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcppostgres` Host header (`POSTGRES_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers.
+
+### misc
+
+- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
 
 ## [0.1.3](https://github.com/rthomazel/mcp/pull/60) docs: document current implementation under spc/
 

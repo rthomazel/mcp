@@ -1,10 +1,17 @@
 # CHANGELOG
 
-## Unreleased
+## [0.12.1](https://github.com/rthomazel/mcp/releases/tag/bench/v0.12.1) fix: ubuntu 26.04 LTS base image; Go 1.27.4 and dependency update
+
+### build
+
+- [`2d24925`](https://github.com/rthomazel/mcp/commit/2d24925) **(go.mod)** Go 1.26.5 -> 1.27.4, with `.tool-versions` and the `golang:` builder image in the Dockerfile — no source changes required.
+- [`2d24925`](https://github.com/rthomazel/mcp/commit/2d24925) **(go.mod)** `github.com/mark3labs/mcp-go` v0.58.0 -> v1.5.0 — a major version bump; no source changes were needed, build, tests and lint pass.
+- [`2d24925`](https://github.com/rthomazel/mcp/commit/2d24925) **(go.mod)** `github.com/golang-migrate/migrate/v4` v4.19.1 -> v4.20.1.
+- [`2d24925`](https://github.com/rthomazel/mcp/commit/2d24925) **(go.mod)** `modernc.org/sqlite` v1.56.0 -> v1.62.0.
 
 ### fix
 
-- **(container)** base the runtime image on `ubuntu:26.04` (LTS) instead of `ubuntu:25.10`, which Dependabot moved it to in #85. 25.10 is an interim release that reached end of life on 2026-07-09 and was moved off the main apt archive, which the image's `apt-get update` depends on.
+- **(container)** base the runtime image on `ubuntu:26.04` (LTS), up from `ubuntu:24.04` in 0.12.0. Dependabot first moved it to `ubuntu:25.10` (#85), an interim release that reached end of life on 2026-07-09 and was moved off the main apt archive, which the image's `apt-get update` depends on.
 
 ## [0.12.0](https://github.com/rthomazel/mcp/releases/tag/bench/v0.12.0) build: mise from the official image; remove jj and local lint
 
