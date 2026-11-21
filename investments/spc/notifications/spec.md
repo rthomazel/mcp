@@ -71,7 +71,7 @@ renders the message text and sends it to every target the configuration routes t
 event type to. Event types, producers and monitors know nothing about how an event is
 handled.
 
-**Configuration.** One declaration of how notifications work: the channel
+**Configuration.** One versioned YAML file declaring how notifications work: the channel
 implementations in use with their settings, the categories each offers, and for each
 notifying event type its message format and its targets, each target being a channel
 implementation and one of its categories. Routing lives only here.
@@ -219,6 +219,29 @@ The system category is for the occasional message about the system, not a place 
 logs or alerts. Logs and system failures are observed through infrastructure-level
 observability, which this does not replace.
 
+### Configuration file
+
+The notifications configuration is a single YAML file, because it is too structured for
+flat settings. It carries a version number that identifies its format, so the format can
+evolve; a file with a version the server does not know is rejected.
+
+- Changes to the file take effect without restarting the server, within about one worker
+  pass. How the file is loaded and cached is a matter for the models.
+- Secrets are not in the file. The file says where each secret comes from, for example
+  an environment variable, so the file can be versioned and reviewed without exposing
+  the Telegram credential, which can still be rotated without a code change.
+- If no file exists, notifications are unconfigured: an event type has no target, which
+  logs a warning and counts as delivered, as described above, so the system runs
+  without Telegram.
+- If a file exists but is invalid, events are never treated as delivered because of it.
+  When the server starts with an invalid file, it still starts, but the notification
+  handler fails with an error logged until the file is valid, so events retry and
+  surface through the rules above. When an edit makes a running file invalid, the last
+  valid configuration keeps being used and an error is logged.
+- The configuration source is replaceable. A later source, such as a database behind a
+  dashboard, supplies the same complete configuration to the handler and changes no
+  event type, producer or monitor.
+
 ### Telegram channel implementation
 
 The Telegram channel implementation sends through the Telegram Bot API from the operator's bot. Each
@@ -306,6 +329,8 @@ configuration, not by the monitor.
   its categories. Handlers depend only on the channel interface. Telegram is the first
   channel implementation, with plain text, and the stub behavior applies when an
   implementation or category is unconfigured.
+- The configuration is a versioned YAML file with secrets kept out of it, read live and
+  replaceable by another source later, such as a database.
 - Event types, producers and monitors are unaware of how events are handled: the
   notification handler takes the complete configuration of channel implementations,
   categories and routes.
@@ -354,6 +379,9 @@ configuration, not by the monitor.
   and a snapshot-incomplete event the portfolio category, and a category never falls
   back to the other. No event type, producer or monitor refers to a channel
   implementation or category.
+- A change to the configuration file takes effect without a restart; an invalid file never
+  causes events to be treated as delivered, and a running configuration is kept when an
+  edit makes the file invalid.
 - The notification handler accepts the complete configuration, so changing routes,
   categories or channel implementations changes no event type, producer or monitor.
 - The Telegram credential appears in no log, tool result or event payload.
