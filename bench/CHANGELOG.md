@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### build
+
+- **(container)** add OCI image labels (`org.opencontainers.image.title`, `source`, `version`, `revision`) to the runtime image. The release workflow passes `VERSION` and `REVISION` (commit SHA) as build args, so `docker image inspect` shows which release is running; local builds report `local` / `unknown`.
+
 ## [0.12.1](https://github.com/rthomazel/mcp/releases/tag/bench/v0.12.1) fix: ubuntu 26.04 LTS base image; Go 1.27.4 and dependency update
 
 ### build

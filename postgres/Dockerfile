@@ -28,6 +28,14 @@ COPY --from=builder /build/postgres-mcp /usr/local/bin/postgres-mcp
 COPY ./bin/postgresmcphttp /usr/local/bin/postgresmcphttp
 RUN chmod +x /usr/local/bin/postgresmcphttp
 
+# image metadata (OCI); last so a new version only invalidates this layer
+ARG VERSION=local
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="postgres-mcp" \
+      org.opencontainers.image.source="https://github.com/rthomazel/mcp" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
+
 EXPOSE 8001
 
 CMD ["postgresmcphttp"]

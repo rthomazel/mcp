@@ -34,6 +34,14 @@ WORKDIR /config
 
 USER keys
 
+# image metadata (OCI); last so a new version only invalidates this layer
+ARG VERSION=local
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="keys-mcp" \
+      org.opencontainers.image.source="https://github.com/rthomazel/mcp" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
+
 EXPOSE 8001
 
 CMD ["keysmcphttp"]

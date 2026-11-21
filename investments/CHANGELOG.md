@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### build
+
+- **(container)** add OCI image labels (`org.opencontainers.image.title`, `source`, `version`, `revision`) to the runtime image. The release workflow passes `VERSION` and `REVISION` (commit SHA) as build args, so `docker image inspect` shows which release is running; local builds report `local` / `unknown`.
+
 ## [0.2.1](https://github.com/rthomazel/mcp/releases/tag/investments/v0.2.1) build: tidy go.mod; remove local lint
 
 ### build
