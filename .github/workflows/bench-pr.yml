@@ -31,7 +31,6 @@ jobs:
         with:
           go-version-file: bench/go.mod
 
-      - run: go install github.com/joho/godotenv/cmd/godotenv@v1.5.1
       - run: cp bench/.env-default bench/.env && ./run bench:test
 
   lint:

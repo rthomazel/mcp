@@ -35,8 +35,8 @@ When adding a new package, create a `doc.go` file following this pattern. `cmd/`
 ## Build and Test Commands
 
 Read the run script at the root to find these.
-If mockery is used, generate mocks before running tests and linting.
-If lint, format and tests are passing, dev is complete.
+If mockery is used, generate mocks before running tests.
+If format and tests are passing, dev is complete. CI runs the linter.
 ## Misc
 
 be more minimalistic: we need the right answer, call out hypotheses explicitly.

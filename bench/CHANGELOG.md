@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### misc
+
+- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
+- **(go.mod)** drop the `golangci-lint` tool dependency, and the `go install godotenv` CI step, since `./run test` already uses the `godotenv` tool from `go.mod`.
+
 ### fix
 
 - **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcpbench` Host header (`BENCH_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers.

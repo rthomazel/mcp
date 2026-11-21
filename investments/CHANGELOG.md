@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### misc
+
+- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
+
 ## [0.2.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.2.0) feat: cash, position P&L, status and value history
 
 ### feat

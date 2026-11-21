@@ -16,7 +16,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
-        module: [bench, keys, postgres]
+        module: [bench, investments, keys, postgres]
 
     steps:
       # GITHUB_TOKEN cannot push changes under .github/workflows, which the golangci-lint bump

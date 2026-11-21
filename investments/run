@@ -25,13 +25,9 @@ build_arch() {
 }
 
 case "$cmd" in
-# -- generate mocks, run before test and lint
+# -- generate mocks, run before test
 mocks)
   go tool mockery
-  ;;
-# -- run golangci-lint
-lint)
-  go tool golangci-lint run ./...
   ;;
 # -- start the server on stdio, reads .env
 dev)

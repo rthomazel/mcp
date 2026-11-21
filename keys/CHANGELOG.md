@@ -19,6 +19,12 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
+## Unreleased
+
+### misc
+
+- **(dev)** remove `./run lint`; golangci-lint runs in CI only, pinned in the PR workflow and bumped by the weekly Go update.
+
 ## [0.1.3](https://github.com/rthomazel/mcp/pull/60) docs: document current implementation under spc/
 
 ### docs
