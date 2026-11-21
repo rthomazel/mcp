@@ -83,7 +83,8 @@ for handling. Nothing is recorded on a read.
 
 A worker runs inside the server process, like the daily job. It checks the outbox
 twice per minute, and once immediately on startup. For each event that is not fully
-handled, has not been given up on, and whose backoff has passed, it runs every handler
+handled, has not been given up on, was recorded within the last week, and whose backoff
+has passed, it runs every handler
 registered for the event's type that has not yet succeeded for it.
 
 - Retries are per handler: a handler that already succeeded for an event does not run
@@ -129,16 +130,25 @@ A delivery-failed event that is itself given up on only logs and shows in status
 never records another delivery-failed event, so a failing channel cannot cause a
 cascade.
 
+### Age limit
+
+An event is only considered for handling during the week after it was recorded. The
+worker's lookup skips anything older, so an event that was given up on, or one that
+sat unhandled for a week because the server was down, can never block, slow or crowd
+out newer events, and no manual cleanup is needed for delivery to carry on. An event
+older than a week that is not fully handled is expired. Skipping an expired event is
+not logged, since the lookup runs constantly; status is where it shows.
+
 ### Failed deliveries in status
 
 The status view, which already reports unresolved failed and incomplete runs, also
-lists every event that was given up on, with its type, when it was recorded and its
+lists every event that was given up on or has expired, with its type, when it was recorded and its
 failure count. Any such event makes the overall verdict needs attention. It stays
 until it is removed.
 
 ### Removing events
 
-The agent can remove an event that was given up on, to clean up failed deliveries
+The agent can remove an event that was given up on or has expired, to clean up failed deliveries
 once the operator has dealt with the cause. Events that are pending, backing off or
 fully handled cannot be removed by the agent. Removing is by event identity, which
 status exposes for events that gave up. This is the only write the agent has on the
@@ -194,7 +204,7 @@ if the operator wants.
 
 Fully handled events are deleted after one year, by a periodic cleanup run in the same
 worker. Events that are not fully handled are never deleted by the cleanup, no matter
-how old, and neither are events that were given up on: those leave only when the
+how old, and neither are events that were given up on or expired: those leave only when the
 operator removes them.
 
 ### Scheduled monitors
@@ -269,7 +279,9 @@ for the date, which covers a daily job that did not run.
 - Giving up logs an error and also records a delivery-failed event, which cannot
   cascade.
 - Given-up events appear in status and are removed by an agent tool.
-- Processed events are retained for one year; unprocessed and given-up events stay.
+- Processed events are retained for one year; unprocessed, given-up and expired events stay.
+- Events are only considered for handling for a week after they were recorded, so a
+  stuck event never blocks newer ones.
 - Notifying goes through a channel interface that handlers depend on; Telegram is the
   first adapter, with plain text, and the stub is active when it is unconfigured. One
   adapter is active at a time.
@@ -298,7 +310,9 @@ for the date, which covers a daily job that did not run.
   delivery-failed event is recorded, and the event is listed in status with a needs
   attention verdict.
 - A given-up delivery-failed event does not record another delivery-failed event.
-- The agent can remove a given-up event and no other event; after removal status no
+- An event older than one week that is not fully handled is not picked up again and
+  is listed in status as expired; it does not block or delay newer events.
+- The agent can remove a given-up or expired event and no other event; after removal status no
   longer lists it.
 - A notification handler uses only the channel interface; replacing the active adapter
   changes no handler and no producer.
@@ -329,6 +343,6 @@ for the date, which covers a daily job that did not run.
 ## Refs
 
 - Related: 2026-11-13-investments-mcp, the base spec this extends.
-- Related: 2026-11-15-status, which lists given-up events.
+- Related: 2026-11-15-status, which lists given-up and expired events.
 - Related: 2026-09-17-core-event-bus, the walk-in service's outbox this follows.
 - Related: 2026-11-13-investments-mcp-plan, the daily schedule the first monitor follows.

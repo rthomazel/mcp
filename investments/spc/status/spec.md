@@ -22,7 +22,7 @@ for each held instrument, its latest stored price date and whether it is missing
 old; the latest completed snapshot date and whether the latest price date has no completed
 snapshot; and the failed or incomplete runs that still need attention. A run needs
 attention until a later completed run of the same kind supersedes it: for a snapshot run, a completed run for the same date; for a rebuild, a later completed rebuild whose range covers it. The view gives one overall verdict, healthy or needs attention, with reasons.
-It also lists events in the outbox that were given up on, which need attention until removed, as specified in the notifications feature. The raw updates log stays available.
+It also lists events in the outbox that were given up on or have expired, which need attention until removed, as specified in the notifications feature. The raw updates log stays available.
 
 ## Acceptance criteria
 
@@ -31,4 +31,4 @@ It also lists events in the outbox that were given up on, which need attention u
 ## Refs
 
 - Related: 2026-11-13-investments-mcp, the base spec this extends.
-- Related: 2026-11-21-notifications, whose given-up events status lists.
+- Related: 2026-11-21-notifications, whose given-up and expired events status lists.
