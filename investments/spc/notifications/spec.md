@@ -237,7 +237,8 @@ evolve; a file with a version the server does not know is rejected.
   When the server starts with an invalid file, it still starts, but the notification
   handler fails with an error logged until the file is valid, so events retry and
   surface through the rules above. When an edit makes a running file invalid, the last
-  valid configuration keeps being used and an error is logged.
+  valid configuration keeps being used. In both cases an error is logged on every
+  worker pass for as long as the file is invalid, not once, so it cannot go unnoticed.
 - The configuration source is replaceable. A later source, such as a database behind a
   dashboard, supplies the same complete configuration to the handler and changes no
   event type, producer or monitor.
@@ -381,7 +382,8 @@ configuration, not by the monitor.
   implementation or category.
 - A change to the configuration file takes effect without a restart; an invalid file never
   causes events to be treated as delivered, and a running configuration is kept when an
-  edit makes the file invalid.
+  edit makes the file invalid, and an error is logged on every worker pass while it is
+  invalid.
 - The notification handler accepts the complete configuration, so changing routes,
   categories or channel implementations changes no event type, producer or monitor.
 - The Telegram credential appears in no log, tool result or event payload.
