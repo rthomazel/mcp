@@ -21,7 +21,7 @@ jobs:
     steps:
       # GITHUB_TOKEN cannot push changes under .github/workflows, which the golangci-lint bump
       # edits, so the update runs with a token minted from the rthomazel-actions GitHub App
-      - uses: actions/create-github-app-token@v3.2.0
+      - uses: actions/create-github-app-token@v3.3.0
         id: app-token
         with:
           app-id: ${{ secrets.ACTIONS_APP_ID }}
@@ -37,7 +37,7 @@ jobs:
           # update-go pushes with the credential checkout stores
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: actions/setup-go@v6.3.0
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: ${{ matrix.module }}/go.mod
 

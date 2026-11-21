@@ -1,0 +1,29 @@
+version: 2
+
+# Go modules, the Go version, Dockerfile golang: tags and the golangci-lint pin are bumped by
+# the weekly "Update Go dependencies" workflow, so there is no gomod entry here.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels: [dependencies, github-actions]
+
+  - package-ecosystem: docker
+    directories:
+      - /bench
+      - /investments
+      - /keys
+      - /postgres
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels: [dependencies, docker]
+    ignore:
+      # the weekly Go update keeps the golang: tag in step with go.mod
+      - dependency-name: golang

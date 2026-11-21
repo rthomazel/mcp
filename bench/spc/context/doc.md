@@ -21,7 +21,7 @@ A single `metadata` block with:
 - `volumes`: one line per relevant mount, marked `persistent`, `ro`, or `rw`. Mounts at the mise directory and the home directory are persistent.
   The root mount, pseudo and overlay filesystems (proc, sysfs, tmpfs, devpts, cgroup, mqueue, overlay), and mounts under `/proc`, `/sys`, `/dev`, `/run`, and `/etc` are omitted.
 - A note that the container is ephemeral and that installs under `$HOME/bin` persist.
-- `installed`: versions of bash, git, jujutsu, mise, python3, pip3, rg, make, jq, and curl; `-` when a tool is missing or reports nothing.
+- `installed`: versions of bash, git, mise, python3, pip3, rg, make, jq, and curl; `-` when a tool is missing or reports nothing.
 - `auto-detected in path`: executables found on `PATH` that were absent from the startup snapshot, when there are any.
 
 ## Behavior
