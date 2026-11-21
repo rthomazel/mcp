@@ -44,4 +44,4 @@ distorting the model.
 
 - 2026-11-13-brazil-portfolio
 - 2026-11-13-ams-wallet
-- 2026-11-13-notifications
+- 2026-11-21-notifications

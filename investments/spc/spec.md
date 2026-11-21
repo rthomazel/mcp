@@ -4,7 +4,7 @@ type: spec
 summary: Personal investment monitoring MCP server with ledger-based positions, daily prices and valuation snapshots.
 author: Thom
 created: 2026-11-13
-updated: 2026-11-15
+updated: 2026-11-21
 agents: claude
 ---
 
