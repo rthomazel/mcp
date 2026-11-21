@@ -1,0 +1,87 @@
+# Constants
+
+handlerNamePrefix = "notification".
+noTargetHandlerName = "notification:none".
+
+# Types
+
+## Source
+
+1. loader *Loader
+2. store domain.Store
+3. renderers map[string]map[string]Renderer
+4. lookupEnv func(string) string
+
+Implements outbox.HandlerSource. It is the one notification handler, expanded for the current configuration, so the worker sees plain domain.EventHandler values.
+
+## targetHandler
+
+1. name string
+2. renderer Renderer
+3. channel Channel
+4. category string
+
+Delivers one event to one target: one channel and one of its categories.
+
+## noTargetHandler
+
+No fields.
+
+Stands in for an event type with no target.
+
+# Functions
+
+## NewSource(loader *Loader, store domain.Store, lookupEnv func(string) string) *Source
+
+Build a Source with the renderers from NewRenderers.
+
+## Source.Handlers(ctx Context) (map[string][]domain.EventHandler, error)
+
+1. Read the configuration from the loader.
+2. Build each configured channel with newChannel.
+3. For each event type of domain.NotifyingEvents, find its route.
+4. Build one targetHandler for each target of the route, with the renderer for the route's format.
+5. if the route has no target, or there is no route, use a single noTargetHandler.
+6. Return the handlers by event type.
+
+#### Errors
+
+- **1.** if the loader fails, return the error.
+
+Every notifying type has a handler list, so a type without targets is handled and delivered with a warning, never an error. Channels are rebuilt on every call, which is cheap; the configuration may have changed.
+
+## newChannel(cfg ChannelConfig, lookupEnv func(string) string) Channel
+
+Return a TelegramChannel for the telegram implementation and a StubChannel otherwise.
+
+## targetHandlerName(channel string, category string) string
+
+Return the prefix, the channel and the category joined by colons, for example notification:telegram:portfolio. The name is stored on the event, so it never changes meaning: names are not reused for another purpose and not dropped while events that name them may be in flight.
+
+## targetHandler.Name() string
+
+Return the stored name.
+
+## targetHandler.Handle(ctx Context, event domain.Event) error
+
+1. Render the event through the renderer.
+2. Send the text to the category through the channel.
+3. Return nil.
+
+#### Errors
+
+- **1.** if rendering fails, return the wrapped error.
+
+---
+
+- **2.** if sending fails, return the wrapped error naming the channel and category.
+
+Targets are independent: each is its own handler with its own name on the event, so a target that delivered is not sent again when another failed, and one failing target does not stop the others.
+
+## noTargetHandler.Name() string
+
+Return noTargetHandlerName.
+
+## noTargetHandler.Handle(ctx Context, event domain.Event) error
+
+Log a warning naming the event type that nothing is configured to receive it and return nil.
