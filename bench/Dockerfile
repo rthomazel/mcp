@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 go build \
 FROM ghcr.io/jdx/mise:2026.11.8 AS mise
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
-FROM ubuntu:25.10
+FROM ubuntu:26.04
 
 # skip prompts from apt
 ENV DEBIAN_FRONTEND=noninteractive
