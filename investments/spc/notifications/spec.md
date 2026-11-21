@@ -65,13 +65,16 @@ for different purposes. The Telegram channel implementation has two: portfolio, 
 for what the operator wants to know about the investments, and system, a chat for the
 few messages about the system's own health.
 
-**Notification handler.** The generic handler for events that notify. There is one for
-each notifying event type, configured with a message format for that type and the
-targets the event goes to, each target being a channel implementation and one of its
-categories. It renders the message text from the event and sends it to every target.
+**Notification handler.** The generic handler for events that notify. It accepts the
+complete notifications configuration as one unit, and for each event it handles it
+renders the message text and sends it to every target the configuration routes that
+event type to. Event types, producers and monitors know nothing about how an event is
+handled.
 
-**Configuration.** The notifications configuration declares the channel implementations
-in use, their categories, and for each notifying event type the targets it goes to.
+**Configuration.** One declaration of how notifications work: the channel
+implementations in use with their settings, the categories each offers, and for each
+notifying event type its message format and its targets, each target being a channel
+implementation and one of its categories. Routing lives only here.
 
 **Monitor.** A job that runs on a schedule, judges a condition on the system's
 current state, and records an event when the condition holds. A monitor names the
@@ -133,8 +136,8 @@ silent. It does three things:
 1. It logs an error naming the event, its type and its failure count, never its payload.
    The log is the dependable record, because the notification below needs the channel
    implementation that may be the very thing failing.
-2. It records a delivery-failed event, which a notification handler announces to the
-   operator on the system category, naming the type of the event that failed and
+2. It records a delivery-failed event, which the configuration routes like any other
+   event, intended to the system category, naming the type of the event that failed and
    when it was recorded.
 3. The event shows up in the status view, as described below.
 
@@ -154,9 +157,15 @@ not logged, since the lookup runs constantly; status is where it shows.
 ### Failed deliveries in status
 
 The status view, which already reports unresolved failed and incomplete runs, also
-lists every event that was given up on or has expired, with its type, when it was recorded and its
-failure count. Any such event makes the overall verdict needs attention. It stays
-until it is removed.
+reports events that did not get handled, in two separate areas of its message.
+
+- Events that were given up on within the last week are listed with their type, when
+  they were recorded and their failure count. They make the overall verdict needs
+  attention until they are removed or become expired.
+- Expired events, those not fully handled and older than a week, including events that
+  were given up on earlier, are listed in their own area, labeled as expired, with the
+  same details. They are informational: they do not affect the verdict, and they stay
+  in view until they are removed.
 
 ### Removing events
 
@@ -255,7 +264,8 @@ ran.
 
 Each monitor has its own spec under spc/monitors, one file per monitor. The first is
 the latest price date without a snapshot, in its own spec; it records the
-snapshot-incomplete event and its portfolio category.
+snapshot-incomplete event; where it is announced is decided by the notifications
+configuration, not by the monitor.
 
 ## Non-goals
 
@@ -286,7 +296,8 @@ snapshot-incomplete event and its portfolio category.
   of ten. Revisit if a type gets several handlers or targets that diverge in practice.
 - Giving up logs an error and also records a delivery-failed event, which cannot
   cascade.
-- Given-up events appear in status and are removed by an agent tool.
+- Given-up events need attention in status for a week and are then listed as expired,
+  informationally; both are removed by an agent tool.
 - Processed events are retained for one year; unprocessed, given-up and expired events stay.
 - Events are only considered for handling for a week after they were recorded, so a
   stuck event never blocks newer ones.
@@ -295,8 +306,12 @@ snapshot-incomplete event and its portfolio category.
   its categories. Handlers depend only on the channel interface. Telegram is the first
   channel implementation, with plain text, and the stub behavior applies when an
   implementation or category is unconfigured.
-- Categories separate investment notifications from system messages. Delivery failures
-  go to the system category, which never falls back to the portfolio one.
+- Event types, producers and monitors are unaware of how events are handled: the
+  notification handler takes the complete configuration of channel implementations,
+  categories and routes.
+- Categories separate investment notifications from system messages. The intended
+  configuration sends delivery failures to the system category, which never falls back
+  to the portfolio one.
 - Events can follow observed state: a scheduled monitor, not the daily job, records the
   snapshot-incomplete event, so it does not depend on there being two
   daily runs and also covers a run that never happened.
@@ -321,7 +336,8 @@ snapshot-incomplete event and its portfolio category.
   attention verdict.
 - A given-up delivery-failed event does not record another delivery-failed event.
 - An event older than one week that is not fully handled is not picked up again and
-  is listed in status as expired; it does not block or delay newer events.
+  is listed in status as expired, in an area that does not affect the verdict; it does
+  not block or delay newer events.
 - The agent can remove a given-up or expired event and no other event; after removal status no
   longer lists it.
 - A notification handler uses only the channel interface; replacing a channel
@@ -334,8 +350,12 @@ snapshot-incomplete event and its portfolio category.
   that chat are set; when they are not, nothing is sent, a warning is logged and the
   handler succeeds. An event type with no target configured logs a warning and is
   treated as delivered.
-- A delivery-failed event goes to the system category and the snapshot-incomplete
-  event to the portfolio category; a category never falls back to the other.
+- With the intended configuration, a delivery-failed event reaches the system category
+  and a snapshot-incomplete event the portfolio category, and a category never falls
+  back to the other. No event type, producer or monitor refers to a channel
+  implementation or category.
+- The notification handler accepts the complete configuration, so changing routes,
+  categories or channel implementations changes no event type, producer or monitor.
 - The Telegram credential appears in no log, tool result or event payload.
 - The cleanup deletes fully handled events older than a year and no others.
 - A restart of the server does not lose pending events.

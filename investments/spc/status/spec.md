@@ -22,7 +22,7 @@ for each held instrument, its latest stored price date and whether it is missing
 old; the latest completed snapshot date and whether the latest price date has no completed
 snapshot; and the failed or incomplete runs that still need attention. A run needs
 attention until a later completed run of the same kind supersedes it: for a snapshot run, a completed run for the same date; for a rebuild, a later completed rebuild whose range covers it. The view gives one overall verdict, healthy or needs attention, with reasons.
-It also lists events in the outbox that were given up on or have expired, which need attention until removed, as specified in the notifications feature. The raw updates log stays available.
+It also reports outbox events that were not handled, as specified in the notifications feature: events given up on within the last week need attention, and older unhandled events are listed separately as expired, without affecting the verdict. The raw updates log stays available.
 
 ## Acceptance criteria
 
