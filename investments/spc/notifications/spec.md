@@ -16,8 +16,7 @@ Draft. This specifies a generic event outbox, the worker that drains it, a
 channel-independent notification interface with Telegram as its first adapter,
 scheduled checks that record events from observed state, and the first check, a daily run that left the latest price date without a snapshot. Daily equity and
 valuation checks, tied to price fluctuations and portfolio equity, are separate
-follow-up specs that add their own checks and event kinds. This spec supersedes the former notifications idea,
-and where it conflicts with the notifications non-goal of the base spec, this spec wins.
+follow-up specs that add their own checks and event kinds.
 
 ## Intent
 
