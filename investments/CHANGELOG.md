@@ -1,6 +1,10 @@
 # CHANGELOG
 
-## Unreleased
+## [0.2.1](https://github.com/rthomazel/mcp/releases/tag/investments/v0.2.1) build: tidy go.mod; remove local lint
+
+### build
+
+- [`0e9e933`](https://github.com/rthomazel/mcp/commit/0e9e933) **(go.mod)** drop the unused indirect requirement `github.com/stretchr/objx` v0.5.3 (`go mod tidy`). Already on Go 1.27.4, so the weekly update changed nothing else.
 
 ### misc
 
