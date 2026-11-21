@@ -169,15 +169,17 @@ One adapter is active at a time. Adding another adapter requires no change to an
 handler or producer, only the adapter and its configuration. Sending to several
 adapters at once is not specified.
 
-The stub adapter sends nothing and always succeeds. It is active until the active
-service is configured, so the system runs without Telegram, and events are still
-recorded and handled.
+The stub adapter sends nothing and always succeeds, logging a warning each time it
+handles a message, so an unconfigured system is visible in the logs. It is active
+until the active service is configured, so the system runs without Telegram, and
+events are still recorded and handled.
 
 Destinations keep different kinds of message apart. Investment notifications go to
 the portfolio destination and messages about the system itself go to the system
 destination, so the operator can read, mute or route them separately. A destination
-that has nothing configured behind it sends nothing and reports success, like the stub,
-so it never falls back to another destination: the two are in the same place only
+that has nothing configured behind it sends nothing, logs the same warning and reports
+success, like the
+stub, so it never falls back to another destination: the two are in the same place only
 when the operator configures them to be.
 
 The system destination is for the occasional message about the system, not a place for
@@ -299,7 +301,8 @@ snapshot-incomplete event and names its portfolio destination.
 - A notification handler uses only the channel interface; replacing the active adapter
   changes no handler and no producer.
 - A message reaches the chat configured for its destination when the credential and
-  that chat are set, and nothing is sent, with no error, when they are not.
+  that chat are set; when they are not, nothing is sent, a warning is logged and the
+  handler succeeds.
 - A delivery-failed event goes to the system destination and the incomplete-snapshot
   event to the portfolio destination; a destination with no chat never falls back to
   the other.
