@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### build
+
+- **(container)** take `mise` from the official `ghcr.io/jdx/mise` image (`COPY --from`) instead of downloading the release binary with `ARG MISE_VERSION`, so Dependabot can bump it. v2026.3.6 -> 2026.11.8: the version tags before 2026.9.11 are a different, source-built image.
+
 ### fix
 
 - **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcpbench` Host header (`BENCH_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers.
