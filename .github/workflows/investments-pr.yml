@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.1.7
 
-      - uses: actions/setup-go@v5.0.2
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: investments/go.mod
 
@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.1.7
 
-      - uses: actions/setup-go@v5.0.2
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: investments/go.mod
 
@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.1.7
 
-      - uses: actions/setup-go@v5.0.2
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: investments/go.mod
 
