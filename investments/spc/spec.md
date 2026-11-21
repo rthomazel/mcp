@@ -4,7 +4,7 @@ type: spec
 summary: Personal investment monitoring MCP server with ledger-based positions, daily prices and valuation snapshots.
 author: Thom
 created: 2026-11-13
-updated: 2026-11-15
+updated: 2026-11-21
 agents: claude
 ---
 
@@ -57,7 +57,7 @@ Included:
 - Fundamentals, news and broad market research. A separate market-trends
   workflow covers these.
 - Frontend or dashboard.
-- Scheduled LLM reviews and notifications.
+- Scheduled LLM reviews.
 - A reusable investment-review skill. It may follow later.
 
 ## Concepts
@@ -355,5 +355,6 @@ least once before the system is relied on. Staging and rollout order are in the 
 ## Refs
 
 - Related: cash, position-pnl, status and value-history, the follow-up features under spc/.
+- Related: 2026-11-21-notifications, the source for notifications.
 - Related: mcp/bench/spc for the spec conventions used by sibling servers.
 - Related: interface doc/skills/tiingo-api, how the provider API behaves, validated live.
