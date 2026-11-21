@@ -51,10 +51,15 @@ notification message. A handler has a stable name, which is stored with the even
 **Registry.** The mapping from each event type to the handlers that run for it.
 
 **Channel.** The notification interface: one operation that sends a plain-text
-message to the operator and reports whether it was delivered. Notification handlers
+message to a destination and reports whether it was delivered. Notification handlers
 depend only on this interface, never on any particular service. Telegram is its first
 adapter, and a stub that sends nothing is another. Which adapter is active is decided
 by configuration.
+
+**Destination.** A named place a channel delivers to, so one channel can reach
+different places for different purposes. Two exist: portfolio, for what the operator
+wants to know about the investments, and system, for the few messages about the
+system's own health. Every notification handler names its destination.
 
 **Monitor.** A job that runs on a schedule, judges a condition on the system's
 current state, and records an event when the condition holds. A monitor names the
@@ -116,7 +121,8 @@ silent. It does three things:
    The log is the dependable record, because the notification below needs the channel
    that may be the very thing failing.
 2. It records a delivery-failed event, which a notification handler announces to the
-   operator, naming the type of the event that failed and when it was recorded.
+   operator on the system destination, naming the type of the event that failed and
+   when it was recorded.
 3. The event shows up in the status view, as described below.
 
 A delivery-failed event that is itself given up on only logs and shows in status. It
@@ -142,7 +148,8 @@ models.
 ### Channel interface
 
 A notification handler produces the message text for its event type from the event's
-data and hands it to the channel, which only sends it. Message text is plain and
+data and hands it to the channel with the destination it names, and the channel only
+sends it. Message text is plain and
 channel-neutral, with no markup, so no handler is written for one service's formatting
 and content cannot be rejected for formatting reasons. The channel reports failure
 when the message could not be delivered, and that is a handler failure, retried and
@@ -156,15 +163,28 @@ The stub adapter sends nothing and always succeeds. It is active until the activ
 service is configured, so the system runs without Telegram, and events are still
 recorded and handled.
 
+Destinations keep different kinds of message apart. Investment notifications go to
+the portfolio destination and messages about the system itself go to the system
+destination, so the operator can read, mute or route them separately. A destination
+that has nothing configured behind it sends nothing and reports success, like the stub,
+so it never falls back to another destination: the two are in the same place only
+when the operator configures them to be.
+
+The system destination is for the occasional message about the system, not a place for
+logs or alerts. Logs and system failures are observed through infrastructure-level
+observability, which this does not replace.
+
 ### Telegram adapter
 
-The Telegram adapter sends through the Telegram Bot API from the operator's bot, in a
-direct chat with the operator. There is a single configured chat.
+The Telegram adapter sends through the Telegram Bot API from the operator's bot. Each
+destination is configured with its own chat, which can be a direct chat with the
+operator or a channel; the two can be different chats, and can be set to the same one
+if the operator wants.
 
 - A non-success response from Telegram, or a failure to reach it, is reported to
   the interface as a failure to deliver.
-- The adapter is active only when both the bot credential and the chat are configured;
-  otherwise the stub is.
+- The adapter is active when the bot credential is configured, and the stub otherwise.
+  A destination with no chat configured sends nothing, as described above.
 - The bot credential is a server-side secret. It never appears in tool results, logs
   or event payloads, and configuration allows replacing it without a code change.
 - The operator verifies delivery to Telegram themself; the system provides no test
@@ -224,6 +244,8 @@ for the date, which covers a daily job that did not run.
 - Event kinds and monitors beyond the snapshot monitor and delivery failures. Equity and
   valuation monitors come with their own specs.
 - Adapters other than Telegram and the stub, and sending to several at once.
+- Replacing logging or infrastructure-level observability of system failures.
+- Destinations beyond portfolio and system.
 - Replies, commands or any inbound Telegram interaction, and a test-message feature.
 - Exactly-once delivery.
 - Agent tools to create, edit or retry events, or to read the outbox beyond what
@@ -249,8 +271,10 @@ for the date, which covers a daily job that did not run.
 - Given-up events appear in status and are removed by an agent tool.
 - Processed events are retained for one year; unprocessed and given-up events stay.
 - Notifying goes through a channel interface that handlers depend on; Telegram is the
-  first adapter, with one direct chat and plain text, and the stub is active when it is
-  unconfigured. One adapter is active at a time.
+  first adapter, with plain text, and the stub is active when it is unconfigured. One
+  adapter is active at a time.
+- Destinations separate investment notifications from system messages. Delivery
+  failures go to the system destination, which never falls back to the portfolio one.
 - Events follow observed state: a scheduled monitor at 7:00 AM Eastern, not the daily
   job, records the snapshot-incomplete event, so it does not depend on there being two
   daily runs and also covers a run that never happened.
@@ -278,8 +302,11 @@ for the date, which covers a daily job that did not run.
   longer lists it.
 - A notification handler uses only the channel interface; replacing the active adapter
   changes no handler and no producer.
-- A message reaches the configured Telegram chat when the credential and chat are set,
-  and nothing is sent, with no error, when they are not.
+- A message reaches the chat configured for its destination when the credential and
+  that chat are set, and nothing is sent, with no error, when they are not.
+- A delivery-failed event goes to the system destination and the incomplete-snapshot
+  event to the portfolio destination; a destination with no chat never falls back to
+  the other.
 - The Telegram credential appears in no log, tool result or event payload.
 - The cleanup deletes fully handled events older than a year and no others.
 - A restart of the server does not lose pending events.
