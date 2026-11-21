@@ -14,8 +14,8 @@ agents: claude
 
 Draft v1, design agreed with Thom in a prior session, restructured to SDD format.
 Plan stages 1 to 7 are implemented and v1 is deployed and in operator testing.
-Operator feedback from the deployed v1 is specified as separate features, which extend this spec: cash, position-pnl, status and
-value-history. Where they conflict with the exclusions below, the feature specs win.
+Operator feedback from the deployed v1 is specified as separate features, which extend this spec: cash, position-pnl, status,
+value-history and notifications. Where they conflict with the exclusions below, the feature specs win.
 Remaining open questions are at the end.
 
 ## Intent
@@ -57,7 +57,7 @@ Included:
 - Fundamentals, news and broad market research. A separate market-trends
   workflow covers these.
 - Frontend or dashboard.
-- Scheduled LLM reviews and notifications.
+- Scheduled LLM reviews. Notifications are specified in the notifications feature.
 - A reusable investment-review skill. It may follow later.
 
 ## Concepts
@@ -354,6 +354,6 @@ least once before the system is relied on. Staging and rollout order are in the 
 
 ## Refs
 
-- Related: cash, position-pnl, status and value-history, the follow-up features under spc/.
+- Related: cash, position-pnl, status, value-history and notifications, the follow-up features under spc/.
 - Related: mcp/bench/spc for the spec conventions used by sibling servers.
 - Related: interface doc/skills/tiingo-api, how the provider API behaves, validated live.

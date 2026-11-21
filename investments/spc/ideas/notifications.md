@@ -11,8 +11,8 @@ agents: claude
 
 ## Status
 
-Idea only, not part of v1. The Investments MCP spec lists notifications as a
-non-goal; this captures a possible follow-up. Everything below is to be decided.
+Superseded by the specification in spc/notifications/spec.md (2026-11-21-notifications). Kept as the
+original idea record.
 
 ## Idea
 
