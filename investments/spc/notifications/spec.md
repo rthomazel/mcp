@@ -12,18 +12,20 @@ agents: claude
 
 ## Status
 
-Draft. This specifies a generic event outbox, the worker that drains it, the Telegram
-channel, scheduled checks that record events from observed state, and the first check,
-a daily run that left the latest price date without a snapshot. Daily equity and
+Draft. This specifies a generic event outbox, the worker that drains it, a
+channel-independent notification interface with Telegram as its first adapter,
+scheduled checks that record events from observed state, and the first check, a daily run that left the latest price date without a snapshot. Daily equity and
 valuation checks, tied to price fluctuations and portfolio equity, are separate
 follow-up specs that add their own checks and event kinds. This spec supersedes the former notifications idea,
 and where it conflicts with the notifications non-goal of the base spec, this spec wins.
 
 ## Intent
 
-Let the system tell the operator, over Telegram, when something meaningful happens,
-without the operator asking the agent. Telegram is easy to integrate and enough for
-a personal system.
+Let the system tell the operator when something meaningful happens, without the
+operator asking the agent. Telegram is the first way it does so: easy to integrate
+and enough for a personal system. Notifying is defined independently of Telegram, so
+another way of reaching the operator can replace or join it without touching any
+handler or producer.
 
 The outbox itself is generic, not a notification feature. Producers only record that
 something happened and know nothing about how it is announced or acted on. What runs
@@ -44,13 +46,16 @@ not as scattered literals.
 **Outbox.** The table of events. It is both the queue that handling works from and
 a durable history of what was recorded.
 
-**Handler.** One side effect attached to one event type, for example one Telegram
-message kind. A handler has a stable name, which is stored with the event.
+**Handler.** One side effect attached to one event type, for example one kind of
+notification message. A handler has a stable name, which is stored with the event.
 
 **Registry.** The mapping from each event type to the handlers that run for it.
 
-**Channel.** A destination a notification handler sends through. Telegram is the
-first and only channel.
+**Channel.** The notification interface: one operation that sends a plain-text
+message to the operator and reports whether it was delivered. Notification handlers
+depend only on this interface, never on any particular service. Telegram is its first
+adapter, and a stub that sends nothing is another. Which adapter is active is decided
+by configuration.
 
 **Check.** A routine that runs on a schedule, judges a condition on the system's
 current state, and records an event when the condition holds. A check names the
@@ -111,7 +116,7 @@ silent. It does three things:
 1. It logs an error naming the event, its type and its failure count, never its payload.
    The log is the dependable record, because the notification below needs the channel
    that may be the very thing failing.
-2. It records a delivery-failed event, which a Telegram handler announces to the
+2. It records a delivery-failed event, which a notification handler announces to the
    operator, naming the type of the event that failed and when it was recorded.
 3. The event shows up in the status view, as described below.
 
@@ -135,18 +140,32 @@ status exposes for events that gave up. This is the only write the agent has on 
 outbox; it cannot create, edit or retry events. The exact tool contract is in the
 models.
 
-### Telegram channel
+### Channel interface
 
-Messages are sent through the Telegram Bot API from the operator's bot, in a direct
-chat with the operator. There is a single configured chat. A handler produces the
-message text for its event type from the event's data and the channel only sends it.
+A notification handler produces the message text for its event type from the event's
+data and hands it to the channel, which only sends it. Message text is plain and
+channel-neutral, with no markup, so no handler is written for one service's formatting
+and content cannot be rejected for formatting reasons. The channel reports failure
+when the message could not be delivered, and that is a handler failure, retried and
+counted as described above.
 
-- A non-success response from Telegram, or a failure to reach it, is a handler
-  failure and is retried and counted as described above. Messages are plain text with
-  no markup, so content can never be rejected for formatting reasons.
-- Until both the bot credential and the chat are configured, a stub channel that
-  sends nothing and always succeeds is used, so the system runs without Telegram.
-  Events are still recorded and handled.
+One adapter is active at a time. Adding another adapter requires no change to any
+handler or producer, only the adapter and its configuration. Sending to several
+adapters at once is not specified.
+
+The stub adapter sends nothing and always succeeds. It is active until the active
+service is configured, so the system runs without Telegram, and events are still
+recorded and handled.
+
+### Telegram adapter
+
+The Telegram adapter sends through the Telegram Bot API from the operator's bot, in a
+direct chat with the operator. There is a single configured chat.
+
+- A non-success response from Telegram, or a failure to reach it, is reported to
+  the interface as a failure to deliver.
+- The adapter is active only when both the bot credential and the chat are configured;
+  otherwise the stub is.
 - The bot credential is a server-side secret. It never appears in tool results, logs
   or event payloads, and configuration allows replacing it without a code change.
 - The operator verifies delivery to Telegram themself; the system provides no test
@@ -196,7 +215,7 @@ an evening run that is incomplete and is completed by the 6 AM run records nothi
 A date that stays unresolved is announced once, however many times it is checked.
 An agent refresh or rebuild that completes the date before 7:00 AM also resolves it.
 
-The Telegram handler for the event names the date. When the updates log has an
+The notification handler for the event names the date. When the updates log has an
 incomplete entry for it, the message names which instruments had which issue, with
 symbols, dates and counts only. When it has none, the message says no run was recorded
 for the date, which covers a daily job that did not run.
@@ -205,7 +224,7 @@ for the date, which covers a daily job that did not run.
 
 - Event kinds and checks beyond the snapshot check and delivery failures. Equity and
   valuation checks come with their own specs.
-- Channels other than Telegram.
+- Adapters other than Telegram and the stub, and sending to several at once.
 - Replies, commands or any inbound Telegram interaction, and a test-message feature.
 - Exactly-once delivery.
 - Agent tools to create, edit or retry events, or to read the outbox beyond what
@@ -230,7 +249,9 @@ for the date, which covers a daily job that did not run.
   cascade.
 - Given-up events appear in status and are removed by an agent tool.
 - Processed events are retained for one year; unprocessed and given-up events stay.
-- Telegram only, one direct chat, plain text, stub channel when unconfigured.
+- Notifying goes through a channel interface that handlers depend on; Telegram is the
+  first adapter, with one direct chat and plain text, and the stub is active when it is
+  unconfigured. One adapter is active at a time.
 - Events follow observed state: a scheduled check at 7:00 AM Eastern, not the daily
   job, records the snapshot-incomplete event, so it does not depend on there being two
   daily runs and also covers a run that never happened.
@@ -256,6 +277,8 @@ for the date, which covers a daily job that did not run.
 - A given-up delivery-failed event does not record another delivery-failed event.
 - The agent can remove a given-up event and no other event; after removal status no
   longer lists it.
+- A notification handler uses only the channel interface; replacing the active adapter
+  changes no handler and no producer.
 - A message reaches the configured Telegram chat when the credential and chat are set,
   and nothing is sent, with no error, when they are not.
 - The Telegram credential appears in no log, tool result or event payload.
