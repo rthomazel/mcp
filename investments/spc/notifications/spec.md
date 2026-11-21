@@ -1,7 +1,7 @@
 ---
 id: 2026-11-21-notifications
 type: spec
-summary: Generic event outbox with a retrying in-process worker, delivering to the operator over Telegram, starting with incomplete daily runs.
+summary: Generic event outbox with a retrying in-process worker and scheduled checks, delivering to the operator over Telegram, starting with a check for a missing daily snapshot.
 author: Thom
 created: 2026-11-21
 updated: 2026-11-21
@@ -13,9 +13,10 @@ agents: claude
 ## Status
 
 Draft. This specifies a generic event outbox, the worker that drains it, the Telegram
-channel, and the first event kind, an incomplete daily run. Daily equity and valuation
-checks, tied to price fluctuations and portfolio equity, are separate follow-up specs
-that add their own event kinds. This spec supersedes the former notifications idea,
+channel, scheduled checks that record events from observed state, and the first check,
+a daily run that left the latest price date without a snapshot. Daily equity and
+valuation checks, tied to price fluctuations and portfolio equity, are separate
+follow-up specs that add their own checks and event kinds. This spec supersedes the former notifications idea,
 and where it conflicts with the notifications non-goal of the base spec, this spec wins.
 
 ## Intent
@@ -51,18 +52,23 @@ message kind. A handler has a stable name, which is stored with the event.
 **Channel.** A destination a notification handler sends through. Telegram is the
 first and only channel.
 
-The outbox and the updates log are separate. Neither is derived from the other and
-neither depends on the other; an event is recorded beside the updates entry for the
-same occurrence, not generated from it.
+**Check.** A routine that runs on a schedule, judges a condition on the system's
+current state, and records an event when the condition holds. A check names the
+subject it judges, for example a date, so it announces each subject at most once.
+
+The outbox does not replace or duplicate the updates log, which stays the record of
+ingestion outcomes. A check may read the updates log, as status does, to judge its
+condition, but an event is never a copy of an updates entry.
 
 ## Behavior
 
 ### Recording events
 
-An event is recorded in the same unit of work as the change that caused it, so an
-event exists if and only if the change was committed. Recording an event never
-changes the outcome of the change it reports, and no producer waits for handling.
-Nothing is recorded on a read.
+There are two kinds of producer. A change records its event in the same unit of work
+as the change itself, so the event exists if and only if the change was committed. A
+scheduled check records its event from the state it observed, as described below.
+Recording an event never changes the outcome of what it reports, and no producer waits
+for handling. Nothing is recorded on a read.
 
 ### Handling
 
@@ -153,23 +159,51 @@ worker. Events that are not fully handled are never deleted by the cleanup, no m
 how old, and neither are events that were given up on: those leave only when the
 operator removes them.
 
-### First event kind: incomplete daily run
+### Scheduled checks
 
-The daily job runs in the evening and again at 6 AM Eastern, and an evening run that
-is incomplete usually completes the next morning. The 6 AM run records an incomplete
-daily run event when, after that run, the date it judged is still not completed, that
-is, when it could not write that date's snapshot because a held instrument lacked a
-usable price. The evening run records no event, and neither does an agent refresh or
-rebuild. If the date is completed by the 6 AM run, or was already completed, nothing
-is recorded.
+A scheduler runs inside the server process, like the daily job, and runs each check
+at its own time in the market timezone, so daylight saving changes keep the same local
+times. Checks are independent of the daily job and of each other: a check does not know
+how or when the job ran, only what state it left. A check does not run at startup; if
+the server was down at its time, the next scheduled time judges the state then.
 
-The event is recorded together with the run's outcome in the updates log, and its
-Telegram handler announces the date and which instruments had which issue, naming
-symbols, dates and counts only. At most one such event is recorded per 6 AM run.
+- A check records an event only for a subject that has no event of that check in the
+  outbox yet, so repeating the check, or a later check seeing the same unresolved
+  subject, never announces it twice. An event the operator removed no longer counts,
+  so a subject that is still unresolved can be announced again.
+- A check that fails is logged at error level and does not stop other checks or the
+  next scheduled time.
+- Checks hold no state of their own beyond the outbox.
+
+Checks exist because an event should follow observed state, not which run happened
+to execute. A check also catches what a producer cannot, such as a daily job that never
+ran.
+
+### First check: latest price date without a snapshot
+
+The first check runs at 7:00 AM Eastern, an hour after the last daily run of the day
+at 6:00 AM, which leaves time for that run to finish. It judges the latest date that
+has price data, using the same definition as the status view: the date is unresolved
+when it has no completed snapshot. A date with no active positions that was recorded
+complete is resolved.
+
+- If the date is unresolved, the check records a snapshot-incomplete event for that
+  date, unless one already exists for it.
+- If the date is resolved, or no price data exists yet, it records nothing.
+
+Because the check judges state at 7:00 AM, the evening run alone never triggers it:
+an evening run that is incomplete and is completed by the 6 AM run records nothing.
+A date that stays unresolved is announced once, however many times it is checked.
+An agent refresh or rebuild that completes the date before 7:00 AM also resolves it.
+
+The Telegram handler for the event names the date. When the updates log has an
+incomplete entry for it, the message names which instruments had which issue, with
+symbols, dates and counts only. When it has none, the message says no run was recorded
+for the date, which covers a daily job that did not run.
 
 ## Non-goals
 
-- Event kinds beyond incomplete daily runs and delivery failures. Equity and
+- Event kinds and checks beyond the snapshot check and delivery failures. Equity and
   valuation checks come with their own specs.
 - Channels other than Telegram.
 - Replies, commands or any inbound Telegram interaction, and a test-message feature.
@@ -177,7 +211,8 @@ symbols, dates and counts only. At most one such event is recorded per 6 AM run.
 - Agent tools to create, edit or retry events, or to read the outbox beyond what
   status shows.
 - A separate delivery process; the worker runs in the server.
-- Mixing the outbox and the updates log.
+- Using the outbox to store or replace the updates log.
+- Announcing that an unresolved date was later resolved.
 
 ## Decisions
 
@@ -196,7 +231,10 @@ symbols, dates and counts only. At most one such event is recorded per 6 AM run.
 - Given-up events appear in status and are removed by an agent tool.
 - Processed events are retained for one year; unprocessed and given-up events stay.
 - Telegram only, one direct chat, plain text, stub channel when unconfigured.
-- The incomplete-run event is first and fires only from the 6 AM run.
+- Events follow observed state: a scheduled check at 7:00 AM Eastern, not the daily
+  job, records the snapshot-incomplete event, so it does not depend on there being two
+  daily runs and also covers a run that never happened.
+- A check announces each subject at most once.
 
 ## Acceptance criteria
 
@@ -223,9 +261,17 @@ symbols, dates and counts only. At most one such event is recorded per 6 AM run.
 - The Telegram credential appears in no log, tool result or event payload.
 - The cleanup deletes fully handled events older than a year and no others.
 - A restart of the server does not lose pending events.
-- A 6 AM run that leaves its date incomplete records one incomplete daily run event
-  and a Telegram message naming the date and the affected instruments; an evening run
-  that is incomplete records none; a 6 AM run that completes the date records none.
+- At 7:00 AM Eastern, when the latest price date has no completed snapshot, one
+  snapshot-incomplete event is recorded for it, and a Telegram message names the date
+  and the affected instruments, or says no run was recorded.
+- The check records nothing when the date has a completed snapshot, including a date
+  with no active positions, or when no price data exists; and an incomplete evening run
+  completed by the 6 AM run produces no event.
+- Running the check again for the same unresolved date records no second event; after
+  the operator removes that event, a still unresolved date is announced again.
+- A daily job that never ran is caught by the check.
+- A failing check is logged and does not stop other checks or its next run, and the
+  check does not run at startup.
 
 ## Open questions
 
@@ -236,4 +282,4 @@ symbols, dates and counts only. At most one such event is recorded per 6 AM run.
 - Related: 2026-11-13-investments-mcp, the base spec this extends.
 - Related: 2026-11-15-status, which lists given-up events.
 - Related: 2026-09-17-core-event-bus, the walk-in service's outbox this follows.
-- Related: 2026-11-13-investments-mcp-plan, the daily schedule the first event kind relies on.
+- Related: 2026-11-13-investments-mcp-plan, the daily schedule the first check follows.
