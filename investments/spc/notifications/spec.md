@@ -347,6 +347,12 @@ snapshot-incomplete event and its portfolio category.
 ## Open questions
 
 - Which equity and valuation monitors to notify on, in the follow-up specs.
+- How notifications can carry formatting. Messages are plain text today, so any channel
+  implementation can deliver them. Once a channel implementation such as email supports
+  richer content like HTML, a notification might offer a richer form while Telegram
+  keeps plain text. Whether the message format produces one neutral text that each
+  channel implementation renders, or several forms chosen per channel implementation, is
+  for future discussion.
 
 ## Refs
 
