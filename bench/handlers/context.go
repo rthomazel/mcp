@@ -25,7 +25,6 @@ var (
 var preInstalled = map[string]string{
 	"bash":    "bash --version | head -1 | cut -d' ' -f4",
 	"git":     "git --version | cut -d' ' -f3",
-	"jujutsu": "jj version",
 	"mise":    "mise v 2>/dev/null | tail -1",
 	"python3": "python3 --version | cut -d' ' -f2",
 	"pip3":    "pip3 --version 2>/dev/null | cut -d' ' -f2",
