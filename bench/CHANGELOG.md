@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### fix
+
+- **(container)** base the runtime image on `ubuntu:26.04` (LTS) instead of `ubuntu:25.10`, which Dependabot moved it to in #85. 25.10 is an interim release that reached end of life on 2026-07-09 and was moved off the main apt archive, which the image's `apt-get update` depends on.
+
 ## [0.12.0](https://github.com/rthomazel/mcp/releases/tag/bench/v0.12.0) build: mise from the official image; remove jj and local lint
 
 ### build
