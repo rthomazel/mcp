@@ -188,6 +188,9 @@ symbols, dates and counts only. At most one such event is recorded per 6 AM run.
 - The worker runs in the server process, polls twice per minute, and gives up after
   ten failures, logging an error.
 - An unhandled event type is an error, not a silent skip.
+- Failures are counted per event, not per handler: with one handler per type they are
+  the same, and per-handler counting needs a more elaborate column or table. Revisit
+  when a type gets a second handler.
 - Giving up logs an error and also records a delivery-failed event, which cannot
   cascade.
 - Given-up events appear in status and are removed by an agent tool.
