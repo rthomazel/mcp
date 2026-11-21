@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## [0.12.0](https://github.com/rthomazel/mcp/releases/tag/bench/v0.12.0) build: mise from the official image; remove jj and local lint
 
 ### build
 
