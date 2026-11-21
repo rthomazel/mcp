@@ -11,6 +11,10 @@
 
 - **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcpbench` Host header (`BENCH_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers.
 
+### misc
+
+- **(container)** remove the `jj` (Jujutsu) binary from the image; agents use `git`, and nothing in bench called `jj`. The `context` tool no longer reports a `jujutsu` version.
+
 ## [0.11.2](https://github.com/rthomazel/mcp/pull/62) fix: stats keep running with a blank encryption key; redact base64
 
 ### fix
