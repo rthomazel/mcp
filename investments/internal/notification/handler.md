@@ -10,7 +10,7 @@ noTargetHandlerName = "notification:none".
 1. loader *Loader
 2. store domain.Store
 3. renderers map[string]map[string]Renderer
-4. lookupEnv func(string) string
+4. telegramToken string, the bot token from the server configuration
 
 Implements outbox.HandlerSource. It is the one notification handler, expanded for the current configuration, so the worker sees plain domain.EventHandler values.
 
@@ -31,7 +31,7 @@ Stands in for an event type with no target.
 
 # Functions
 
-## NewSource(loader *Loader, store domain.Store, lookupEnv func(string) string) *Source
+## NewSource(loader *Loader, store domain.Store, telegramToken string) *Source
 
 Build a Source with the renderers from NewRenderers.
 
@@ -50,7 +50,7 @@ Build a Source with the renderers from NewRenderers.
 
 Every notifying type has a handler list, so a type without targets is handled and delivered with a warning, never an error. Channels are rebuilt on every call, which is cheap; the configuration may have changed.
 
-## newChannel(cfg ChannelConfig, lookupEnv func(string) string) Channel
+## newChannel(cfg ChannelConfig, telegramToken string) Channel
 
 Return a TelegramChannel for the telegram implementation and a StubChannel otherwise.
 

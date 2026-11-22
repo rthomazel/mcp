@@ -16,15 +16,15 @@ const (
 // Source is the one notification handler, expanded for the current
 // configuration. It implements outbox.HandlerSource.
 type Source struct {
-	loader    *Loader
-	store     domain.Store
-	renderers map[string]map[string]Renderer
-	lookupEnv func(string) string
+	loader        *Loader
+	store         domain.Store
+	renderers     map[string]map[string]Renderer
+	telegramToken string
 }
 
 // NewSource builds a Source with the renderers from NewRenderers.
-func NewSource(loader *Loader, store domain.Store, lookupEnv func(string) string) *Source {
-	return &Source{loader: loader, store: store, renderers: NewRenderers(store), lookupEnv: lookupEnv}
+func NewSource(loader *Loader, store domain.Store, telegramToken string) *Source {
+	return &Source{loader: loader, store: store, renderers: NewRenderers(store), telegramToken: telegramToken}
 }
 
 type targetHandler struct {
@@ -48,7 +48,7 @@ func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, 
 
 	channels := make(map[string]Channel, len(cfg.Channels))
 	for _, channel := range cfg.Channels {
-		channels[channel.Name] = newChannel(channel, s.lookupEnv)
+		channels[channel.Name] = newChannel(channel, s.telegramToken)
 	}
 
 	routes := make(map[string]Route, len(cfg.Routes))
@@ -84,9 +84,9 @@ func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, 
 	return handlers, nil
 }
 
-func newChannel(cfg ChannelConfig, lookupEnv func(string) string) Channel {
+func newChannel(cfg ChannelConfig, telegramToken string) Channel {
 	if cfg.Implementation == implementationTelegram {
-		return NewTelegramChannel(cfg, lookupEnv)
+		return NewTelegramChannel(cfg, telegramToken)
 	}
 
 	return &StubChannel{name: cfg.Name}

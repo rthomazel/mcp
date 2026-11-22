@@ -18,13 +18,13 @@ The channel implementation for the Telegram Bot API, sending as the operator's b
 
 # Functions
 
-## NewTelegramChannel(cfg ChannelConfig, lookupEnv func(string) string) *TelegramChannel
+## NewTelegramChannel(cfg ChannelConfig, token string) *TelegramChannel
 
-1. Read the token from the environment variable named by the channel's token_env setting through lookupEnv.
+1. Keep the token, taken from the server configuration.
 2. Collect the chat of each category from its chat_id setting.
 3. Return the channel with a client using telegramTimeout.
 
-The token is read, not configured: the file names where it comes from and never contains it.
+The token comes from the server configuration, never from the notifications file.
 
 ## TelegramChannel.SendPlainText(ctx Context, category string, text string) error
 

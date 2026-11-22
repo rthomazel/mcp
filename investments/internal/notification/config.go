@@ -30,10 +30,9 @@ type Config struct {
 
 // ChannelConfig declares one channel and its categories.
 type ChannelConfig struct {
-	Name           string            `yaml:"name"`
-	Implementation string            `yaml:"implementation"`
-	Settings       map[string]string `yaml:"settings"`
-	Categories     []CategoryConfig  `yaml:"categories"`
+	Name           string           `yaml:"name"`
+	Implementation string           `yaml:"implementation"`
+	Categories     []CategoryConfig `yaml:"categories"`
 }
 
 // CategoryConfig declares one category of a channel.

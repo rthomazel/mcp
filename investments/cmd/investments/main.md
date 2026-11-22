@@ -17,7 +17,7 @@ Run run(); on error print the fatal message to stderr and exit with status 1.
 3. Open the store with postgres.Open, defer its cleanup.
 4. Apply pending migrations with migrate.
 5. Build the Tiingo client, the refresher and the daily job, and log at info level that the daily job is enabled with its run times and provider, and start the scheduler in a goroutine that stops when the process shuts down.
-6. Build the notifications loader over the configured file, the notification handler source over it and the store, and the outbox worker over the store and the source, and start the worker in a goroutine that stops when the process shuts down.
+6. Build the notifications loader over the configured file, the notification handler source over it, the store and the Telegram bot token, and the outbox worker over the store and the source, and start the worker in a goroutine that stops when the process shuts down.
 7. Build the monitor scheduler with the snapshot-incomplete monitor over the store, log at info level the monitor and its run time, and start the scheduler in a goroutine that stops when the process shuts down.
 8. Build the MCP server named "investments-mcp" with version.
 9. Build the handlers over the store, the refresher and the query timeout, and register the tools on the server.

@@ -12,6 +12,7 @@ defaultStalePriceDays = 5, from the spec: a price five or more days older than t
 3. StalePriceDays int
 4. TiingoAPIKey string, the market data credential, a server-side secret
 5. NotificationsConfigFile string, the path of the notifications configuration YAML file, empty meaning no file
+6. TelegramBotToken string, the Telegram bot credential, a server-side secret, empty meaning Telegram is unconfigured
 
 # Functions
 
@@ -22,7 +23,8 @@ defaultStalePriceDays = 5, from the spec: a price five or more days older than t
 3. Read INVESTMENTS_MCP_STALE_PRICE_DAYS as an integer, defaulting to defaultStalePriceDays.
 4. Read INVESTMENTS_MCP_TIINGO_API_KEY.
 5. Read INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE, optional.
-6. Return the populated Config.
+6. Read INVESTMENTS_MCP_TELEGRAM_BOT_TOKEN, optional.
+7. Return the populated Config.
 
 #### Errors
 

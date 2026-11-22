@@ -73,7 +73,7 @@ func run() error {
 		return fmt.Errorf("building monitor scheduler: %w", err)
 	}
 
-	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, os.Getenv)
+	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, cfg.TelegramBotToken)
 	worker := outbox.NewWorker(store, source)
 
 	running.Go(func() { monitors.Run(ctx) })

@@ -17,8 +17,7 @@ const (
 	telegramTimeout = 10 * time.Second
 	telegramMaxText = 4096
 
-	settingTokenEnv = "token_env"
-	settingChatID   = "chat_id"
+	settingChatID = "chat_id"
 )
 
 // TelegramChannel sends through the Telegram Bot API, one chat per category.
@@ -30,20 +29,15 @@ type TelegramChannel struct {
 	baseURL string
 }
 
-// NewTelegramChannel reads the token from the environment variable named by
-// the token_env setting; the file never contains the credential.
-func NewTelegramChannel(cfg ChannelConfig, lookupEnv func(string) string) *TelegramChannel {
+// NewTelegramChannel builds the channel with the bot token from the server
+// configuration; the notifications file never holds a credential.
+func NewTelegramChannel(cfg ChannelConfig, token string) *TelegramChannel {
 	chats := make(map[string]string, len(cfg.Categories))
 
 	for _, category := range cfg.Categories {
 		if chat := category.Settings[settingChatID]; chat != "" {
 			chats[category.Name] = chat
 		}
-	}
-
-	var token string
-	if name := cfg.Settings[settingTokenEnv]; name != "" {
-		token = lookupEnv(name)
 	}
 
 	return &TelegramChannel{

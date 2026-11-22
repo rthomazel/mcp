@@ -22,6 +22,8 @@ type Config struct {
 
 	// NotificationsConfigFile is the path of the notifications YAML file; empty means unconfigured.
 	NotificationsConfigFile string
+	// TelegramBotToken is a server-side secret, never logged or returned; empty means Telegram is unconfigured.
+	TelegramBotToken string
 }
 
 // Load reads the configuration from INVESTMENTS_MCP_* environment variables.
@@ -33,6 +35,7 @@ func Load() (*Config, error) {
 		TiingoAPIKey:   os.Getenv("INVESTMENTS_MCP_TIINGO_API_KEY"),
 
 		NotificationsConfigFile: os.Getenv("INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE"),
+		TelegramBotToken:        os.Getenv("INVESTMENTS_MCP_TELEGRAM_BOT_TOKEN"),
 	}
 
 	if cfg.DSN == "" {

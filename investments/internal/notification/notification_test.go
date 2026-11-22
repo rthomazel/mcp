@@ -24,7 +24,6 @@ version: 1
 channels:
   - name: telegram
     implementation: telegram
-    settings: {token_env: TG_TOKEN}
     categories:
       - {name: portfolio, settings: {chat_id: "1"}}
       - {name: system, settings: {chat_id: "2"}}
@@ -50,7 +49,6 @@ func TestLoaderReadsAValidFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, cfg.Version)
 	assert.Len(t, cfg.Channels[0].Categories, 2)
-	assert.Equal(t, "TG_TOKEN", cfg.Channels[0].Settings["token_env"])
 	assert.Len(t, cfg.Routes[0].Targets, 2)
 }
 
@@ -121,7 +119,7 @@ func TestTelegramSendsPlainTextToTheCategoryChat(t *testing.T) {
 	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
-	channel := NewTelegramChannel(cfg.Channels[0], func(string) string { return "secret" })
+	channel := NewTelegramChannel(cfg.Channels[0], "secret")
 	channel.baseURL = server.URL
 
 	require.NoError(t, channel.SendPlainText(context.Background(), "system", "hello"))
@@ -137,10 +135,10 @@ func TestTelegramWithoutCredentialsWarnsAndSucceeds(t *testing.T) {
 	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
-	noToken := NewTelegramChannel(cfg.Channels[0], func(string) string { return "" })
+	noToken := NewTelegramChannel(cfg.Channels[0], "")
 	assert.NoError(t, noToken.SendPlainText(context.Background(), "system", "x"))
 
-	noChat := NewTelegramChannel(cfg.Channels[0], func(string) string { return "secret" })
+	noChat := NewTelegramChannel(cfg.Channels[0], "secret")
 	assert.NoError(t, noChat.SendPlainText(context.Background(), "unknown", "x"))
 }
 
@@ -153,7 +151,7 @@ func TestTelegramFailuresDoNotLeakTheToken(t *testing.T) {
 	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
-	channel := NewTelegramChannel(cfg.Channels[0], func(string) string { return "secret" })
+	channel := NewTelegramChannel(cfg.Channels[0], "secret")
 	channel.baseURL = server.URL
 
 	err = channel.SendPlainText(context.Background(), "system", "x")
@@ -219,7 +217,7 @@ func TestRenderers(t *testing.T) {
 }
 
 func TestSourceExpandsTargetsAndFallsBackToNoTarget(t *testing.T) {
-	source := NewSource(NewLoader(writeConfig(t, validConfig)), &fakeStore{}, func(string) string { return "" })
+	source := NewSource(NewLoader(writeConfig(t, validConfig)), &fakeStore{}, "")
 
 	handlers, err := source.Handlers(context.Background())
 	require.NoError(t, err)
@@ -236,7 +234,7 @@ func TestSourceExpandsTargetsAndFallsBackToNoTarget(t *testing.T) {
 	assert.Equal(t, []string{"notification:telegram:system", "notification:telegram:portfolio"}, names(domain.Events.SnapshotIncomplete))
 	assert.Equal(t, []string{"notification:none"}, names(domain.Events.NotificationFailed))
 
-	unconfigured := NewSource(NewLoader(""), &fakeStore{}, os.Getenv)
+	unconfigured := NewSource(NewLoader(""), &fakeStore{}, "")
 	handlers, err = unconfigured.Handlers(context.Background())
 	require.NoError(t, err)
 	assert.Len(t, handlers, len(domain.NotifyingEvents))
@@ -244,7 +242,7 @@ func TestSourceExpandsTargetsAndFallsBackToNoTarget(t *testing.T) {
 }
 
 func TestSourceFailsOnInvalidConfigurationWithoutAFallback(t *testing.T) {
-	source := NewSource(NewLoader(writeConfig(t, "version: 9")), &fakeStore{}, os.Getenv)
+	source := NewSource(NewLoader(writeConfig(t, "version: 9")), &fakeStore{}, "")
 
 	_, err := source.Handlers(context.Background())
 	assert.Error(t, err)

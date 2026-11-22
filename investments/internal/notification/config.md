@@ -19,8 +19,7 @@ The complete notifications configuration, parsed from one YAML file. The handler
 
 1. Name string, unique, the name routes and handler names use
 2. Implementation string, implementationTelegram or implementationStub
-3. Settings map[string]string, the implementation's own settings; for Telegram, token_env, the name of the environment variable holding the bot credential
-4. Categories []CategoryConfig
+3. Categories []CategoryConfig
 
 ## CategoryConfig
 
@@ -38,7 +37,7 @@ The complete notifications configuration, parsed from one YAML file. The handler
 1. Channel string
 2. Category string
 
-Secrets are never in the file, only the name of the environment variable that holds them, so the file can be versioned and reviewed.
+The file holds no credentials, so it can be versioned and reviewed. Credentials are server configuration, read from environment variables into config.Config.
 
 ## Loader
 
