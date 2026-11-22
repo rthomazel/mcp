@@ -59,7 +59,13 @@ func run() error {
 	refresher := marketdata.NewRefresher(store, provider)
 	job := marketdata.NewJob(store, refresher, provider.Name())
 
-	scheduler, err := marketdata.NewScheduler(job, cfg.MarketTimezone)
+	tasks := []domain.ScheduledTask{marketdata.DailyTask(job)}
+
+	for _, m := range []monitor.Monitor{monitor.NewSnapshotIncomplete(store)} {
+		tasks = append(tasks, monitor.Task(m, cfg.MonitorTimeout))
+	}
+
+	scheduler, err := domain.NewScheduler(tasks, cfg.MarketTimezone)
 	if err != nil {
 		return fmt.Errorf("building scheduler: %w", err)
 	}
@@ -72,20 +78,12 @@ func run() error {
 
 	running.Go(func() { scheduler.Run(ctx) })
 
-	monitors, err := monitor.NewScheduler([]monitor.Monitor{monitor.NewSnapshotIncomplete(store)}, cfg.MarketTimezone, cfg.MonitorTimeout)
-	if err != nil {
-		stop()
-
-		return fmt.Errorf("building monitor scheduler: %w", err)
-	}
-
 	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, cfg.TelegramBotToken)
 	worker := worker.NewNotifications(store, source, worker.Settings{
 		PollInterval: cfg.WorkerPollInterval, PruneInterval: cfg.WorkerPruneInterval,
 		BatchLimit: cfg.WorkerBatchLimit, HandlerTimeout: cfg.WorkerHandlerTimeout,
 	})
 
-	running.Go(func() { monitors.Run(ctx) })
 	running.Go(func() { worker.Run(ctx) })
 
 	defer func() {

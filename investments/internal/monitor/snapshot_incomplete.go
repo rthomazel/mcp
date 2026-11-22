@@ -10,7 +10,7 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
-var snapshotIncompleteAt = ClockTime{Hour: 7}
+var snapshotIncompleteAt = domain.ClockTime{Hour: 7}
 
 // SnapshotIncomplete watches for a latest price date without a completed snapshot.
 type SnapshotIncomplete struct {
@@ -26,7 +26,7 @@ func NewSnapshotIncomplete(store domain.Store) *SnapshotIncomplete {
 func (m *SnapshotIncomplete) Name() string { return domain.Events.SnapshotIncomplete }
 
 // At is 07:00 market time.
-func (m *SnapshotIncomplete) At() ClockTime { return snapshotIncompleteAt }
+func (m *SnapshotIncomplete) At() domain.ClockTime { return snapshotIncompleteAt }
 
 // Run records one event per unresolved date.
 func (m *SnapshotIncomplete) Run(ctx context.Context) error {

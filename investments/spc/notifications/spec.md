@@ -328,8 +328,8 @@ operator removes them.
 
 ### Scheduled monitors
 
-A scheduler runs inside the server process, like the daily job, and runs each monitor
-at its own time in the market timezone, so daylight saving changes keep the same local
+The same scheduler that runs the daily job runs inside the server process and runs each
+monitor at its own time in the market timezone, so daylight saving changes keep the same local
 times. Monitors are independent of the daily job and of each other: a monitor does not know
 how or when the job ran, only what state it left. A monitor does not run at startup; if
 the server was down at its time, the next scheduled time judges the state then.

@@ -13,35 +13,14 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
-func newYork(t *testing.T) *time.Location {
-	t.Helper()
+func TestTaskRunsTheMonitorAtItsTime(t *testing.T) {
+	monitor := NewSnapshotIncomplete(&fakeStore{})
+	task := Task(monitor, time.Minute)
 
-	location, err := time.LoadLocation("America/New_York")
-	require.NoError(t, err)
-
-	return location
-}
-
-func TestNextRunIsStrictlyAfterNowInMarketTime(t *testing.T) {
-	location := newYork(t)
-	at := ClockTime{Hour: 7}
-
-	before := time.Date(2026, 3, 1, 6, 0, 0, 0, location)
-	assert.Equal(t, time.Date(2026, 3, 1, 7, 0, 0, 0, location), nextRun(before, location, at))
-
-	exactly := time.Date(2026, 3, 1, 7, 0, 0, 0, location)
-	assert.Equal(t, time.Date(2026, 3, 2, 7, 0, 0, 0, location), nextRun(exactly, location, at))
-}
-
-func TestNextRunKeepsLocalTimeAcrossDaylightSaving(t *testing.T) {
-	location := newYork(t)
-	// Clocks go forward on 2026-03-08.
-	now := time.Date(2026, 3, 7, 8, 0, 0, 0, location)
-	next := nextRun(now, location, ClockTime{Hour: 7})
-
-	assert.Equal(t, 7, next.In(location).Hour())
-	assert.Equal(t, 8, next.In(location).Day())
-	assert.Equal(t, 22, int(next.Sub(now).Hours())) // the day is an hour shorter
+	assert.Equal(t, []domain.ClockTime{{Hour: 7}}, task.At)
+	assert.Equal(t, time.Minute, task.Timeout)
+	assert.Contains(t, task.Name, domain.Events.SnapshotIncomplete)
+	assert.NoError(t, task.Run(context.Background()))
 }
 
 type fakeStore struct {
@@ -75,7 +54,7 @@ func TestSnapshotIncompleteRecordsTheDateOnce(t *testing.T) {
 	require.NoError(t, json.Unmarshal(store.recorded[0].Data, &data))
 	assert.Equal(t, date, data.Date)
 
-	assert.Equal(t, ClockTime{Hour: 7}, monitor.At())
+	assert.Equal(t, domain.ClockTime{Hour: 7}, monitor.At())
 	assert.Equal(t, domain.Events.SnapshotIncomplete, monitor.Name())
 }
 
