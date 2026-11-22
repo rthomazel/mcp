@@ -11,7 +11,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/rthomazel/mcp/investments/internal/config"
-	"github.com/rthomazel/mcp/investments/internal/data"
 	"github.com/rthomazel/mcp/investments/internal/domain"
 	"github.com/rthomazel/mcp/investments/internal/handlers"
 	"github.com/rthomazel/mcp/investments/internal/marketdata"
@@ -58,14 +57,14 @@ func run() error {
 
 	provider := tiingo.NewClient(cfg.TiingoAPIKey, "")
 	refresher := marketdata.NewRefresher(store, provider)
-	job := data.NewJob(store, refresher, provider.Name())
+	job := marketdata.NewJob(store, refresher, provider.Name())
 
-	scheduler, err := data.NewScheduler(job, cfg.MarketTimezone)
+	scheduler, err := marketdata.NewScheduler(job, cfg.MarketTimezone)
 	if err != nil {
 		return fmt.Errorf("building scheduler: %w", err)
 	}
 
-	slog.Info("daily job enabled", "provider", provider.Name(), "run_times", data.RunTimesDescription(cfg.MarketTimezone))
+	slog.Info("daily job enabled", "provider", provider.Name(), "run_times", marketdata.RunTimesDescription(cfg.MarketTimezone))
 
 	ctx, stop := context.WithCancel(context.Background())
 

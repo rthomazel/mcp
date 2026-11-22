@@ -1,4 +1,4 @@
-package data
+package marketdata
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
 )
 
 func newYork(t *testing.T) *time.Location {
@@ -102,7 +101,7 @@ func TestSchedulerStopsWhenCancelled(t *testing.T) {
 
 // signalStore reports when the daily job reaches the snapshot step.
 type signalStore struct {
-	*fakeStore
+	*jobStore
 
 	reached chan struct{}
 	once    sync.Once
@@ -111,7 +110,7 @@ type signalStore struct {
 func (s *signalStore) WriteSnapshot(ctx context.Context, date domain.Date) (domain.SnapshotResult, error) {
 	defer s.once.Do(func() { close(s.reached) })
 
-	return s.fakeStore.WriteSnapshot(ctx, date)
+	return s.jobStore.WriteSnapshot(ctx, date)
 }
 
 // secondBeforeRun returns a zone in which the next run time is within a second.
@@ -125,9 +124,9 @@ func secondBeforeRun(now time.Time) *time.Location {
 }
 
 func TestSchedulerFiresTheJobAndKeepsRunning(t *testing.T) {
-	fake := &fakeStore{instruments: twoInstruments(), latest: new(day(2)), snapshot: domain.SnapshotResult{Date: day(2), Complete: true}}
-	store := &signalStore{fakeStore: fake, reached: make(chan struct{})}
-	job := NewJob(store, marketdata.NewRefresher(store, &fakeProvider{}), "fake")
+	fake := &jobStore{instruments: twoInstruments(), latest: new(day(2)), snapshot: domain.SnapshotResult{Date: day(2), Complete: true}}
+	store := &signalStore{jobStore: fake, reached: make(chan struct{})}
+	job := NewJob(store, NewRefresher(store, &jobProvider{}), "fake")
 
 	scheduler := &Scheduler{job: job, location: secondBeforeRun(time.Now()), clock: time.Now}
 
@@ -157,8 +156,8 @@ func TestSchedulerFiresTheJobAndKeepsRunning(t *testing.T) {
 }
 
 func TestRunOnceSurvivesAFailedRun(t *testing.T) {
-	store := &fakeStore{listErr: errors.New("db down")}
-	scheduler := &Scheduler{job: newJob(store, &fakeProvider{}), location: time.UTC, clock: time.Now}
+	store := &jobStore{listErr: errors.New("db down")}
+	scheduler := &Scheduler{job: newJob(store, &jobProvider{}), location: time.UTC, clock: time.Now}
 
 	assert.NotPanics(t, func() { scheduler.runOnce(context.Background()) })
 	assert.Empty(t, store.snapshotted)
