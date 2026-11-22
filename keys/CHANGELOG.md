@@ -19,7 +19,11 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
-## Unreleased
+## [0.1.5](https://github.com/rthomazel/mcp/releases/tag/keys/v0.1.5) fix: pin mcp-proxy and allow the service Host header
+
+### fix
+
+- **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcpkeys` Host header (`KEYS_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers, so LiteLLM health checks failed with "Invalid Host header".
 
 ### build
 
