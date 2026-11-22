@@ -209,7 +209,7 @@ func TestRebuildReplacesRangeAndIsLogged(t *testing.T) {
 	require.NoError(t, store.DB().QueryRow(`SELECT reason FROM updates WHERE data_type = 'snapshot_rebuild'`).Scan(&reason))
 	assert.Equal(t, "backdated buy", reason)
 
-	// A rebuilt date counts as completed for the daily job.
+	// A rebuilt date counts as completed for the price refresh job.
 	again, err := store.WriteSnapshot(ctx, date(2026, 11, 4))
 	require.NoError(t, err)
 	assert.True(t, again.Skipped)
@@ -271,7 +271,7 @@ func TestNoSnapshotForAWeekend(t *testing.T) {
 	friday, saturday, monday := date(2026, 11, 6), date(2026, 11, 7), date(2026, 11, 9)
 	seedHolding(t, store, "VTI", "3", date(2026, 11, 2), friday, monday)
 
-	// The daily job snapshots the latest price date, which is never a weekend day.
+	// The price refresh job snapshots the latest price date, which is never a weekend day.
 	latest, err := store.LatestSessionDate(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, monday, *latest)

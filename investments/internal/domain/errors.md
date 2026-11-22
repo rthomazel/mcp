@@ -28,7 +28,13 @@ Matched through IncompleteSnapshotError. Some active instrument has no price dat
 
 ## ErrSnapshotExists = "snapshot already exists"
 
-Returned when snapshot rows exist for a date that is not marked completed. The daily job never overwrites them; a rebuild replaces them. Logged at error level where it arises.
+Returned when snapshot rows exist for a date that is not marked completed. The price refresh job never overwrites them; a rebuild replaces them. Logged at error level where it arises.
+
+## ErrEventNotFound = "event not found"
+
+## ErrEventNotRemovable = "event is not given up or expired"
+
+Returned when removing an event that is pending, backing off or fully handled. Only an event that was given up on or has expired can be removed.
 
 # Types
 

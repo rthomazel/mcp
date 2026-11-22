@@ -14,7 +14,7 @@ Average-cost rules, applied per ledger row in order, all in SQL:
 - DIVIDEND and TAX: no change to quantity, cost or realized; they are summed separately.
 
 Fees are inside cost on buys and inside net proceeds on sells, so they are reported but never subtracted again, in realized P&L or in the total return.
-Snapshots keep using valuationSQL alone, so the daily job never pays for the ledger walk.
+Snapshots keep using valuationSQL alone, so the price refresh job never pays for the ledger walk.
 
 # Functions
 

@@ -2,30 +2,42 @@
 
 pingAttempts = 5.
 pingBackoff = 10 seconds, the database may not be reachable immediately on startup.
-marketTimezone = "America/New_York", used to derive today's date when no date is given.
 postgresUniqueViolation = "23505".
 postgresForeignKeyViolation = "23503".
 postgresCheckViolation = "23514".
 
 # Types
 
+## Settings
+
+1. StalePriceDays int
+2. MarketTimezone string
+3. MaxHistoryPoints int
+4. Events domain.EventPolicy
+
+The store's tunables, all from the server configuration; the store holds no defaults.
+
 ## Store
 
 1. db *sqlx.DB
 2. stalePriceDays int
-3. marketLocation *Location, the loaded marketTimezone
+3. marketLocation *Location, the loaded market timezone, used to derive today's date when no date is given
+4. maxHistoryPoints int, the most points one value history query returns
+5. events domain.EventPolicy
+6. clock func() Time, the time source for the event queries and status; the real clock, which tests replace
 
-The one flat struct implementing domain.Store, with a compile-time assertion. Its methods are spread across instrument.go, transaction.go, positions.go, valuation.go and price.go by concern.
+The one flat struct implementing domain.Store, with a compile-time assertion. Its methods are spread across instrument.go, transaction.go, positions.go, valuation.go, price.go and event.go by concern.
 
 # Functions
 
-## Open(dsn string, stalePriceDays int) (*Store, func() error, error)
+## Open(dsn string, settings Settings) (*Store, func() error, error)
 
 1. Parse the DSN with pgx.
 2. Open a database/sql handle over the pgx stdlib connector and wrap it with sqlx.
 3. Ping, retrying up to pingAttempts with pingBackoff between attempts.
-4. Load marketTimezone.
-5. Return the Store and a cleanup function that closes the handle.
+4. Load settings.MarketTimezone.
+5. Set the clock to the real one.
+6. Return the Store and a cleanup function that closes the handle.
 
 #### Errors
 

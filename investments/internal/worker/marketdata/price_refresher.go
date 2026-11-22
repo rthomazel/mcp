@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
+	"time"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
-// Refresher orchestrates the provider and the store. It holds no state of its own.
-type Refresher struct {
+// PriceRefresher orchestrates the provider and the store. It holds no state of its own.
+type PriceRefresher struct {
 	store    domain.Store
 	provider domain.PriceProvider
 }
@@ -22,9 +25,9 @@ type RefreshResult struct {
 	Err        error
 }
 
-// NewRefresher builds a Refresher over the store and the provider.
-func NewRefresher(store domain.Store, provider domain.PriceProvider) *Refresher {
-	return &Refresher{store: store, provider: provider}
+// NewPriceRefresher builds a PriceRefresher over the store and the provider.
+func NewPriceRefresher(store domain.Store, provider domain.PriceProvider) *PriceRefresher {
+	return &PriceRefresher{store: store, provider: provider}
 }
 
 // RegisterInstrument fetches the full history, registers the instrument and
@@ -32,7 +35,7 @@ func NewRefresher(store domain.Store, provider domain.PriceProvider) *Refresher 
 // creates an instrument that can never be priced. If storing fails after
 // registering, the instrument is returned with the error and the next refresh
 // backfills it.
-func (r *Refresher) RegisterInstrument(ctx context.Context, draft domain.Instrument) (domain.Instrument, error) {
+func (r *PriceRefresher) RegisterInstrument(ctx context.Context, draft domain.Instrument) (domain.Instrument, error) {
 	draft = draft.Normalize()
 	if err := draft.Validate(); err != nil {
 		return domain.Instrument{}, err
@@ -65,7 +68,7 @@ func (r *Refresher) RegisterInstrument(ctx context.Context, draft domain.Instrum
 // the instrument has no prices. A from date earlier than that re-fetches older
 // history; the start is never later than the latest stored date, so no gap opens.
 // It ignores holdings: a caller can refresh any named instrument.
-func (r *Refresher) RefreshInstrument(ctx context.Context, instrument domain.Instrument, from *domain.Date) RefreshResult {
+func (r *PriceRefresher) RefreshInstrument(ctx context.Context, instrument domain.Instrument, from *domain.Date) RefreshResult {
 	result := RefreshResult{Instrument: instrument}
 
 	fail := func(step string, err error) RefreshResult {
@@ -103,7 +106,7 @@ func (r *Refresher) RefreshInstrument(ctx context.Context, instrument domain.Ins
 // in order. Rate limiting stops the run and marks the remaining instruments;
 // any other failure is left in that instrument's result and the run continues.
 // A sold instrument costs no provider request.
-func (r *Refresher) RefreshAll(ctx context.Context, from *domain.Date) ([]RefreshResult, error) {
+func (r *PriceRefresher) RefreshAll(ctx context.Context, from *domain.Date) ([]RefreshResult, error) {
 	positions, err := r.store.GetPositions(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("reading held instruments: %w", err)
@@ -136,4 +139,38 @@ func (r *Refresher) RefreshAll(ctx context.Context, from *domain.Date) ([]Refres
 	}
 
 	return results, nil
+}
+
+const runTimeout = 30 * time.Minute
+
+// runTimes are the price refresh run times, ascending: 06:00 picks up mutual funds,
+// 20:30 follows the equity close and corrections.
+var runTimes = []domain.ClockTime{{Hour: 6}, {Hour: 20, Minute: 30}}
+
+// RunTimesDescription renders the run times for the startup log.
+func RunTimesDescription(timezone string) string {
+	parts := make([]string, 0, len(runTimes))
+	for _, runTime := range runTimes {
+		parts = append(parts, fmt.Sprintf("%02d:%02d", runTime.Hour, runTime.Minute))
+	}
+
+	return strings.Join(parts, ", ") + " " + timezone
+}
+
+// RefreshTask is the price refresh job as a task for the domain scheduler, run at
+// runTimes. A failed run never stops the schedule; the next slot retries.
+func RefreshTask(job *Job) domain.ScheduledTask {
+	return domain.ScheduledTask{
+		Name: "price refresh", At: runTimes, Timeout: runTimeout,
+		Run: func(ctx context.Context) error {
+			report, err := job.Run(ctx)
+			if err != nil {
+				return err
+			}
+
+			slog.InfoContext(ctx, "price refresh report", "refreshed", report.Refreshed, "failed", report.Failed)
+
+			return nil
+		},
+	}
 }

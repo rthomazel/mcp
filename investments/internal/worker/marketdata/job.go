@@ -1,4 +1,4 @@
-package data
+package marketdata
 
 import (
 	"context"
@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
 )
 
 // Job is the daily routine, without scheduling.
 type Job struct {
 	store     domain.Store
-	refresher *marketdata.Refresher
+	refresher *PriceRefresher
 	provider  string
 	clock     func() time.Time
 }
@@ -28,7 +27,7 @@ type RunReport struct {
 }
 
 // NewJob builds a Job using the real clock.
-func NewJob(store domain.Store, refresher *marketdata.Refresher, provider string) *Job {
+func NewJob(store domain.Store, refresher *PriceRefresher, provider string) *Job {
 	return &Job{store: store, refresher: refresher, provider: provider, clock: time.Now}
 }
 
@@ -42,7 +41,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 
 	results, err := j.refresher.RefreshAll(ctx, nil)
 	if err != nil && ctx.Err() != nil {
-		slog.ErrorContext(ctx, "daily run cancelled", "step", "refreshing prices", "err", err)
+		slog.ErrorContext(ctx, "price refresh run cancelled", "step", "refreshing prices", "err", err)
 
 		return report, err
 	}
@@ -62,11 +61,11 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 	}
 
 	if err != nil {
-		slog.ErrorContext(ctx, "daily run step failed", "step", "refreshing prices", "err", err)
+		slog.ErrorContext(ctx, "price refresh run step failed", "step", "refreshing prices", "err", err)
 	}
 
 	if err := j.store.RecordUpdate(ctx, update); err != nil {
-		slog.ErrorContext(ctx, "daily run step failed", "step", "recording prices update", "err", err)
+		slog.ErrorContext(ctx, "price refresh run step failed", "step", "recording prices update", "err", err)
 
 		return report, fmt.Errorf("recording prices update: %w", err)
 	}
@@ -76,7 +75,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 
 	latest, err := j.store.LatestSessionDate(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx, "daily run step failed", "step", "reading latest session date", "err", err)
+		slog.ErrorContext(ctx, "price refresh run step failed", "step", "reading latest session date", "err", err)
 
 		return report, fmt.Errorf("reading latest session date: %w", err)
 	}
@@ -89,7 +88,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 
 	snapshot, err := j.store.WriteSnapshot(ctx, *latest)
 	if err != nil {
-		slog.ErrorContext(ctx, "daily run step failed", "step", "writing snapshot", "err", err)
+		slog.ErrorContext(ctx, "price refresh run step failed", "step", "writing snapshot", "err", err)
 
 		return report, fmt.Errorf("writing snapshot: %w", err)
 	}
@@ -112,7 +111,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 // pricesUpdate builds the prices log row: completed when every instrument
 // succeeded, incomplete otherwise, failed when the instruments could not be
 // listed. The message carries symbols only, never the credential.
-func (j *Job) pricesUpdate(started time.Time, results []marketdata.RefreshResult, listErr error) domain.Update {
+func (j *Job) pricesUpdate(started time.Time, results []RefreshResult, listErr error) domain.Update {
 	provider := j.provider
 	update := domain.Update{
 		Provider: &provider, DataType: domain.UpdateDataPrices, StartedAt: started,

@@ -1,27 +1,23 @@
-package data
+package marketdata
 
 import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
 )
 
-func day(d int) domain.Date { return time.Date(2026, 11, d, 0, 0, 0, 0, time.UTC) }
-
-type fakeProvider struct {
+type jobProvider struct {
 	errs map[string]error
 }
 
-func (p *fakeProvider) Name() string { return "fake" }
+func (p *jobProvider) Name() string { return "fake" }
 
-func (p *fakeProvider) FetchPrices(_ context.Context, symbol string, _ *domain.Date) ([]domain.PriceBar, error) {
+func (p *jobProvider) FetchPrices(_ context.Context, symbol string, _ *domain.Date) ([]domain.PriceBar, error) {
 	if err := p.errs[symbol]; err != nil {
 		return nil, err
 	}
@@ -29,7 +25,7 @@ func (p *fakeProvider) FetchPrices(_ context.Context, symbol string, _ *domain.D
 	return []domain.PriceBar{{Date: day(2), Open: "1", High: "1", Low: "1", Close: "1", AdjustedClose: "1", Volume: 1}}, nil
 }
 
-type fakeStore struct {
+type jobStore struct {
 	domain.Store
 
 	instruments []domain.Instrument
@@ -43,7 +39,7 @@ type fakeStore struct {
 	snapshotted []domain.Date
 }
 
-func (s *fakeStore) GetPositions(context.Context, *domain.Date) (domain.PositionsResult, error) {
+func (s *jobStore) GetPositions(context.Context, *domain.Date) (domain.PositionsResult, error) {
 	if s.listErr != nil {
 		return domain.PositionsResult{}, s.listErr
 	}
@@ -58,28 +54,28 @@ func (s *fakeStore) GetPositions(context.Context, *domain.Date) (domain.Position
 	return result, nil
 }
 
-func (s *fakeStore) LatestPriceDate(context.Context, int) (*domain.Date, error) { return nil, nil }
+func (s *jobStore) LatestPriceDate(context.Context, int) (*domain.Date, error) { return nil, nil }
 
-func (s *fakeStore) UpsertPrices(context.Context, int, []domain.PriceBar) error { return nil }
+func (s *jobStore) UpsertPrices(context.Context, int, []domain.PriceBar) error { return nil }
 
-func (s *fakeStore) RecordUpdate(_ context.Context, update domain.Update) error {
+func (s *jobStore) RecordUpdate(_ context.Context, update domain.Update) error {
 	s.updates = append(s.updates, update)
 
 	return s.recordErr
 }
 
-func (s *fakeStore) LatestSessionDate(context.Context) (*domain.Date, error) {
+func (s *jobStore) LatestSessionDate(context.Context) (*domain.Date, error) {
 	return s.latest, s.latestErr
 }
 
-func (s *fakeStore) WriteSnapshot(_ context.Context, date domain.Date) (domain.SnapshotResult, error) {
+func (s *jobStore) WriteSnapshot(_ context.Context, date domain.Date) (domain.SnapshotResult, error) {
 	s.snapshotted = append(s.snapshotted, date)
 
 	return s.snapshot, s.snapshotErr
 }
 
-func newJob(store *fakeStore, provider *fakeProvider) *Job {
-	return NewJob(store, marketdata.NewRefresher(store, provider), "fake")
+func newJob(store *jobStore, provider *jobProvider) *Job {
+	return NewJob(store, NewPriceRefresher(store, provider), "fake")
 }
 
 func twoInstruments() []domain.Instrument {
@@ -87,12 +83,12 @@ func twoInstruments() []domain.Instrument {
 }
 
 func TestJobRunWritesSnapshot(t *testing.T) {
-	store := &fakeStore{
+	store := &jobStore{
 		instruments: twoInstruments(), latest: new(day(2)),
 		snapshot: domain.SnapshotResult{Date: day(2), Complete: true, Rows: 2},
 	}
 
-	report, err := newJob(store, &fakeProvider{}).Run(context.Background())
+	report, err := newJob(store, &jobProvider{}).Run(context.Background())
 
 	require.NoError(t, err)
 	assert.Equal(t, 2, report.Refreshed)
@@ -106,8 +102,8 @@ func TestJobRunWritesSnapshot(t *testing.T) {
 }
 
 func TestJobRunPartialFailureStillSnapshots(t *testing.T) {
-	store := &fakeStore{instruments: twoInstruments(), latest: new(day(2)), snapshot: domain.SnapshotResult{Date: day(2)}}
-	provider := &fakeProvider{errs: map[string]error{"VTI": domain.ErrRateLimited}}
+	store := &jobStore{instruments: twoInstruments(), latest: new(day(2)), snapshot: domain.SnapshotResult{Date: day(2)}}
+	provider := &jobProvider{errs: map[string]error{"VTI": domain.ErrRateLimited}}
 
 	report, err := newJob(store, provider).Run(context.Background())
 
@@ -120,9 +116,9 @@ func TestJobRunPartialFailureStillSnapshots(t *testing.T) {
 }
 
 func TestJobRunListFailureRecordsFailed(t *testing.T) {
-	store := &fakeStore{listErr: errors.New("db down")}
+	store := &jobStore{listErr: errors.New("db down")}
 
-	_, err := newJob(store, &fakeProvider{}).Run(context.Background())
+	_, err := newJob(store, &jobProvider{}).Run(context.Background())
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.UpdateStatusFailed, store.updates[0].Status)
@@ -130,9 +126,9 @@ func TestJobRunListFailureRecordsFailed(t *testing.T) {
 }
 
 func TestJobRunNoPricesNoSnapshot(t *testing.T) {
-	store := &fakeStore{}
+	store := &jobStore{}
 
-	report, err := newJob(store, &fakeProvider{}).Run(context.Background())
+	report, err := newJob(store, &jobProvider{}).Run(context.Background())
 
 	require.NoError(t, err)
 	assert.Nil(t, report.Snapshot)
@@ -140,7 +136,7 @@ func TestJobRunNoPricesNoSnapshot(t *testing.T) {
 }
 
 func TestJobRunErrors(t *testing.T) {
-	tests := map[string]*fakeStore{
+	tests := map[string]*jobStore{
 		"recording": {instruments: twoInstruments(), recordErr: errors.New("boom")},
 		"latest":    {instruments: twoInstruments(), latestErr: errors.New("boom")},
 		"snapshot":  {instruments: twoInstruments(), latest: new(day(2)), snapshotErr: errors.New("boom")},
@@ -148,7 +144,7 @@ func TestJobRunErrors(t *testing.T) {
 
 	for name, store := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := newJob(store, &fakeProvider{}).Run(context.Background())
+			_, err := newJob(store, &jobProvider{}).Run(context.Background())
 
 			assert.Error(t, err)
 		})
@@ -156,11 +152,11 @@ func TestJobRunErrors(t *testing.T) {
 }
 
 func TestJobRunCancelled(t *testing.T) {
-	store := &fakeStore{instruments: twoInstruments()}
+	store := &jobStore{instruments: twoInstruments()}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := newJob(store, &fakeProvider{}).Run(ctx)
+	_, err := newJob(store, &jobProvider{}).Run(ctx)
 
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, store.updates, "a cancelled run records nothing")

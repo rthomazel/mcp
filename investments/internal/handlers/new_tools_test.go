@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -205,3 +206,39 @@ func TestAddTransactionPassesTheFee(t *testing.T) {
 	require.Len(t, store.recorded, 1)
 	assert.Equal(t, "1.25", string(store.recorded[0].Fee))
 }
+
+func TestHandleRemoveEvent(t *testing.T) {
+	ctx := context.Background()
+	request := func(id any) mcp.CallToolRequest {
+		var req mcp.CallToolRequest
+		req.Params.Arguments = map[string]any{"id": id}
+
+		return req
+	}
+
+	for name, tc := range map[string]struct {
+		id      any
+		err     error
+		wantErr bool
+		want    string
+	}{
+		"removed":       {id: float64(7), want: `"removed": 7`},
+		"missing id":    {id: float64(0), wantErr: true, want: "invalid input"},
+		"not found":     {id: float64(7), err: domain.ErrEventNotFound, wantErr: true, want: "event not found"},
+		"not removable": {id: float64(7), err: domain.ErrEventNotRemovable, wantErr: true, want: "not given up on or expired"},
+	} {
+		store := &removeEventStore{err: tc.err}
+		result, err := newHandler(&fakeStore{Store: store}, &fakeProvider{}).HandleRemoveEvent(ctx, request(tc.id))
+		require.NoError(t, err, name)
+		assert.Equal(t, tc.wantErr, result.IsError, name)
+		assert.Contains(t, result.Content[0].(mcp.TextContent).Text, tc.want, name)
+	}
+}
+
+type removeEventStore struct {
+	domain.Store
+
+	err error
+}
+
+func (s *removeEventStore) RemoveEvent(context.Context, int64) error { return s.err }

@@ -3,7 +3,7 @@
 ## Job
 
 1. store domain.Store
-2. refresher *marketdata.Refresher
+2. refresher *PriceRefresher
 3. provider string, the provider name recorded in the updates log
 4. clock func() Time
 
@@ -17,7 +17,7 @@ The daily routine, without scheduling. It holds no state beyond its dependencies
 
 # Functions
 
-## NewJob(store domain.Store, refresher *marketdata.Refresher, provider string) *Job
+## NewJob(store domain.Store, refresher *PriceRefresher, provider string) *Job
 
 Build a Job using the real clock.
 

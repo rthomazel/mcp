@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rthomazel/mcp/investments/db"
+	"github.com/rthomazel/mcp/investments/internal/config"
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
@@ -46,7 +47,7 @@ func newTestStore(t *testing.T) *Store {
 
 	u.Path = "/" + name
 
-	store, cleanup, err := Open(u.String(), 5)
+	store, cleanup, err := Open(u.String(), testSettings())
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -66,6 +67,19 @@ func newTestStore(t *testing.T) *Store {
 	require.NoError(t, migrator.Up())
 
 	return store
+}
+
+// testSettings are the configuration defaults, with the stale price threshold the tests were written for.
+func testSettings() Settings {
+	defaults := config.Defaults()
+
+	return Settings{
+		StalePriceDays: 5, MarketTimezone: defaults.MarketTimezone, MaxHistoryPoints: defaults.MaxHistoryPoints,
+		Events: domain.EventPolicy{
+			MaxFailures: defaults.EventMaxFailures, BackoffBase: defaults.EventBackoffBase,
+			MaxAge: defaults.EventMaxAge, Retention: defaults.EventRetention,
+		},
+	}
 }
 
 func date(year int, month time.Month, day int) domain.Date {

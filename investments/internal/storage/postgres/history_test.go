@@ -144,7 +144,7 @@ func TestValueHistoryRejectsTooManyPoints(t *testing.T) {
 
 	history, err := store.GetValueHistory(context.Background(), domain.HistoryFilter{WindowDays: 7})
 	require.NoError(t, err)
-	assert.Less(t, len(history.Points), domain.MaxHistoryPoints)
+	assert.Less(t, len(history.Points), store.maxHistoryPoints)
 
 	_, err = store.GetValueHistory(context.Background(), domain.HistoryFilter{WindowDays: -1})
 	require.ErrorIs(t, err, domain.ErrInvalidInput)

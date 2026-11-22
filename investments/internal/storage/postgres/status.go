@@ -100,6 +100,16 @@ func (s *Store) GetStatus(ctx context.Context) (domain.Status, error) {
 		return domain.Status{}, err
 	}
 
+	now := s.clock()
+
+	if status.GivenUpEvents, err = s.queryEvents(ctx, s.db, givenUpEventsSQL, now, domain.UpdateFilter{}.ResolvedLimit()); err != nil {
+		return domain.Status{}, err
+	}
+
+	if status.ExpiredEvents, err = s.queryEvents(ctx, s.db, expiredEventsSQL, now, domain.UpdateFilter{}.ResolvedLimit()); err != nil {
+		return domain.Status{}, err
+	}
+
 	status.Summarize()
 
 	return status, nil

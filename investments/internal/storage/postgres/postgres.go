@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	pingAttempts   = 5
-	pingBackoff    = 10 * time.Second
-	marketTimezone = "America/New_York"
+	pingAttempts = 5
+	pingBackoff  = 10 * time.Second
 
 	postgresUniqueViolation     = "23505"
 	postgresForeignKeyViolation = "23503"
@@ -30,13 +29,24 @@ var _ domain.Store = (*Store)(nil)
 
 // Store implements domain.Store; its methods are spread across files by concern.
 type Store struct {
-	db             *sqlx.DB
-	stalePriceDays int
-	marketLocation *time.Location
+	db               *sqlx.DB
+	stalePriceDays   int
+	marketLocation   *time.Location
+	maxHistoryPoints int
+	events           domain.EventPolicy
+	clock            func() time.Time // replaceable in tests
+}
+
+// Settings are the store's tunables, taken from the server configuration.
+type Settings struct {
+	StalePriceDays   int
+	MarketTimezone   string
+	MaxHistoryPoints int
+	Events           domain.EventPolicy
 }
 
 // Open connects to the database and returns the store and a cleanup function.
-func Open(dsn string, stalePriceDays int) (*Store, func() error, error) {
+func Open(dsn string, settings Settings) (*Store, func() error, error) {
 	connConfig, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing dsn: %w", err)
@@ -59,14 +69,17 @@ func Open(dsn string, stalePriceDays int) (*Store, func() error, error) {
 		time.Sleep(pingBackoff)
 	}
 
-	location, err := time.LoadLocation(marketTimezone)
+	location, err := time.LoadLocation(settings.MarketTimezone)
 	if err != nil {
 		_ = handle.Close()
 
-		return nil, nil, fmt.Errorf("loading timezone %s: %w", marketTimezone, err)
+		return nil, nil, fmt.Errorf("loading timezone %s: %w", settings.MarketTimezone, err)
 	}
 
-	store := &Store{db: handle, stalePriceDays: stalePriceDays, marketLocation: location}
+	store := &Store{
+		db: handle, stalePriceDays: settings.StalePriceDays, marketLocation: location,
+		maxHistoryPoints: settings.MaxHistoryPoints, events: settings.Events, clock: time.Now,
+	}
 
 	return store, handle.Close, nil
 }

@@ -24,6 +24,8 @@ type Status struct {
 	LatestSnapshotDate *Date // newest price date covered by a completed run, nil when none
 	SnapshotMissing    bool  // LatestPriceDate has no completed snapshot
 	NeedsAttention     []Update
+	GivenUpEvents      []Event // outbox events given up on and not yet expired, newest first
+	ExpiredEvents      []Event // outbox events not fully handled and expired; never affect health
 }
 
 // Summarize fills Reasons and Healthy from the other fields.
@@ -49,6 +51,10 @@ func (s *Status) Summarize() {
 
 	if len(s.NeedsAttention) > 0 {
 		s.Reasons = append(s.Reasons, fmt.Sprintf("%d failed or incomplete runs not yet superseded", len(s.NeedsAttention)))
+	}
+
+	if len(s.GivenUpEvents) > 0 {
+		s.Reasons = append(s.Reasons, fmt.Sprintf("%d events given up on after repeated failures", len(s.GivenUpEvents)))
 	}
 
 	s.Healthy = len(s.Reasons) == 0

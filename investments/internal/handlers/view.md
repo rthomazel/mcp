@@ -2,7 +2,7 @@
 
 ## Views
 
-Each tool result is a JSON object built from small view types, one per domain type returned: Instrument, Transaction, ValuePoint, Extreme, Drawdown, SeriesSummary, ValueHistory, InstrumentStatus, Status, ClosedPosition, PnLTotals, CashTransaction, CashBalance, CashIntegrityError, Position, IntegrityError, Holding, Portfolio, PriceBar, SnapshotRow, SnapshotDay, RefreshResult, RebuildResult, SnapshotIssue and Update.
+Each tool result is a JSON object built from small view types, one per domain type returned: Instrument, Transaction, ValuePoint, Extreme, Drawdown, SeriesSummary, ValueHistory, InstrumentStatus, Status, ClosedPosition, PnLTotals, CashTransaction, CashBalance, CashIntegrityError, Position, IntegrityError, Holding, Portfolio, PriceBar, SnapshotRow, SnapshotDay, RefreshResult, RebuildResult, SnapshotIssue, Update and Event.
 
 Conventions shared by every view:
 
@@ -10,7 +10,7 @@ Conventions shared by every view:
 2. Decimals are strings carrying the exact stored text; no number is ever a float.
 3. Dates are YYYY-MM-DD strings and timestamps are RFC 3339.
 4. Optional values that are absent are null, never zero or an empty string.
-5. Instruments appear as symbol and exchange; internal ids are not exposed. Position and holding views also carry the instrument's name and type, looked up from the instrument list by id, so the agent can group a portfolio by type without a second call.
+5. Instruments appear as symbol and exchange; internal ids are not exposed. Position and holding views also carry the instrument's name and type, looked up from the instrument list by id, so the agent can group a portfolio by type without a second call. The one exception to hiding ids is the Event view: it carries its id, since events have no natural key and remove_event takes it. An Event view also carries its type, when it was recorded, its failure count, when it was given up on or null, and never its payload.
 
 The views keep the domain package free of presentation tags, since Date is a plain time value that would otherwise marshal as a timestamp.
 

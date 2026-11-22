@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rthomazel/mcp/investments/internal/config"
 	"github.com/rthomazel/mcp/investments/internal/storage/postgres"
 )
 
@@ -29,12 +30,14 @@ func TestMigrateAppliesSchemaAndIsRepeatable(t *testing.T) {
 	_, err = admin.Exec(ctx, "CREATE DATABASE "+name)
 	require.NoError(t, err)
 
+	defaults := config.Defaults()
+
 	u, err := url.Parse(adminDSN)
 	require.NoError(t, err)
 
 	u.Path = "/" + name
 
-	store, cleanup, err := postgres.Open(u.String(), 5)
+	store, cleanup, err := postgres.Open(u.String(), postgres.Settings{StalePriceDays: 5, MarketTimezone: defaults.MarketTimezone, MaxHistoryPoints: defaults.MaxHistoryPoints})
 	require.NoError(t, err)
 
 	t.Cleanup(func() {

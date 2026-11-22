@@ -145,7 +145,7 @@ func (s *Store) GetValueHistory(ctx context.Context, filter domain.HistoryFilter
 }
 
 func (s *Store) historyPoints(ctx context.Context, history domain.ValueHistory) ([]domain.ValuePoint, error) {
-	rows, err := s.db.QueryxContext(ctx, historyPointsSQL, history.From, history.To, history.WindowDays, domain.MaxHistoryPoints+1)
+	rows, err := s.db.QueryxContext(ctx, historyPointsSQL, history.From, history.To, history.WindowDays, s.maxHistoryPoints+1)
 	if err != nil {
 		return nil, fmt.Errorf("reading value history: %w", err)
 	}
@@ -171,9 +171,9 @@ func (s *Store) historyPoints(ctx context.Context, history domain.ValueHistory) 
 		return nil, fmt.Errorf("reading value history: %w", err)
 	}
 
-	if len(points) > domain.MaxHistoryPoints {
+	if len(points) > s.maxHistoryPoints {
 		return nil, fmt.Errorf("%w: the series has more than %d points, use a larger window_days or a narrower range",
-			domain.ErrInvalidInput, domain.MaxHistoryPoints)
+			domain.ErrInvalidInput, s.maxHistoryPoints)
 	}
 
 	return points, nil

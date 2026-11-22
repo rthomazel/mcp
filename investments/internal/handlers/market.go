@@ -8,7 +8,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
+	"github.com/rthomazel/mcp/investments/internal/worker/marketdata"
 )
 
 // refreshResultView is the refresh_prices result. Error is set when the run

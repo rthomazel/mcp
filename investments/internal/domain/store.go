@@ -30,7 +30,7 @@ type Store interface {
 	GetStatus(ctx context.Context) (Status, error)
 	// GetValueHistory returns the securities value and account equity series
 	// with summary measures. Returns ErrInvalidInput, including for a series
-	// over MaxHistoryPoints.
+	// over the configured maximum number of points.
 	GetValueHistory(ctx context.Context, filter HistoryFilter) (ValueHistory, error)
 	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
 	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
@@ -64,4 +64,23 @@ type Store interface {
 	ListSnapshots(ctx context.Context, filter SnapshotFilter) ([]SnapshotRow, error)
 	// ListUpdates returns updates log rows, newest first, limited. Returns ErrInvalidInput.
 	ListUpdates(ctx context.Context, filter UpdateFilter) ([]Update, error)
+	// RecordEvent validates draft and inserts it into the outbox. With a
+	// subject, an existing event of the same type and subject makes it a no-op
+	// reporting created false. Returns ErrInvalidInput.
+	RecordEvent(ctx context.Context, draft DraftEvent) (created bool, err error)
+	// ListDueEvents returns up to limit events Event.Eligible accepts now whose
+	// type starts with typePrefix (empty for any), oldest first. Returns
+	// ErrInvalidInput for a non-positive limit.
+	ListDueEvents(ctx context.Context, typePrefix string, limit int) ([]Event, error)
+	// SaveEventOutcome applies one handling pass in one transaction: merges
+	// succeeded handler names, marks handled, or counts a failure with backoff
+	// and gives up at the configured maximum failures (error log, notification.failed event).
+	// Returns ErrInvalidInput or ErrEventNotFound.
+	SaveEventOutcome(ctx context.Context, id int64, outcome EventOutcome) error
+	// RemoveEvent deletes an event given up on or expired. Returns
+	// ErrEventNotFound or ErrEventNotRemovable.
+	RemoveEvent(ctx context.Context, id int64) error
+	// PruneEvents deletes fully handled events older than the configured retention and
+	// returns how many.
+	PruneEvents(ctx context.Context) (int, error)
 }

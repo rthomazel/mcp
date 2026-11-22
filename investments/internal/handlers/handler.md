@@ -8,20 +8,20 @@ internalErrorText = "internal error, see the server logs".
 ## Handler
 
 1. store domain.Store
-2. refresher *marketdata.Refresher
+2. refresher *marketdata.PriceRefresher
 3. queryTimeout Duration, from the configuration, the deadline for every other tool
 
 The MCP tool layer. It holds no state beyond its dependencies and depends on domain.Store, never on the Postgres implementation.
 
 # Functions
 
-## New(store domain.Store, refresher *marketdata.Refresher, queryTimeout Duration) *Handler
+## New(store domain.Store, refresher *marketdata.PriceRefresher, queryTimeout Duration) *Handler
 
 Build a Handler.
 
 ## Handler.Register(server *MCPServer)
 
-Add the tools to server, each with the description, parameters and hints its model gives, bound to its handler method. Descriptions follow the sibling bench server: plain dense sentences without markdown that lead with exactly what the tool does, state the return shape, say which failures leave nothing written, and point to the related tool for the next step. Parameter descriptions give the format and what absence means, start with Optional when they are, and use schema constraints such as enums and minimums instead of prose. Read tools, including list_updates, list_cash_transactions, get_cash, get_status and get_value_history, carry the read-only hint; rebuild_snapshots carries the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
+Add the tools to server, each with the description, parameters and hints its model gives, bound to its handler method. Descriptions follow the sibling bench server: plain dense sentences without markdown that lead with exactly what the tool does, state the return shape, say which failures leave nothing written, and point to the related tool for the next step. Parameter descriptions give the format and what absence means, start with Optional when they are, and use schema constraints such as enums and minimums instead of prose. Read tools, including list_updates, list_cash_transactions, get_cash, get_status and get_value_history, carry the read-only hint; rebuild_snapshots and remove_event carry the destructive hint; refresh_prices and rebuild_snapshots carry the idempotent hint.
 
 ## Handler.resolveInstrument(ctx Context, symbol string, exchange string) (domain.Instrument, error)
 
@@ -71,7 +71,7 @@ Marshal value to indented JSON text and return it as the tool result. A marshall
 
 ## Handler.failure(ctx Context, tool string, err error) *CallToolResult
 
-1. if err is ErrInvalidInput, ErrInstrumentNotFound, ErrInstrumentExists, a negative balance, ErrSnapshotIncomplete, ErrSnapshotExists, ErrSymbolNotFound or ErrRateLimited, return a tool error carrying err's message; these are the caller's to act on and are not logged.
+1. if err is ErrInvalidInput, ErrInstrumentNotFound, ErrInstrumentExists, a negative balance, ErrSnapshotIncomplete, ErrSnapshotExists, ErrSymbolNotFound, ErrRateLimited, ErrEventNotFound or ErrEventNotRemovable, return a tool error carrying err's message; these are the caller's to act on and are not logged.
 2. if the context deadline was exceeded, log at warn level and return a tool error saying the call timed out.
 3. otherwise log at error level with the tool name and the error, and return a tool error with internalErrorText.
 
