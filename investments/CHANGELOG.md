@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## [0.4.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.4.0) feat: monitors configuration and portfolio drawdown monitor
 
 ### feat
 
