@@ -117,7 +117,7 @@ Validates draft and inserts it into the outbox. When the draft has a subject and
 
 ### ListDueEvents(ctx Context, limit int) ([]Event, error)
 
-Returns up to limit events that Event.Eligible accepts at the store's current time, oldest first by recorded time then id: not fully handled, not given up on, recorded within EventMaxAge, and past their backoff. Expired and given-up events are never returned. Returns ErrInvalidInput for a non-positive limit.
+Returns up to limit events that Event.Eligible accepts at the store's current time, oldest first by recorded time then id: not fully handled, not given up on, not yet expired, and past their backoff. Expired and given-up events are never returned. Returns ErrInvalidInput for a non-positive limit.
 
 ### SaveEventOutcome(ctx Context, id int64, outcome EventOutcome) error
 

@@ -1,13 +1,13 @@
 # Constants
 
-insertEventSQL = insert an events row from type, subject and data, ON CONFLICT (type, subject) WHERE subject IS NOT NULL DO NOTHING, returning the id; no row comes back when the conflict was hit.
-dueEventsSQL = select the full events rows that are not processed, not given up on, recorded after now minus EventMaxAge, and whose backoff_until is null or not after now, ordered by created_at then id, limited. It mirrors domain.Event.Eligible.
+insertEventSQL = insert an events row from type, subject and data, with expired_at set to now plus EventMaxAge, ON CONFLICT (type, subject) WHERE subject IS NOT NULL DO NOTHING, returning the id; no row comes back when the conflict was hit.
+dueEventsSQL = select the full events rows that are not processed, not given up on, whose expired_at is after now, and whose backoff_until is null or not after now, ordered by created_at then id, limited. It mirrors domain.Event.Eligible.
 lockEventSQL = select the full row of one event by id FOR UPDATE.
 saveEventSQL = update one event: set handled_by to its names plus the new ones without duplicates, processed_at when handled, failures, backoff_until and given_up_at as the caller computed.
-removeEventSQL = delete one event by id when processed_at is null and either given_up_at is set or created_at is EventMaxAge or longer before now, returning the id.
+removeEventSQL = delete one event by id when processed_at is null and either given_up_at is set or expired_at is not after now, returning the id.
 pruneEventsSQL = delete the events whose processed_at is EventRetention or longer before now.
-givenUpEventsSQL = select the full rows with processed_at null, given_up_at set and created_at after now minus EventMaxAge, newest first by created_at then id, limited.
-expiredEventsSQL = select the full rows with processed_at null and created_at EventMaxAge or longer before now, newest first by created_at then id, limited.
+givenUpEventsSQL = select the full rows with processed_at null, given_up_at set and expired_at after now, newest first by created_at then id, limited.
+expiredEventsSQL = select the full rows with processed_at null and expired_at not after now, newest first by created_at then id, limited.
 
 # Functions
 

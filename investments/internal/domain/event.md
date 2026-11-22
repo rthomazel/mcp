@@ -2,7 +2,7 @@
 
 MaxEventFailures = 10, the failed attempts after which an event is given up on.
 EventBackoffBase = 30 seconds, the delay after the first failure; each further failure doubles it.
-EventMaxAge = 7 days, how long after it was recorded an event is still considered for handling.
+EventMaxAge = 7 days, how long after it was recorded an event is still considered for handling; it sets the event's ExpiredAt.
 EventRetention = 1 year, how long after it was fully handled an event is kept.
 
 # Vars
@@ -29,11 +29,12 @@ The types that notify, in a stable order. Every one of them has a notification h
 5. Failures int
 6. BackoffUntil *Time, the earliest time of the next attempt, nil before the first failure
 7. CreatedAt Time
-8. ProcessedAt *Time, set when every registered handler has succeeded
-9. GivenUpAt *Time, set when Failures reached MaxEventFailures
-10. HandledBy []string, the names of the handlers that already succeeded
+8. ExpiredAt Time, the time from which the event is expired, CreatedAt plus EventMaxAge, fixed when it is recorded
+9. ProcessedAt *Time, set when every registered handler has succeeded
+10. GivenUpAt *Time, set when Failures reached MaxEventFailures
+11. HandledBy []string, the names of the handlers that already succeeded
 
-One row of the outbox. An event is pending until ProcessedAt or GivenUpAt is set. It is expired when it is not fully handled and was recorded EventMaxAge or longer before the reference time, whether or not it was given up on. Events are identified by ID, which status exposes because they have no natural key.
+One row of the outbox. An event is pending until ProcessedAt or GivenUpAt is set. It is expired when it is not fully handled and ExpiredAt is not after the reference time, whether or not it was given up on. Events are identified by ID, which status exposes because they have no natural key.
 
 ## DraftEvent
 
@@ -111,4 +112,4 @@ The reference for the SQL that selects due events, and the way tests pin it.
 
 ## Event.Expired(now Time) bool
 
-Report whether ProcessedAt is nil and CreatedAt is EventMaxAge or longer before now.
+Report whether ProcessedAt is nil and ExpiredAt is not after now.
