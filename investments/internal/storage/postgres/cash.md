@@ -11,7 +11,7 @@ listCashTransactionsSQL = select cash_transactions matching the optional kind an
 
 # Functions
 
-## Store.RecordCashTransaction(ctx Context, draft domain.CashTransaction) (domain.CashRecordResult, error)
+## Cash.Record(ctx Context, draft domain.CashTransaction) (domain.CashRecordResult, error)
 
 1. Validate draft with CashTransaction.Validate.
 2. Run inside withTx:
@@ -37,7 +37,7 @@ listCashTransactionsSQL = select cash_transactions matching the optional kind an
 A cash balance below zero is not rejected. No row lock is needed: nothing is validated against a running balance, and the single opening balance is enforced by a partial unique index.
 Recording never rebuilds; RebuildFrom only tells the caller.
 
-## Store.ListCashTransactions(ctx Context, filter domain.CashTransactionFilter) ([]domain.CashTransaction, error)
+## Cash.List(ctx Context, filter domain.CashTransactionFilter) ([]domain.CashTransaction, error)
 
 1. Normalize filter with CashTransactionFilter.Normalize.
 2. Select via listCashTransactionsSQL.
@@ -51,7 +51,7 @@ Recording never rebuilds; RebuildFrom only tells the caller.
 
 - **2.** if the query fails, return the wrapped error.
 
-## Store.GetCash(ctx Context, date *domain.Date) (domain.CashBalance, error)
+## Cash.Get(ctx Context, date *domain.Date) (domain.CashBalance, error)
 
 1. Derive the reference date: date, or today in Store.marketLocation.
 2. Return cashBalance for it on the store's database handle.
@@ -87,4 +87,4 @@ Entries dated before the opening balance never count. A not initialized balance 
 3. if isOpening, return effective.
 4. Read the opening date via openingDateSQL; if one exists on or before effective, return effective, otherwise nil.
 
-Shared by RecordCashTransaction and RecordTransaction, so every entry that moves a stored cash balance reports the same rebuild date. An entry before the opening balance never changes a balance, so it needs no rebuild.
+Shared by Cash.Record and RecordTransaction, so every entry that moves a stored cash balance reports the same rebuild date. An entry before the opening balance never changes a balance, so it needs no rebuild.

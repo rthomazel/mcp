@@ -13,7 +13,9 @@ import (
 
 // Job is the daily routine, without scheduling.
 type Job struct {
-	store     domain.Store
+	prices    domain.PriceStore
+	snapshots domain.SnapshotStore
+	updates   domain.UpdateStore
 	refresher *PriceRefresher
 	provider  string
 	clock     func() time.Time
@@ -27,8 +29,8 @@ type RunReport struct {
 }
 
 // NewJob builds a Job using the real clock.
-func NewJob(store domain.Store, refresher *PriceRefresher, provider string) *Job {
-	return &Job{store: store, refresher: refresher, provider: provider, clock: time.Now}
+func NewJob(prices domain.PriceStore, snapshots domain.SnapshotStore, updates domain.UpdateStore, refresher *PriceRefresher, provider string) *Job {
+	return &Job{prices: prices, snapshots: snapshots, updates: updates, refresher: refresher, provider: provider, clock: time.Now}
 }
 
 // Run refreshes prices, logs the outcome, then snapshots the latest price
@@ -64,7 +66,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 		slog.ErrorContext(ctx, "price refresh run step failed", "step", "refreshing prices", "err", err)
 	}
 
-	if err := j.store.RecordUpdate(ctx, update); err != nil {
+	if err := j.updates.Record(ctx, update); err != nil {
 		slog.ErrorContext(ctx, "price refresh run step failed", "step", "recording prices update", "err", err)
 
 		return report, fmt.Errorf("recording prices update: %w", err)
@@ -73,7 +75,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 	slog.InfoContext(ctx, "prices refreshed", "refreshed", report.Refreshed, "failed", report.Failed,
 		"status", update.Status, "bars", update.RecordsUpdated)
 
-	latest, err := j.store.LatestSessionDate(ctx)
+	latest, err := j.prices.LatestSessionDate(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "price refresh run step failed", "step", "reading latest session date", "err", err)
 
@@ -86,7 +88,7 @@ func (j *Job) Run(ctx context.Context) (RunReport, error) {
 		return report, nil
 	}
 
-	snapshot, err := j.store.WriteSnapshot(ctx, *latest)
+	snapshot, err := j.snapshots.Write(ctx, *latest)
 	if err != nil {
 		slog.ErrorContext(ctx, "price refresh run step failed", "step", "writing snapshot", "err", err)
 

@@ -7,15 +7,16 @@ internalErrorText = "internal error, see the server logs".
 
 ## Handler
 
-1. store domain.Store
-2. refresher *marketdata.PriceRefresher
-3. queryTimeout Duration, from the configuration, the deadline for every other tool
+1. store domain.GenericStore, the generic store, taken from stores
+2. stores domain.Stores
+3. refresher *marketdata.PriceRefresher
+4. queryTimeout Duration, from the configuration, the deadline for every other tool
 
-The MCP tool layer. It holds no state beyond its dependencies and depends on domain.Store, never on the Postgres implementation.
+The MCP tool layer. It holds no state beyond its dependencies and depends on the domain stores, never on the Postgres implementation.
 
 # Functions
 
-## New(store domain.Store, refresher *marketdata.PriceRefresher, queryTimeout Duration) *Handler
+## New(stores domain.Stores, refresher *marketdata.PriceRefresher, queryTimeout Duration) *Handler
 
 Build a Handler.
 

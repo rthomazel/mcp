@@ -22,7 +22,7 @@ type priceRow struct {
 	Volume      int64
 }
 
-func storedPrices(t *testing.T, store *Store, instrumentID int) map[string]priceRow {
+func storedPrices(t *testing.T, store *Stores, instrumentID int) map[string]priceRow {
 	t.Helper()
 
 	rows, err := store.DB().Query(
@@ -54,9 +54,9 @@ func TestUpsertPrices(t *testing.T) {
 	voo := registerETF(t, store, "VOO")
 	ctx := context.Background()
 
-	require.NoError(t, store.UpsertPrices(ctx, voo.ID, nil), "empty is a no-op")
+	require.NoError(t, store.Prices.Upsert(ctx, voo.ID, nil), "empty is a no-op")
 
-	require.NoError(t, store.UpsertPrices(ctx, voo.ID, []domain.PriceBar{bar(12, "696.00"), bar(13, "693.38")}))
+	require.NoError(t, store.Prices.Upsert(ctx, voo.ID, []domain.PriceBar{bar(12, "696.00"), bar(13, "693.38")}))
 
 	stored := storedPrices(t, store, voo.ID)
 	require.Len(t, stored, 2)
@@ -67,7 +67,7 @@ func TestUpsertPrices(t *testing.T) {
 	revised := bar(13, "694.00")
 	revised.Volume = 2000
 
-	require.NoError(t, store.UpsertPrices(ctx, voo.ID, []domain.PriceBar{revised, bar(14, "700")}))
+	require.NoError(t, store.Prices.Upsert(ctx, voo.ID, []domain.PriceBar{revised, bar(14, "700")}))
 
 	stored = storedPrices(t, store, voo.ID)
 	require.Len(t, stored, 3)
@@ -81,11 +81,11 @@ func TestUpsertPricesRejections(t *testing.T) {
 	voo := registerETF(t, store, "VOO")
 	ctx := context.Background()
 
-	assert.ErrorIs(t, store.UpsertPrices(ctx, 9999, []domain.PriceBar{bar(12, "1")}), domain.ErrInstrumentNotFound)
+	assert.ErrorIs(t, store.Prices.Upsert(ctx, 9999, []domain.PriceBar{bar(12, "1")}), domain.ErrInstrumentNotFound)
 
 	// One bad bar means none are stored.
-	assert.ErrorIs(t, store.UpsertPrices(ctx, voo.ID, []domain.PriceBar{bar(12, "696"), bar(13, "0")}), domain.ErrInvalidInput)
-	assert.ErrorIs(t, store.UpsertPrices(ctx, voo.ID, []domain.PriceBar{bar(12, "696"), bar(12, "697")}), domain.ErrInvalidInput)
+	assert.ErrorIs(t, store.Prices.Upsert(ctx, voo.ID, []domain.PriceBar{bar(12, "696"), bar(13, "0")}), domain.ErrInvalidInput)
+	assert.ErrorIs(t, store.Prices.Upsert(ctx, voo.ID, []domain.PriceBar{bar(12, "696"), bar(12, "697")}), domain.ErrInvalidInput)
 	assert.Empty(t, storedPrices(t, store, voo.ID))
 }
 
@@ -95,22 +95,22 @@ func TestLatestPriceDate(t *testing.T) {
 	qqq := registerETF(t, store, "QQQ")
 	ctx := context.Background()
 
-	latest, err := store.LatestPriceDate(ctx, voo.ID)
+	latest, err := store.Prices.LatestDate(ctx, voo.ID)
 	require.NoError(t, err)
 	assert.Nil(t, latest)
 
-	require.NoError(t, store.UpsertPrices(ctx, voo.ID, []domain.PriceBar{bar(12, "1"), bar(13, "2")}))
+	require.NoError(t, store.Prices.Upsert(ctx, voo.ID, []domain.PriceBar{bar(12, "1"), bar(13, "2")}))
 
-	latest, err = store.LatestPriceDate(ctx, voo.ID)
+	latest, err = store.Prices.LatestDate(ctx, voo.ID)
 	require.NoError(t, err)
 	require.NotNil(t, latest)
 	assert.Equal(t, date(2026, 11, 13), *latest)
 
-	other, err := store.LatestPriceDate(ctx, qqq.ID)
+	other, err := store.Prices.LatestDate(ctx, qqq.ID)
 	require.NoError(t, err)
 	assert.Nil(t, other, "per instrument")
 
-	unknown, err := store.LatestPriceDate(ctx, 9999)
+	unknown, err := store.Prices.LatestDate(ctx, 9999)
 	require.NoError(t, err)
 	assert.Nil(t, unknown)
 }

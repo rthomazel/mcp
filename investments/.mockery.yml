@@ -3,10 +3,35 @@ template: testify
 packages:
   github.com/rthomazel/mcp/investments/internal/domain:
     interfaces:
-      Store:
+      GenericStore:
         config:
           dir: internal/domain
           filename: mock_store.go
+          pkgname: domain
+      CashStore:
+        config:
+          dir: internal/domain
+          filename: mock_cash_store.go
+          pkgname: domain
+      PriceStore:
+        config:
+          dir: internal/domain
+          filename: mock_price_store.go
+          pkgname: domain
+      SnapshotStore:
+        config:
+          dir: internal/domain
+          filename: mock_snapshot_store.go
+          pkgname: domain
+      UpdateStore:
+        config:
+          dir: internal/domain
+          filename: mock_update_store.go
+          pkgname: domain
+      EventStore:
+        config:
+          dir: internal/domain
+          filename: mock_event_store.go
           pkgname: domain
       PriceProvider:
         config:

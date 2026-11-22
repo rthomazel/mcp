@@ -25,7 +25,7 @@ type cashStore struct {
 	err         error
 }
 
-func (s *cashStore) RecordCashTransaction(_ context.Context, draft domain.CashTransaction) (domain.CashRecordResult, error) {
+func (s cashOps) Record(_ context.Context, draft domain.CashTransaction) (domain.CashRecordResult, error) {
 	s.cashDraft = draft
 	result := s.cashResult
 	result.CashTransaction = draft
@@ -33,13 +33,13 @@ func (s *cashStore) RecordCashTransaction(_ context.Context, draft domain.CashTr
 	return result, s.err
 }
 
-func (s *cashStore) ListCashTransactions(_ context.Context, filter domain.CashTransactionFilter) ([]domain.CashTransaction, error) {
+func (s cashOps) List(_ context.Context, filter domain.CashTransactionFilter) ([]domain.CashTransaction, error) {
 	s.cashFilter = filter
 
 	return []domain.CashTransaction{{Kind: domain.CashDeposit, Amount: "5", EffectiveDate: day(3)}}, s.err
 }
 
-func (s *cashStore) GetCash(context.Context, *domain.Date) (domain.CashBalance, error) {
+func (s cashOps) Get(context.Context, *domain.Date) (domain.CashBalance, error) {
 	return s.cashBalance, s.err
 }
 
@@ -51,7 +51,18 @@ func (s *cashStore) GetValueHistory(_ context.Context, filter domain.HistoryFilt
 	return s.history, s.err
 }
 
-func cashHandler(store *cashStore) *Handler { return New(store, nil, time.Minute) }
+// cashOps is the CashStore over a cashStore.
+type cashOps struct {
+	domain.CashStore
+	*cashStore
+}
+
+func cashHandler(store *cashStore) *Handler {
+	stores := store.bundle(store)
+	stores.Cash = cashOps{cashStore: store}
+
+	return New(stores, nil, time.Minute)
+}
 
 func TestAddCashTransactionParsesAndReportsRebuildFrom(t *testing.T) {
 	stale := day(3)
@@ -228,7 +239,7 @@ func TestHandleRemoveEvent(t *testing.T) {
 		"not removable": {id: float64(7), err: domain.ErrEventNotRemovable, wantErr: true, want: "not given up on or expired"},
 	} {
 		store := &removeEventStore{err: tc.err}
-		result, err := newHandler(&fakeStore{Store: store}, &fakeProvider{}).HandleRemoveEvent(ctx, request(tc.id))
+		result, err := New(domain.Stores{Events: store}, nil, time.Minute).HandleRemoveEvent(ctx, request(tc.id))
 		require.NoError(t, err, name)
 		assert.Equal(t, tc.wantErr, result.IsError, name)
 		assert.Contains(t, result.Content[0].(mcp.TextContent).Text, tc.want, name)
@@ -236,9 +247,9 @@ func TestHandleRemoveEvent(t *testing.T) {
 }
 
 type removeEventStore struct {
-	domain.Store
+	domain.EventStore
 
 	err error
 }
 
-func (s *removeEventStore) RemoveEvent(context.Context, int64) error { return s.err }
+func (s *removeEventStore) Remove(context.Context, int64) error { return s.err }

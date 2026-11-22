@@ -62,8 +62,8 @@ ORDER BY created_at DESC, id DESC
 LIMIT $2`
 )
 
-// RecordEvent validates draft and inserts it into the outbox.
-func (s *Store) RecordEvent(ctx context.Context, draft domain.DraftEvent) (bool, error) {
+// Record validates draft and inserts it into the outbox.
+func (s *Events) Record(ctx context.Context, draft domain.DraftEvent) (bool, error) {
 	if err := draft.Validate(); err != nil {
 		return false, err
 	}
@@ -86,7 +86,7 @@ func (s *Store) RecordEvent(ctx context.Context, draft domain.DraftEvent) (bool,
 
 // insertEvent is the one way an event is written. A change that must record
 // an event in its own unit of work calls it with its transaction.
-func (s *Store) insertEvent(ctx context.Context, tx *sqlx.Tx, draft domain.DraftEvent, now time.Time) (bool, error) {
+func (s *Events) insertEvent(ctx context.Context, tx *sqlx.Tx, draft domain.DraftEvent, now time.Time) (bool, error) {
 	data := draft.Data
 	if len(data) == 0 {
 		data = json.RawMessage(`{}`)
@@ -106,8 +106,8 @@ func (s *Store) insertEvent(ctx context.Context, tx *sqlx.Tx, draft domain.Draft
 	return true, nil
 }
 
-// ListDueEvents returns up to limit events due for a handling pass whose type starts with typePrefix.
-func (s *Store) ListDueEvents(ctx context.Context, typePrefix string, limit int) ([]domain.Event, error) {
+// ListDue returns up to limit events due for a handling pass whose type starts with typePrefix.
+func (s *Events) ListDue(ctx context.Context, typePrefix string, limit int) ([]domain.Event, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("%w: limit must be positive", domain.ErrInvalidInput)
 	}
@@ -115,8 +115,8 @@ func (s *Store) ListDueEvents(ctx context.Context, typePrefix string, limit int)
 	return s.queryEvents(ctx, s.db, dueEventsSQL, s.clock(), typePrefix, limit)
 }
 
-// SaveEventOutcome applies the outcome of one handling pass in one transaction.
-func (s *Store) SaveEventOutcome(ctx context.Context, id int64, outcome domain.EventOutcome) error {
+// SaveOutcome applies the outcome of one handling pass in one transaction.
+func (s *Events) SaveOutcome(ctx context.Context, id int64, outcome domain.EventOutcome) error {
 	if err := outcome.Validate(); err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func (s *Store) SaveEventOutcome(ctx context.Context, id int64, outcome domain.E
 
 // giveUp logs the failure and announces it, except for a failed announcement,
 // which only logs so a failing channel cannot cascade.
-func (s *Store) giveUp(ctx context.Context, tx *sqlx.Tx, event domain.Event, failures int, now time.Time) error {
+func (s *Events) giveUp(ctx context.Context, tx *sqlx.Tx, event domain.Event, failures int, now time.Time) error {
 	slog.Error("event given up on after repeated failures", "id", event.ID, "type", event.Type, "failures", failures)
 
 	if event.Type == domain.Events.NotificationFailed {
@@ -200,8 +200,8 @@ func (s *Store) giveUp(ctx context.Context, tx *sqlx.Tx, event domain.Event, fai
 	return nil
 }
 
-// RemoveEvent deletes an event that was given up on or has expired.
-func (s *Store) RemoveEvent(ctx context.Context, id int64) error {
+// Remove deletes an event that was given up on or has expired.
+func (s *Events) Remove(ctx context.Context, id int64) error {
 	var removed int64
 
 	err := s.db.GetContext(ctx, &removed, removeEventSQL, id, s.clock())
@@ -225,8 +225,8 @@ func (s *Store) RemoveEvent(ctx context.Context, id int64) error {
 	return fmt.Errorf("%w: event %d", domain.ErrEventNotRemovable, id)
 }
 
-// PruneEvents deletes fully handled events kept for the retention or longer.
-func (s *Store) PruneEvents(ctx context.Context) (int, error) {
+// Prune deletes fully handled events kept for the retention or longer.
+func (s *Events) Prune(ctx context.Context) (int, error) {
 	result, err := s.db.ExecContext(ctx, pruneEventsSQL, s.clock().Add(-s.events.Retention))
 	if err != nil {
 		return 0, fmt.Errorf("pruning events: %w", err)

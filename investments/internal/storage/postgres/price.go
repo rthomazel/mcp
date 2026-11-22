@@ -51,8 +51,8 @@ type priceBarJSON struct {
 	Volume        int64  `json:"volume"`
 }
 
-// UpsertPrices stores the bars in one statement, replacing existing dates.
-func (s *Store) UpsertPrices(ctx context.Context, instrumentID int, bars []domain.PriceBar) error {
+// Upsert stores the bars in one statement, replacing existing dates.
+func (s *Prices) Upsert(ctx context.Context, instrumentID int, bars []domain.PriceBar) error {
 	if len(bars) == 0 {
 		return nil
 	}
@@ -110,8 +110,8 @@ func marshalBars(bars []domain.PriceBar) ([]byte, error) {
 	return payload, nil
 }
 
-// LatestPriceDate returns the latest stored price date, nil when there is none.
-func (s *Store) LatestPriceDate(ctx context.Context, instrumentID int) (*domain.Date, error) {
+// LatestDate returns the latest stored price date, nil when there is none.
+func (s *Prices) LatestDate(ctx context.Context, instrumentID int) (*domain.Date, error) {
 	var latest sql.NullTime
 	if err := s.db.QueryRowxContext(ctx, latestPriceDateSQL, instrumentID).Scan(&latest); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("reading latest price date: %w", err)
@@ -126,8 +126,8 @@ func (s *Store) LatestPriceDate(ctx context.Context, instrumentID int) (*domain.
 	return &date, nil
 }
 
-// ListPrices returns the stored price records of one instrument, newest first.
-func (s *Store) ListPrices(ctx context.Context, filter domain.PriceFilter) ([]domain.PriceBar, error) {
+// List returns the stored price records of one instrument, newest first.
+func (s *Prices) List(ctx context.Context, filter domain.PriceFilter) ([]domain.PriceBar, error) {
 	if err := filter.Validate(); err != nil {
 		return nil, err
 	}
@@ -160,4 +160,9 @@ func (s *Store) ListPrices(ctx context.Context, filter domain.PriceFilter) ([]do
 	}
 
 	return bars, nil
+}
+
+// LatestSessionDate returns the latest price date across all instruments.
+func (s *Prices) LatestSessionDate(ctx context.Context) (*domain.Date, error) {
+	return s.latestSessionDate(ctx)
 }

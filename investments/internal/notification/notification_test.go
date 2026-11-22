@@ -190,14 +190,14 @@ func TestTelegramFailuresDoNotLeakTheToken(t *testing.T) {
 	assert.NotContains(t, err.Error(), "secret")
 }
 
-type fakeStore struct {
-	domain.Store
+type fakeUpdates struct {
+	domain.UpdateStore
 
 	updates []domain.Update
 	err     error
 }
 
-func (s *fakeStore) ListUpdates(context.Context, domain.UpdateFilter) ([]domain.Update, error) {
+func (s *fakeUpdates) List(context.Context, domain.UpdateFilter) ([]domain.Update, error) {
 	return s.updates, s.err
 }
 
@@ -208,7 +208,7 @@ func TestRenderers(t *testing.T) {
 	require.NoError(t, err)
 
 	event := domain.Event{Type: domain.Events.SnapshotIncomplete, Data: data}
-	renderers := NewRenderers(&fakeStore{updates: []domain.Update{
+	renderers := NewRenderers(&fakeUpdates{updates: []domain.Update{
 		{DateFrom: &other, DateTo: &other, ErrorMessage: "wrong day"},
 		{DateFrom: &day, DateTo: &day, ErrorMessage: "VOO missing price"},
 	}})
@@ -219,12 +219,12 @@ func TestRenderers(t *testing.T) {
 	assert.Contains(t, text, "VOO missing price")
 	assert.NotContains(t, text, "wrong day")
 
-	empty := NewRenderers(&fakeStore{})
+	empty := NewRenderers(&fakeUpdates{})
 	text, err = empty[domain.Events.SnapshotIncomplete][defaultFormat].Render(context.Background(), event)
 	require.NoError(t, err)
 	assert.Contains(t, text, "no run was recorded")
 
-	failing := NewRenderers(&fakeStore{err: errors.New("db")})
+	failing := NewRenderers(&fakeUpdates{err: errors.New("db")})
 	_, err = failing[domain.Events.SnapshotIncomplete][defaultFormat].Render(context.Background(), event)
 	assert.Error(t, err)
 
@@ -241,7 +241,7 @@ func TestRenderers(t *testing.T) {
 }
 
 func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
-	source := NewSource(NewLoader(writeConfig(t, validConfig)), &fakeStore{}, "")
+	source := NewSource(NewLoader(writeConfig(t, validConfig)), &fakeUpdates{}, "")
 
 	handlers, err := source.Handlers(context.Background())
 	require.NoError(t, err)
@@ -258,7 +258,7 @@ func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
 	assert.Equal(t, []string{"notification.stub.default", "notification.telegram.portfolio"}, names(domain.Events.SnapshotIncomplete))
 	assert.Equal(t, []string{"notification.none"}, names(domain.Events.NotificationFailed))
 
-	unconfigured := NewSource(NewLoader(""), &fakeStore{}, "")
+	unconfigured := NewSource(NewLoader(""), &fakeUpdates{}, "")
 	handlers, err = unconfigured.Handlers(context.Background())
 	require.NoError(t, err)
 	assert.NoError(t, handlers(domain.Events.SnapshotIncomplete)[0].Handle(context.Background(), domain.Event{}))
@@ -266,7 +266,7 @@ func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
 }
 
 func TestSourceFailsOnInvalidConfigurationWithoutAFallback(t *testing.T) {
-	source := NewSource(NewLoader(writeConfig(t, "version: 9")), &fakeStore{}, "")
+	source := NewSource(NewLoader(writeConfig(t, "version: 9")), &fakeUpdates{}, "")
 
 	_, err := source.Handlers(context.Background())
 	assert.Error(t, err)
@@ -290,7 +290,7 @@ func TestChannelHandlerRendersThenSends(t *testing.T) {
 	channel := &recordingChannel{}
 	handler := &channelHandler{
 		name: "notification.x.y", channel: channel, category: "y",
-		renderer: NewRenderers(&fakeStore{})[domain.Events.SnapshotIncomplete][defaultFormat],
+		renderer: NewRenderers(&fakeUpdates{})[domain.Events.SnapshotIncomplete][defaultFormat],
 	}
 
 	require.NoError(t, handler.Handle(context.Background(), domain.Event{Type: domain.Events.SnapshotIncomplete, Data: data}))

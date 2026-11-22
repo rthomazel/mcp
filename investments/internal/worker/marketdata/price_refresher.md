@@ -7,8 +7,9 @@ runTimeout = 30 minutes, the deadline for one price refresh run.
 
 ## PriceRefresher
 
-1. store domain.Store
-2. provider domain.PriceProvider
+1. store domain.GenericStore, for registering instruments and reading positions
+2. prices domain.PriceStore
+3. provider domain.PriceProvider
 
 Orchestrates the provider and the store. It holds no state of its own.
 
@@ -21,16 +22,16 @@ Orchestrates the provider and the store. It holds no state of its own.
 
 # Functions
 
-## NewPriceRefresher(store domain.Store, provider domain.PriceProvider) *PriceRefresher
+## NewPriceRefresher(store domain.GenericStore, prices domain.PriceStore, provider domain.PriceProvider) *PriceRefresher
 
-Build a PriceRefresher over the store and the provider.
+Build a PriceRefresher over the stores and the provider.
 
 ## PriceRefresher.RegisterInstrument(ctx Context, draft domain.Instrument) (domain.Instrument, error)
 
 1. Normalize and validate draft.
 2. Fetch the full available history through provider.FetchPrices with a nil from.
 3. Register the instrument through store.RegisterInstrument.
-4. Store the bars through store.UpsertPrices.
+4. Store the bars through prices.Upsert.
 5. Return the instrument.
 
 #### Errors
@@ -55,9 +56,9 @@ Only the first two steps depend on the provider; the stage 6 registration capabi
 
 ## PriceRefresher.RefreshInstrument(ctx Context, instrument domain.Instrument, from *domain.Date) RefreshResult
 
-1. Read the latest stored price date through store.LatestPriceDate.
+1. Read the latest stored price date through store.Prices.LatestDate.
 2. Choose the start: the earlier of from and the latest stored date, or the latest stored date when from is nil, or the full history when the instrument has no prices. Fetch bars through provider.FetchPrices from that date inclusive.
-3. Store them through store.UpsertPrices.
+3. Store them through prices.Upsert.
 4. Return the result with the starting date and the number of bars.
 
 #### Errors

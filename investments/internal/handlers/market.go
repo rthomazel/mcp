@@ -45,7 +45,7 @@ func (h *Handler) HandleGetPrices(ctx context.Context, req mcp.CallToolRequest) 
 		return h.failure(ctx, tool, err), nil
 	}
 
-	bars, err := h.store.ListPrices(ctx, domain.PriceFilter{
+	bars, err := h.stores.Prices.List(ctx, domain.PriceFilter{
 		InstrumentID: instrument.ID, From: from, To: to, Limit: req.GetInt("limit", 0),
 	})
 	if err != nil {

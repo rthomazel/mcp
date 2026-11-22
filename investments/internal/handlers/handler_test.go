@@ -20,7 +20,7 @@ func day(d int) domain.Date { return time.Date(2026, 11, d, 0, 0, 0, 0, time.UTC
 
 // fakeStore serves canned data and records the arguments of the calls under test.
 type fakeStore struct {
-	domain.Store
+	domain.GenericStore
 
 	instruments  []domain.Instrument
 	positions    domain.PositionsResult
@@ -55,7 +55,7 @@ func (s *fakeStore) RegisterInstrument(_ context.Context, draft domain.Instrumen
 	return draft, nil
 }
 
-func (s *fakeStore) UpsertPrices(_ context.Context, id int, bars []domain.PriceBar) error {
+func (s fakePrices) Upsert(_ context.Context, id int, bars []domain.PriceBar) error {
 	if s.upsertErr != nil {
 		return s.upsertErr
 	}
@@ -69,7 +69,7 @@ func (s *fakeStore) UpsertPrices(_ context.Context, id int, bars []domain.PriceB
 	return nil
 }
 
-func (s *fakeStore) LatestPriceDate(context.Context, int) (*domain.Date, error) { return nil, nil }
+func (s fakePrices) LatestDate(context.Context, int) (*domain.Date, error) { return nil, nil }
 
 func (s *fakeStore) GetPositions(context.Context, *domain.Date) (domain.PositionsResult, error) {
 	return s.positions, s.positionsErr
@@ -101,29 +101,52 @@ func (s *fakeStore) ListTransactions(_ context.Context, filter domain.Transactio
 	return []domain.Transaction{{InstrumentID: 1, EventType: domain.EventDividend, QuantityChange: "0", CashAmount: "5", EffectiveDate: day(3)}}, nil
 }
 
-func (s *fakeStore) ListPrices(context.Context, domain.PriceFilter) ([]domain.PriceBar, error) {
+func (s fakePrices) List(context.Context, domain.PriceFilter) ([]domain.PriceBar, error) {
 	return []domain.PriceBar{{Date: day(3), Open: "1.50", High: "2", Low: "1", Close: "1.75", AdjustedClose: "1.7", Volume: 10}}, nil
 }
 
-func (s *fakeStore) ListSnapshots(_ context.Context, filter domain.SnapshotFilter) ([]domain.SnapshotRow, error) {
+func (s fakeSnapshots) List(_ context.Context, filter domain.SnapshotFilter) ([]domain.SnapshotRow, error) {
 	s.snapshotFilter = filter
 
 	return s.snapshots, nil
 }
 
-func (s *fakeStore) ListUpdates(_ context.Context, filter domain.UpdateFilter) ([]domain.Update, error) {
+func (s fakeUpdates) List(_ context.Context, filter domain.UpdateFilter) ([]domain.Update, error) {
 	s.updateFilter = filter
 
 	return s.updates, nil
 }
 
-func (s *fakeStore) RebuildSnapshots(_ context.Context, from, to domain.Date, _ string) (domain.RebuildResult, error) {
+func (s fakeSnapshots) Rebuild(_ context.Context, from, to domain.Date, _ string) (domain.RebuildResult, error) {
 	s.rebuildCalls++
 	if s.rebuildErr != nil {
 		return domain.RebuildResult{}, s.rebuildErr
 	}
 
 	return domain.RebuildResult{From: from, To: to, Dates: 2, Rows: 4}, nil
+}
+
+// The narrow stores over a fakeStore: the views share its state.
+type (
+	fakePrices struct {
+		domain.PriceStore
+		*fakeStore
+	}
+	fakeSnapshots struct {
+		domain.SnapshotStore
+		*fakeStore
+	}
+	fakeUpdates struct {
+		domain.UpdateStore
+		*fakeStore
+	}
+)
+
+// bundle returns the stores a handler takes, with store as the generic one.
+func (s *fakeStore) bundle(store domain.GenericStore) domain.Stores {
+	return domain.Stores{
+		Generic: store, Prices: fakePrices{fakeStore: s}, Snapshots: fakeSnapshots{fakeStore: s}, Updates: fakeUpdates{fakeStore: s},
+	}
 }
 
 type fakeProvider struct {
@@ -165,7 +188,9 @@ func newBar(d int) domain.PriceBar {
 }
 
 func newHandler(store *fakeStore, provider *fakeProvider) *Handler {
-	return New(store, marketdata.NewPriceRefresher(store, provider), time.Minute)
+	stores := store.bundle(store)
+
+	return New(stores, marketdata.NewPriceRefresher(store, stores.Prices, provider), time.Minute)
 }
 
 func twoInstruments() []domain.Instrument {
@@ -579,7 +604,8 @@ func TestRefreshPrices(t *testing.T) {
 		store := &fakeStore{instruments: twoInstruments(), positions: held}
 		provider := &cancelingProvider{cancel: cancel}
 
-		handler := New(store, marketdata.NewPriceRefresher(store, provider), time.Minute)
+		stores := store.bundle(store)
+		handler := New(stores, marketdata.NewPriceRefresher(store, stores.Prices, provider), time.Minute)
 
 		result, err := handler.HandleRefreshPrices(ctx, request(nil))
 

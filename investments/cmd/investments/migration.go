@@ -13,8 +13,8 @@ import (
 )
 
 // migrate applies pending up migrations over the store's own connection.
-func migrate(store *postgres.Store) error {
-	driver, err := migratepgx.WithInstance(store.DB(), &migratepgx.Config{})
+func migrate(stores *postgres.Stores) error {
+	driver, err := migratepgx.WithInstance(stores.DB(), &migratepgx.Config{})
 	if err != nil {
 		return fmt.Errorf("creating migration driver: %w", err)
 	}

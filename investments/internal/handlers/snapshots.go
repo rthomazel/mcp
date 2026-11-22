@@ -36,7 +36,7 @@ func (h *Handler) HandleGetSnapshots(ctx context.Context, req mcp.CallToolReques
 		return h.failure(ctx, tool, err), nil
 	}
 
-	rows, err := h.store.ListSnapshots(ctx, domain.SnapshotFilter{
+	rows, err := h.stores.Snapshots.List(ctx, domain.SnapshotFilter{
 		InstrumentID: instrumentID, From: from, To: to, Limit: req.GetInt("limit", 0),
 	})
 	if err != nil {
@@ -68,7 +68,7 @@ func (h *Handler) HandleRebuildSnapshots(ctx context.Context, req mcp.CallToolRe
 	ctx, cancel := h.withTimeout(ctx, true)
 	defer cancel()
 
-	result, err := h.store.RebuildSnapshots(ctx, from, to, strings.TrimSpace(reason))
+	result, err := h.stores.Snapshots.Rebuild(ctx, from, to, strings.TrimSpace(reason))
 	if err != nil {
 		return h.failure(ctx, tool, err), nil
 	}

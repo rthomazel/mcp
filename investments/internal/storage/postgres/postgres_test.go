@@ -25,7 +25,7 @@ const testDSNEnv = "INVESTMENTS_MCP_TEST_DSN"
 // newTestStore creates a throwaway database on the server named by
 // INVESTMENTS_MCP_TEST_DSN (a role allowed to create databases), applies the
 // migrations and returns a store on it. Skips when the variable is unset.
-func newTestStore(t *testing.T) *Store {
+func newTestStore(t *testing.T) *Stores {
 	t.Helper()
 
 	adminDSN := os.Getenv(testDSNEnv)
@@ -88,7 +88,7 @@ func date(year int, month time.Month, day int) domain.Date {
 
 func dp(d domain.Date) *domain.Date { return &d }
 
-func registerETF(t *testing.T, store *Store, symbol string) domain.Instrument {
+func registerETF(t *testing.T, store *Stores, symbol string) domain.Instrument {
 	t.Helper()
 
 	instrument, err := store.RegisterInstrument(context.Background(), domain.Instrument{
@@ -100,7 +100,7 @@ func registerETF(t *testing.T, store *Store, symbol string) domain.Instrument {
 }
 
 // record inserts a transaction executed at noon UTC on the effective date.
-func record(t *testing.T, store *Store, instrumentID int, event domain.EventType, quantity, cash string, effective domain.Date) (domain.RecordResult, error) {
+func record(t *testing.T, store *Stores, instrumentID int, event domain.EventType, quantity, cash string, effective domain.Date) (domain.RecordResult, error) {
 	t.Helper()
 
 	return store.RecordTransaction(context.Background(), domain.DraftTransaction{
@@ -110,7 +110,7 @@ func record(t *testing.T, store *Store, instrumentID int, event domain.EventType
 	})
 }
 
-func insertPrice(t *testing.T, store *Store, instrumentID int, on domain.Date, closePrice string) {
+func insertPrice(t *testing.T, store *Stores, instrumentID int, on domain.Date, closePrice string) {
 	t.Helper()
 
 	_, err := store.DB().Exec(
@@ -120,7 +120,7 @@ func insertPrice(t *testing.T, store *Store, instrumentID int, on domain.Date, c
 	require.NoError(t, err)
 }
 
-func insertSnapshot(t *testing.T, store *Store, instrumentID int, on domain.Date) {
+func insertSnapshot(t *testing.T, store *Stores, instrumentID int, on domain.Date) {
 	t.Helper()
 
 	_, err := store.DB().Exec(

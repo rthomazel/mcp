@@ -1,6 +1,6 @@
 # Functions
 
-## migrate(store *postgres.Store) error
+## migrate(stores *postgres.Stores) error
 
 1. Wrap store.DB() in the golang-migrate Postgres driver.
 2. Create a migrator over the embedded db.Migrations.

@@ -14,7 +14,7 @@ The worker's tunables, from the server configuration, which defaults them to 30 
 
 ## Worker
 
-1. store domain.Store
+1. store domain.EventStore
 2. source domain.EventHandlerSource
 3. settings Settings
 
@@ -22,7 +22,7 @@ The events worker: drains the events table. It holds no state beyond its depende
 
 # Functions
 
-## NewWorker(store domain.Store, source domain.EventHandlerSource, settings Settings) *Worker
+## NewWorker(store domain.EventStore, source domain.EventHandlerSource, settings Settings) *Worker
 
 Build the events worker.
 
@@ -37,7 +37,7 @@ A failing pass never stops the loop. The worker runs inside the server process, 
 ## Worker.RunOnce(ctx Context)
 
 1. Read the handlers from source.
-2. List the due events through store.ListDueEvents with TypePrefix and BatchLimit.
+2. List the due events through store.Events.ListDue with TypePrefix and BatchLimit.
 3. Handle each one with handleEvent, in the order returned.
 
 #### Errors
@@ -56,7 +56,7 @@ The worker takes only events whose type starts with TypePrefix, in the query, so
 2. Look up the handlers registered for event.Type with handlers.
 3. if there are none, log at warn level naming the id and type and return, saving nothing.
 4. Run each handler whose name is not in event.HandledBy, with HandlerTimeout, collecting the names that succeeded and noting any failure.
-5. Save the outcome through store.SaveEventOutcome: the succeeded names, Failed when any handler failed, Handled when none did.
+5. Save the outcome through store.Events.SaveOutcome: the succeeded names, Failed when any handler failed, Handled when none did.
 
 #### Errors
 
@@ -70,4 +70,4 @@ Retries are per handler: a handler already in HandledBy is skipped, so a failing
 
 ## Worker.prune(ctx Context)
 
-Delete the expired history through store.PruneEvents and log the number at info level when it is not zero, or the error at error level.
+Delete the expired history through store.Events.Prune and log the number at info level when it is not zero, or the error at error level.

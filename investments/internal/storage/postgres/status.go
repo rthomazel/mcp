@@ -74,7 +74,7 @@ func (s *Store) GetStatus(ctx context.Context) (domain.Status, error) {
 
 	status.Instruments = instruments
 
-	if status.LatestPriceDate, err = s.LatestSessionDate(ctx); err != nil {
+	if status.LatestPriceDate, err = s.latestSessionDate(ctx); err != nil {
 		return domain.Status{}, err
 	}
 

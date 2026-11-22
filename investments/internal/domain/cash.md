@@ -21,7 +21,7 @@ A string, one of the Cash constants.
 5. EffectiveDate Date
 6. Notes *string
 
-An account-level cash event that belongs to no instrument. Distinct from Transaction, the instrument ledger; the cash ledger is both together. Also the caller's input to Store.RecordCashTransaction, with ID zero; it is normalized and validated before it touches the database.
+An account-level cash event that belongs to no instrument. Distinct from Transaction, the instrument ledger; the cash ledger is both together. Also the caller's input to Cash.Record, with ID zero; it is normalized and validated before it touches the database.
 
 ## CashRecordResult
 
@@ -58,7 +58,7 @@ Reported when the running cash balance is below zero at any entry. Never rejecte
 1. Date Date
 2. BalanceUSD Decimal
 
-A stored daily cash balance, one per snapshot date. Written with the securities snapshot of the same date; see Store.WriteSnapshot.
+A stored daily cash balance, one per snapshot date. Written with the securities snapshot of the same date; see Snapshots.Write.
 
 # Functions
 

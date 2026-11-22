@@ -26,7 +26,7 @@ func (p *jobProvider) FetchPrices(_ context.Context, symbol string, _ *domain.Da
 }
 
 type jobStore struct {
-	domain.Store
+	domain.GenericStore
 
 	instruments []domain.Instrument
 	listErr     error
@@ -54,28 +54,49 @@ func (s *jobStore) GetPositions(context.Context, *domain.Date) (domain.Positions
 	return result, nil
 }
 
-func (s *jobStore) LatestPriceDate(context.Context, int) (*domain.Date, error) { return nil, nil }
+// jobPrices, jobSnapshots and jobUpdates are the narrow stores over a jobStore.
+type (
+	jobPrices struct {
+		domain.PriceStore
 
-func (s *jobStore) UpsertPrices(context.Context, int, []domain.PriceBar) error { return nil }
+		s *jobStore
+	}
+	jobSnapshots struct {
+		domain.SnapshotStore
 
-func (s *jobStore) RecordUpdate(_ context.Context, update domain.Update) error {
-	s.updates = append(s.updates, update)
+		s *jobStore
+	}
+	jobUpdates struct {
+		domain.UpdateStore
 
-	return s.recordErr
+		s *jobStore
+	}
+)
+
+func (p jobPrices) LatestDate(context.Context, int) (*domain.Date, error) { return nil, nil }
+
+func (p jobPrices) Upsert(context.Context, int, []domain.PriceBar) error { return nil }
+
+func (p jobPrices) LatestSessionDate(context.Context) (*domain.Date, error) {
+	return p.s.latest, p.s.latestErr
 }
 
-func (s *jobStore) LatestSessionDate(context.Context) (*domain.Date, error) {
-	return s.latest, s.latestErr
+func (u jobUpdates) Record(_ context.Context, update domain.Update) error {
+	u.s.updates = append(u.s.updates, update)
+
+	return u.s.recordErr
 }
 
-func (s *jobStore) WriteSnapshot(_ context.Context, date domain.Date) (domain.SnapshotResult, error) {
-	s.snapshotted = append(s.snapshotted, date)
+func (n jobSnapshots) Write(_ context.Context, date domain.Date) (domain.SnapshotResult, error) {
+	n.s.snapshotted = append(n.s.snapshotted, date)
 
-	return s.snapshot, s.snapshotErr
+	return n.s.snapshot, n.s.snapshotErr
 }
 
 func newJob(store *jobStore, provider *jobProvider) *Job {
-	return NewJob(store, NewPriceRefresher(store, provider), "fake")
+	prices := jobPrices{s: store}
+
+	return NewJob(prices, jobSnapshots{s: store}, jobUpdates{s: store}, NewPriceRefresher(store, prices, provider), "fake")
 }
 
 func twoInstruments() []domain.Instrument {

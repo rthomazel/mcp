@@ -13,7 +13,7 @@ Description shown to the agent: Read stored daily prices for one instrument, new
 - to string, optional YYYY-MM-DD, inclusive
 
 1. Parse the parameters and resolve the instrument.
-2. Read through store.ListPrices.
+2. Read through store.Prices.List.
 3. Return the bars: open, high, low, close, adjusted close and volume, with the close labelled as the valuation price.
 
 #### Errors

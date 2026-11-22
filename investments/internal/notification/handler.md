@@ -8,7 +8,7 @@ noChannelHandlerName = "notification.none".
 ## Source
 
 1. loader *Loader
-2. store domain.Store
+2. updates domain.UpdateStore
 3. renderers map[string]map[string]Renderer
 4. telegramToken string, the bot token from the server configuration
 
@@ -31,7 +31,7 @@ Stands in for an event type with no notification.
 
 # Functions
 
-## NewSource(loader *Loader, store domain.Store, telegramToken string) *Source
+## NewSource(loader *Loader, updates domain.UpdateStore, telegramToken string) *Source
 
 Build a Source with the renderers from NewRenderers.
 

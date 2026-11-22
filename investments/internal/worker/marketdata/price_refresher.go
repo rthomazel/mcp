@@ -13,7 +13,8 @@ import (
 
 // PriceRefresher orchestrates the provider and the store. It holds no state of its own.
 type PriceRefresher struct {
-	store    domain.Store
+	store    domain.GenericStore
+	prices   domain.PriceStore
 	provider domain.PriceProvider
 }
 
@@ -26,8 +27,8 @@ type RefreshResult struct {
 }
 
 // NewPriceRefresher builds a PriceRefresher over the store and the provider.
-func NewPriceRefresher(store domain.Store, provider domain.PriceProvider) *PriceRefresher {
-	return &PriceRefresher{store: store, provider: provider}
+func NewPriceRefresher(store domain.GenericStore, prices domain.PriceStore, provider domain.PriceProvider) *PriceRefresher {
+	return &PriceRefresher{store: store, prices: prices, provider: provider}
 }
 
 // RegisterInstrument fetches the full history, registers the instrument and
@@ -56,7 +57,7 @@ func (r *PriceRefresher) RegisterInstrument(ctx context.Context, draft domain.In
 		return domain.Instrument{}, err
 	}
 
-	if err := r.store.UpsertPrices(ctx, instrument.ID, bars); err != nil {
+	if err := r.prices.Upsert(ctx, instrument.ID, bars); err != nil {
 		return instrument, fmt.Errorf("instrument %s registered but backfill failed: %w", instrument.Symbol, err)
 	}
 
@@ -77,7 +78,7 @@ func (r *PriceRefresher) RefreshInstrument(ctx context.Context, instrument domai
 		return result
 	}
 
-	latest, err := r.store.LatestPriceDate(ctx, instrument.ID)
+	latest, err := r.prices.LatestDate(ctx, instrument.ID)
 	if err != nil {
 		return fail("reading latest price date", err)
 	}
@@ -92,7 +93,7 @@ func (r *PriceRefresher) RefreshInstrument(ctx context.Context, instrument domai
 		return fail("fetching prices", err)
 	}
 
-	if err := r.store.UpsertPrices(ctx, instrument.ID, bars); err != nil {
+	if err := r.prices.Upsert(ctx, instrument.ID, bars); err != nil {
 		return fail("storing prices", err)
 	}
 
