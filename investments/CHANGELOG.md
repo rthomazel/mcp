@@ -4,10 +4,14 @@
 
 ### feat
 
-- **(notifications)** outbox of events with per-handler retries, exponential backoff and give-up after 10 failures; notifications routed through a versioned YAML file (`INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE`) to Telegram or a stub channel, by category. A 07:00 New York monitor announces a latest price date without a completed snapshot once per date. `get_status` lists events given up on and expired ones; `remove_event` clears them. Adds the `events` table and promotes `go.yaml.in/yaml/v3` to a direct dependency.
-
 - **(monitors)** a separate monitors YAML file (`INVESTMENTS_MCP_MONITORS_CONFIG_FILE`) turns each monitor on or off with `disabled` and carries its settings; a monitor with no entry does not run. **Upgrade note:** the snapshot-incomplete monitor is now `snapshot.incomplete` and stops announcing until the file has an entry for it. The notifications and monitors files are loaded by a shared file loader and validated independently.
 - **(monitors)** `portfolio.drawdown` announces, once per stay, each multiple of `increment_pct` the securities value falls below its all-time high, as `notification.portfolio.drawdown` with the peak and current values. Recovering above a level and falling back announces it again. Changes in value, not returns.
+
+## [0.3.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.3.0) feat: notification outbox, monitors and Telegram channel
+
+### feat
+
+- **(notifications)** outbox of events with per-handler retries, exponential backoff and give-up after 10 failures; notifications routed through a versioned YAML file (`INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE`) to Telegram or a stub channel, by category. A 07:00 New York monitor announces a latest price date without a completed snapshot once per date. `get_status` lists events given up on and expired ones; `remove_event` clears them. Adds the `events` table and promotes `go.yaml.in/yaml/v3` to a direct dependency.
 
 ### build
 
