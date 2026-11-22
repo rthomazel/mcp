@@ -1,4 +1,4 @@
-package notify
+package notification
 
 import (
 	"context"
@@ -105,7 +105,7 @@ func (h *targetHandler) Handle(ctx context.Context, event domain.Event) error {
 		return fmt.Errorf("rendering %s: %w", event.Type, err)
 	}
 
-	if err := h.channel.Send(ctx, h.category, text); err != nil {
+	if err := h.channel.SendPlainText(ctx, h.category, text); err != nil {
 		return fmt.Errorf("sending to %s: %w", h.name, err)
 	}
 

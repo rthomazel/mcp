@@ -1,4 +1,4 @@
-package notify
+package notification
 
 import (
 	"context"
@@ -124,11 +124,11 @@ func TestTelegramSendsPlainTextToTheCategoryChat(t *testing.T) {
 	channel := NewTelegramChannel(cfg.Channels[0], func(string) string { return "secret" })
 	channel.baseURL = server.URL
 
-	require.NoError(t, channel.Send(context.Background(), "system", "hello"))
+	require.NoError(t, channel.SendPlainText(context.Background(), "system", "hello"))
 	assert.Equal(t, "/botsecret/sendMessage", path)
 	assert.Equal(t, map[string]string{"chat_id": "2", "text": "hello"}, body)
 
-	require.NoError(t, channel.Send(context.Background(), "system", strings.Repeat("é", 5000)))
+	require.NoError(t, channel.SendPlainText(context.Background(), "system", strings.Repeat("é", 5000)))
 	assert.Len(t, []rune(body["text"]), telegramMaxText)
 	assert.True(t, strings.HasSuffix(body["text"], "…"))
 }
@@ -138,10 +138,10 @@ func TestTelegramWithoutCredentialsWarnsAndSucceeds(t *testing.T) {
 	require.NoError(t, err)
 
 	noToken := NewTelegramChannel(cfg.Channels[0], func(string) string { return "" })
-	assert.NoError(t, noToken.Send(context.Background(), "system", "x"))
+	assert.NoError(t, noToken.SendPlainText(context.Background(), "system", "x"))
 
 	noChat := NewTelegramChannel(cfg.Channels[0], func(string) string { return "secret" })
-	assert.NoError(t, noChat.Send(context.Background(), "unknown", "x"))
+	assert.NoError(t, noChat.SendPlainText(context.Background(), "unknown", "x"))
 }
 
 func TestTelegramFailuresDoNotLeakTheToken(t *testing.T) {
@@ -156,14 +156,14 @@ func TestTelegramFailuresDoNotLeakTheToken(t *testing.T) {
 	channel := NewTelegramChannel(cfg.Channels[0], func(string) string { return "secret" })
 	channel.baseURL = server.URL
 
-	err = channel.Send(context.Background(), "system", "x")
+	err = channel.SendPlainText(context.Background(), "system", "x")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "429")
 	assert.Contains(t, err.Error(), "Too Many Requests")
 
 	server.Close()
 
-	err = channel.Send(context.Background(), "system", "x")
+	err = channel.SendPlainText(context.Background(), "system", "x")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "secret")
 }
@@ -255,7 +255,7 @@ type recordingChannel struct {
 	err            error
 }
 
-func (c *recordingChannel) Send(_ context.Context, category, text string) error {
+func (c *recordingChannel) SendPlainText(_ context.Context, category, text string) error {
 	c.category, c.text = category, text
 
 	return c.err

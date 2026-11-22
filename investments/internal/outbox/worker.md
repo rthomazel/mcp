@@ -21,7 +21,7 @@ Drains the outbox. It holds no state beyond its dependencies; every retry fact l
 
 1. Handlers(ctx Context) (map[string][]domain.EventHandler, error)
 
-The handlers registered for each event type, read fresh on every pass so configuration changes apply without a restart. Defined here, implemented by the notify package. A type with no entry has no registered handler. An error means the handlers are unavailable.
+The handlers registered for each event type, read fresh on every pass so configuration changes apply without a restart. Defined here, implemented by the notification package. A type with no entry has no registered handler. An error means the handlers are unavailable.
 
 # Functions
 

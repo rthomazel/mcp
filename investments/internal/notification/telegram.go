@@ -1,4 +1,4 @@
-package notify
+package notification
 
 import (
 	"bytes"
@@ -52,9 +52,9 @@ func NewTelegramChannel(cfg ChannelConfig, lookupEnv func(string) string) *Teleg
 	}
 }
 
-// Send posts text to the category's chat. Without a token or chat it warns
+// SendPlainText posts text to the category's chat. Without a token or chat it warns
 // like the stub and succeeds.
-func (c *TelegramChannel) Send(ctx context.Context, category, text string) error {
+func (c *TelegramChannel) SendPlainText(ctx context.Context, category, text string) error {
 	chat := c.chats[category]
 	if c.token == "" || chat == "" {
 		warnUndelivered(ctx, c.name, category)

@@ -8,7 +8,7 @@ The channel implementation that sends nothing.
 
 # Functions
 
-## StubChannel.Send(ctx Context, category string, text string) error
+## StubChannel.SendPlainText(ctx Context, category string, text string) error
 
 Log a warning naming the channel and category that the notification was not delivered because nothing is configured, never the text, and return nil.
 

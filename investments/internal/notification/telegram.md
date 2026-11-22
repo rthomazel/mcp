@@ -26,7 +26,7 @@ The channel implementation for the Telegram Bot API, sending as the operator's b
 
 The token is read, not configured: the file names where it comes from and never contains it.
 
-## TelegramChannel.Send(ctx Context, category string, text string) error
+## TelegramChannel.SendPlainText(ctx Context, category string, text string) error
 
 1. if the token is empty or the category has no chat, log the same warning as StubChannel and return nil.
 2. Truncate text to telegramMaxText characters, ending with an ellipsis when cut.

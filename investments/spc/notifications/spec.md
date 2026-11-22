@@ -65,7 +65,7 @@ for different purposes. The Telegram channel implementation has two: portfolio, 
 for what the operator wants to know about the investments, and system, a chat for the
 few messages about the system's own health.
 
-**Notification handler.** The generic handler for events that notify. It accepts the
+**Notification handler.** The generic handler for events that notification. It accepts the
 complete notifications configuration as one unit, and for each event it handles it
 renders the message text and sends it to every target the configuration routes that
 event type to. Event types, producers and monitors know nothing about how an event is

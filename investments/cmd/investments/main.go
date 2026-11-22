@@ -15,7 +15,7 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/handlers"
 	"github.com/rthomazel/mcp/investments/internal/marketdata"
 	"github.com/rthomazel/mcp/investments/internal/monitor"
-	"github.com/rthomazel/mcp/investments/internal/notify"
+	"github.com/rthomazel/mcp/investments/internal/notification"
 	"github.com/rthomazel/mcp/investments/internal/outbox"
 	"github.com/rthomazel/mcp/investments/internal/provider/tiingo"
 	"github.com/rthomazel/mcp/investments/internal/storage/postgres"
@@ -73,7 +73,7 @@ func run() error {
 		return fmt.Errorf("building monitor scheduler: %w", err)
 	}
 
-	source := notify.NewSource(notify.NewLoader(cfg.NotificationsConfigFile), store, os.Getenv)
+	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, os.Getenv)
 	worker := outbox.NewWorker(store, source)
 
 	running.Go(func() { monitors.Run(ctx) })

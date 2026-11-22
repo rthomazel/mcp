@@ -1,4 +1,4 @@
-package notify
+package notification
 
 import (
 	"context"
@@ -10,8 +10,8 @@ type StubChannel struct {
 	name string
 }
 
-// Send logs that nothing is configured and returns nil.
-func (c *StubChannel) Send(ctx context.Context, category, _ string) error {
+// SendPlainText logs that nothing is configured and returns nil.
+func (c *StubChannel) SendPlainText(ctx context.Context, category, _ string) error {
 	warnUndelivered(ctx, c.name, category)
 
 	return nil
