@@ -454,6 +454,28 @@ configuration, not by the monitor.
 - A failing monitor is logged and does not stop other monitors or its next run, and the
   monitor does not run at startup.
 
+## Ideas considered, not planned
+
+Handling events of other families than notifications, such as `data.`, is not specified.
+These were explored and are recorded so the thinking is not lost; none is planned.
+
+- **One worker per prefix, plus a fallback worker.** Several events workers, each with
+  its own type prefix and handler source, and one with an empty prefix that handles what
+  no other worker claims and warns about types nothing handles. Ownership is derived
+  from the type, so no claim is stored. Prefixes must not overlap, so each worker
+  excludes the prefixes of the workers under its own, computed in main, and the
+  fallback excludes all of them. Failures stay isolated per family, and exactly one
+  worker would prune. It is a little more machinery than the alternative below.
+- **Prefixes declared by handler sources or by handlers.** Rejected. Per-handler
+  prefixes overlap and make the fully-handled decision ambiguous; per-source prefixes
+  work but add a router for little gain over the option above.
+- **A claim column on the event.** Only needed if ownership depends on more than the
+  type, such as the payload; the type decides it today.
+- **Likely direction instead: drop the prefix and map each event type to one owner
+  handler.** A type resolves to exactly one handler family, with the notification
+  family fanning out to its channels. Simpler than prefix routing, and it keeps
+  exclusive ownership.
+
 ## Open questions
 
 - Which equity and valuation monitors to notify on, in the follow-up specs.
