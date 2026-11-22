@@ -19,13 +19,17 @@ Build the monitor.
 
 ## SnapshotIncomplete.Name() string
 
-Return domain.Events.SnapshotIncomplete.
+Return domain.Events.SnapshotIncomplete without domain.NotificationPrefix, snapshot.incomplete, the key of its entry in the monitors configuration.
 
 ## SnapshotIncomplete.At() ClockTime
 
 Return snapshotIncompleteAt.
 
-## SnapshotIncomplete.Run(ctx Context) error
+## SnapshotIncomplete.ValidateParams(params Params) error
+
+Return an error naming the first setting, in name order, when params is not empty; the monitor takes no settings.
+
+## SnapshotIncomplete.Run(ctx Context, params Params) error
 
 1. Read the status through store.GetStatus.
 2. if no price date exists, or the latest price date has a completed snapshot, log at info level and return nil.
@@ -41,4 +45,4 @@ Return snapshotIncompleteAt.
 
 - **3.** if recording fails, return the wrapped error.
 
-It uses the same definition of an unresolved date as the status view, whether the evening run, the 6 AM run, an agent refresh or rebuild, or no run at all left it. One event per date: repeating the run, or a later run seeing the same date, records nothing, until the operator removes the event. The payload is the date only; the message wording is the renderer's.
+It runs only when the monitors configuration has an enabled entry for it, see run. It uses the same definition of an unresolved date as the status view, whether the evening run, the 6 AM run, an agent refresh or rebuild, or no run at all left it. One event per date: repeating the run, or a later run seeing the same date, records nothing, until the operator removes the event. The payload is the date only; the message wording is the renderer's.

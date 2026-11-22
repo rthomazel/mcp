@@ -60,7 +60,7 @@ Money and quantities are PostgreSQL NUMERIC. Go carries them as decimal strings 
 Layout:
 - internal/domain holds business types, validation, errors and the store interfaces: the GenericStore plus the narrower CashStore, PriceStore, SnapshotStore, UpdateStore and EventStore. It imports no other project package and every other package may import it.
 - internal/storage/postgres implements the store interfaces, one small type per narrow store over a shared Store core; each method is its own unit of work.
-- internal/config reads configuration; cmd/investments wires it together.
+- internal/config reads configuration; internal/config/fileloader loads a versioned YAML file with live reload and last valid fallback, used by the separate notifications and monitors configurations; cmd/investments wires it together.
 - Handlers, workers and later layers depend on the domain store interfaces, and take only the stores they use, never the Postgres implementation.
 The store interfaces are mocked with mockery; generate mocks before running tests.
 Configuration, SQL migrations, Dockerfile, run script and `bin/` scripts are not modelled; migrations are reviewed as SQL, with rationale in comments.

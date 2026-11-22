@@ -7,18 +7,19 @@
 3. StalePriceDays int
 4. TiingoAPIKey string, the market data credential, a server-side secret
 5. NotificationsConfigFile string, the path of the notifications configuration YAML file, empty meaning no file
-6. TelegramBotToken string, the Telegram bot credential, a server-side secret, empty meaning Telegram is unconfigured
-7. MarketTimezone string, the IANA zone of the market day, shared by the price refresh job, the monitors and today's date
-8. MaxHistoryPoints int, the most points one value history query returns; a longer series is rejected with a hint to use a larger window or a narrower range, never silently truncated
-9. EventMaxFailures int, the failed attempts after which an event is given up on
-10. EventBackoffBase Duration, the delay after the first failure; each further failure doubles it
-11. EventMaxAge Duration, how long after it was recorded an event is still considered for handling
-12. EventRetention Duration, how long after it was fully handled an event is kept
-13. WorkerPollInterval Duration, how often the events worker looks for due events
-14. WorkerPruneInterval Duration, how often it prunes handled events
-15. WorkerBatchLimit int, the events taken per pass
-16. WorkerHandlerTimeout Duration, the deadline for one handler call
-17. MonitorTimeout Duration, the deadline for one monitor run
+6. MonitorsConfigFile string, the path of the monitors configuration YAML file, empty meaning no file, so no monitor runs
+7. TelegramBotToken string, the Telegram bot credential, a server-side secret, empty meaning Telegram is unconfigured
+8. MarketTimezone string, the IANA zone of the market day, shared by the price refresh job, the monitors and today's date
+9. MaxHistoryPoints int, the most points one value history query returns; a longer series is rejected with a hint to use a larger window or a narrower range, never silently truncated
+10. EventMaxFailures int, the failed attempts after which an event is given up on
+11. EventBackoffBase Duration, the delay after the first failure; each further failure doubles it
+12. EventMaxAge Duration, how long after it was recorded an event is still considered for handling
+13. EventRetention Duration, how long after it was fully handled an event is kept
+14. WorkerPollInterval Duration, how often the events worker looks for due events
+15. WorkerPruneInterval Duration, how often it prunes handled events
+16. WorkerBatchLimit int, the events taken per pass
+17. WorkerHandlerTimeout Duration, the deadline for one handler call
+18. MonitorTimeout Duration, the deadline for one monitor run
 
 Every tunable has a default, so only the DSN and the API key are required. The defaults live here and nowhere else; the packages that use a value take it as a parameter and hold no default.
 
@@ -42,7 +43,7 @@ Tests use it to get the same values the server runs with.
 
 1. Start from Defaults.
 2. Read INVESTMENTS_MCP_DSN and INVESTMENTS_MCP_TIINGO_API_KEY.
-3. Read INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE and INVESTMENTS_MCP_TELEGRAM_BOT_TOKEN, optional.
+3. Read INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE, INVESTMENTS_MCP_MONITORS_CONFIG_FILE and INVESTMENTS_MCP_TELEGRAM_BOT_TOKEN, optional.
 4. Read INVESTMENTS_MCP_MARKET_TIMEZONE, optional.
 5. Read each duration variable, optional, overriding its default: INVESTMENTS_MCP_QUERY_TIMEOUT, _EVENT_BACKOFF_BASE, _EVENT_MAX_AGE, _EVENT_RETENTION, _WORKER_POLL_INTERVAL, _WORKER_PRUNE_INTERVAL, _WORKER_HANDLER_TIMEOUT and _MONITOR_TIMEOUT.
 6. Read each integer variable, optional, overriding its default: INVESTMENTS_MCP_STALE_PRICE_DAYS, _MAX_HISTORY_POINTS, _EVENT_MAX_FAILURES and _WORKER_BATCH_LIMIT.

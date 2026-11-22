@@ -4,7 +4,7 @@ type: spec
 summary: Generic event outbox with a retrying in-process worker and scheduled monitors, delivering to the operator over Telegram, starting with a monitor for a missing daily snapshot.
 author: Thom
 created: 2026-11-21
-updated: 2026-11-21
+updated: 2026-11-22
 agents: claude
 ---
 
@@ -348,6 +348,10 @@ the server was down at its time, the next scheduled time judges the state then.
 - A monitor that fails is logged at error level and does not stop other monitors or the
   next scheduled time.
 - Monitors hold no state of their own beyond the outbox.
+- A monitor runs only when the monitors configuration enables it, a file separate from the
+  notifications file, so what is watched and where it is announced never depend on each
+  other. A monitor with no entry does not run and logs a warning. See
+  spc/monitors/configuration.spec.md.
 
 Monitors exist because an event should follow observed state, not which run happened
 to execute. A monitor also catches what a producer cannot, such as a price refresh job that never
@@ -409,6 +413,8 @@ configuration, not by the monitor.
   snapshot-incomplete event, so it does not depend on there being two
   price refresh runs and also covers a run that never happened.
 - A monitor announces each subject at most once.
+- Which monitors run, and their settings, are in a second YAML file read the same way,
+  not in the notifications file; the two share only the code that loads a file.
 
 ## Acceptance criteria
 
@@ -499,4 +505,5 @@ These were explored and are recorded so the thinking is not lost; none is planne
 - Related: 2026-11-15-status, which lists given-up and expired events.
 - Related: 2026-09-17-core-event-bus, the walk-in service's outbox this follows.
 - Related: 2026-11-21-monitor-snapshot-incomplete, the first monitor.
+- Related: 2026-11-22-monitors-configuration, which monitors run and their settings.
 - Related: 2026-11-13-investments-mcp-plan, the daily schedule the first monitor follows.

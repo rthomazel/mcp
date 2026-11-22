@@ -14,7 +14,7 @@ defaultCategory = "default", the name of the one category of a channel written w
 2. Channels map[string]ChannelConfig, by implementation
 3. Notifications map[string]Notification, by event type
 
-The complete notifications configuration, parsed from one YAML file. The handler takes it whole; no event type, producer or monitor refers to anything in it.
+The complete notifications configuration, parsed from one YAML file by the file loader. The handler takes it whole; no event type, producer or monitor refers to anything in it.
 
 ## ChannelConfig
 
@@ -29,37 +29,11 @@ Written either as a categories map or as the settings of one category given inli
 
 The file holds no credentials, so it can be versioned and reviewed. Credentials are server configuration, read from environment variables into config.Config.
 
-## Loader
-
-1. path string
-2. lastGood *Config
-3. mu Mutex
-
-Reads the file and remembers the last valid result.
-
 # Functions
 
-## NewLoader(path string) *Loader
+## NewConfigLoader(path string) *fileloader.Loader[Config]
 
-Build a Loader for path. An empty path means notifications are unconfigured.
-
-## Loader.Current() (Config, error)
-
-1. if the path is empty or no file exists there, forget the last valid configuration and return an empty Config.
-2. Read the file and parse it as YAML.
-3. Validate the parsed Config.
-4. Remember it as the last valid configuration and return it.
-
-#### Errors
-
-- **2.** if reading or parsing fails, return failed with the wrapped error.
-
----
-
-- **3.** if validation fails, return failed with the error.
-
-Failed means: log at error level, naming the path and the reason, on every call, so an invalid file is reported on every worker pass, not once. If a valid configuration was remembered, return it with a nil error so delivery carries on; otherwise return the error, and the worker fails the due events instead of treating them as delivered.
-The file is read on every call. Passes are thirty seconds apart and the file is small, so caching by checksum would add a stale case for no saving. A later source, such as a database behind a dashboard, replaces the Loader and supplies the same Config.
+Build the loader of the notifications file: fileloader.New with path and Config.Validate. An empty path means notifications are unconfigured. Reading, the last valid configuration and failure logging are the file loader's; a missing file or an unset path gives an empty Config, which has no notification entries.
 
 ## Config.Validate() error
 
