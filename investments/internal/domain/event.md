@@ -73,9 +73,11 @@ Payload of Events.SnapshotIncomplete. The subject of the event is the date, form
 2. CrossedOn Date, the first date of the stay at or below the level
 3. Date Date, the latest series date when it was recorded
 4. DrawdownPercent Decimal, the drawdown on Date, zero or negative
-5. HighDate Date, the date of the all-time high
+5. ValueUSD Decimal, the securities value on Date
+6. HighDate Date, the date of the all-time high
+7. HighValueUSD Decimal, the securities value on HighDate
 
-Payload of Events.PortfolioDrawdown. The subject of the event is the level, an at sign and the crossing date, for example -6@2026-11-10. It carries no balances. The level is formatted without trailing zeros, so a level keeps its subject when the increment changes to another divisor of it.
+Payload of Events.PortfolioDrawdown. The subject of the event is the level, an at sign and the crossing date, for example -6@2026-11-10. The level is formatted without trailing zeros, so a level keeps its subject when the increment changes to another divisor of it.
 
 ## NotificationFailedData
 

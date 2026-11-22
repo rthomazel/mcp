@@ -47,13 +47,13 @@ Only symbols, dates and counts reach the message. The no-run wording covers a pr
 ## PortfolioDrawdownRenderer.Render(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as PortfolioDrawdownData.
-2. Return a message naming the level crossed, the current drawdown and its date, the date of the high and the crossing date, and saying that this is a change in value, not investment return, so sales and withdrawals lower it too.
+2. Return a message naming the level crossed, the current drawdown and its date, the date of the high with its securities value, the current securities value and the crossing date, and saying that this is a change in value, not investment return, so sales and withdrawals lower it too.
 
 #### Errors
 
 - **1.** if decoding fails, return the wrapped error.
 
-The message is built from the payload alone and carries percentages and dates only, no balances.
+The message is built from the payload alone.
 
 ## NotificationFailedRenderer.Render(ctx Context, event domain.Event) (string, error)
 

@@ -77,8 +77,8 @@ without a market move. The message says so. A measure that excludes money moved 
 is a separate, later feature.
 
 The message names the level crossed, the current drawdown and its date, the date of the high
-and the crossing date, with percentages and dates only and no balances. The wording is the
-renderer's.
+and the crossing date, and gives the securities value at the high and the current securities
+value. The wording is the renderer's.
 
 ### Configuration
 
@@ -116,7 +116,8 @@ entry the monitor does not run.
 - The series and the all-time high are the value history's, so a drawdown notification and
   an agent answer never disagree.
 - Value drawdown first, with the flow-adjusted measure left for a separate feature.
-- Percentages and dates only in the message.
+- The message carries the peak and current securities values, so the percentage can be read
+  against the amounts; it is the operator's own portfolio channel.
 
 ## Acceptance criteria
 
@@ -132,7 +133,8 @@ entry the monitor does not run.
 - A missing or non-positive increment makes the monitors file invalid.
 - The drawdown the monitor reads equals the distance from the all-time high that the value
   history reports for the latest date.
-- The message names the level, the drawdown and the dates and contains no balances.
+- The message names the level, the drawdown and the dates, and gives the peak and the
+  current securities value.
 
 ## Refs
 

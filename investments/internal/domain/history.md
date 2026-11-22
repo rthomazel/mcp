@@ -59,9 +59,11 @@ The day after the most recent date whose drawdown was shallower than the level. 
 ## DrawdownState
 
 1. Date Date, the latest date of the series
-2. DrawdownPercent Decimal, the latest value as a percent of the all-time high minus one hundred, zero or negative
-3. HighDate Date, the all-time high through Date, the earliest date winning a tie
-4. Levels []DrawdownLevel, every level the drawdown is at or below, shallowest first, capped by the store
+2. ValueUSD Decimal, the securities value on Date
+3. DrawdownPercent Decimal, the latest value as a percent of the all-time high minus one hundred, zero or negative
+4. HighDate Date, the all-time high through Date, the earliest date winning a tie
+5. HighValueUSD Decimal, the securities value on HighDate
+6. Levels []DrawdownLevel, every level the drawdown is at or below, shallowest first, capped by the store
 
 The securities value drawdown over the same daily series and the same all-time high as SeriesSummary, so FromHighPercent of the latest date and DrawdownPercent agree. No levels means the drawdown is shallower than the first.
 
