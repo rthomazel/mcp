@@ -68,9 +68,10 @@ type Store interface {
 	// subject, an existing event of the same type and subject makes it a no-op
 	// reporting created false. Returns ErrInvalidInput.
 	RecordEvent(ctx context.Context, draft DraftEvent) (created bool, err error)
-	// ListDueEvents returns up to limit events Event.Eligible accepts now,
-	// oldest first. Returns ErrInvalidInput for a non-positive limit.
-	ListDueEvents(ctx context.Context, limit int) ([]Event, error)
+	// ListDueEvents returns up to limit events Event.Eligible accepts now whose
+	// type starts with typePrefix (empty for any), oldest first. Returns
+	// ErrInvalidInput for a non-positive limit.
+	ListDueEvents(ctx context.Context, typePrefix string, limit int) ([]Event, error)
 	// SaveEventOutcome applies one handling pass in one transaction: merges
 	// succeeded handler names, marks handled, or counts a failure with backoff
 	// and gives up at MaxEventFailures (error log, notification.failed event).

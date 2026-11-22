@@ -15,12 +15,15 @@ type fakeStore struct {
 	domain.Store
 
 	due      []domain.Event
+	prefix   string
 	listErr  error
 	outcomes map[int64]domain.EventOutcome
 	pruned   int
 }
 
-func (s *fakeStore) ListDueEvents(context.Context, int) ([]domain.Event, error) {
+func (s *fakeStore) ListDueEvents(_ context.Context, prefix string, _ int) ([]domain.Event, error) {
+	s.prefix = prefix
+
 	return s.due, s.listErr
 }
 
@@ -59,8 +62,8 @@ type fakeSource struct {
 	err      error
 }
 
-func (s fakeSource) Handlers(context.Context) (map[string][]domain.EventHandler, error) {
-	return s.handlers, s.err
+func (s fakeSource) Handlers(context.Context) (Handlers, error) {
+	return func(eventType string) []domain.EventHandler { return s.handlers[eventType] }, s.err
 }
 
 func TestRunOnceHandlesEveryHandler(t *testing.T) {
@@ -70,6 +73,7 @@ func TestRunOnceHandlesEveryHandler(t *testing.T) {
 	NewNotifications(store, fakeSource{handlers: map[string][]domain.EventHandler{"x": {a, b}}}).RunOnce(context.Background())
 
 	assert.Equal(t, domain.EventOutcome{Succeeded: []string{"a", "b"}, Handled: true}, store.outcomes[1])
+	assert.Equal(t, "notification.", store.prefix, "only notification events are taken")
 }
 
 func TestRunOnceRetriesOnlyTheFailedHandler(t *testing.T) {

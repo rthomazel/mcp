@@ -35,20 +35,19 @@ Stands in for an event type with no notification.
 
 Build a Source with the renderers from NewRenderers.
 
-## Source.Handlers(ctx Context) (map[string][]domain.EventHandler, error)
+## Source.Handlers(ctx Context) (worker.Handlers, error)
 
 1. Read the configuration from the loader.
 2. Build each configured channel with newChannel, by its key.
-3. For each event type of domain.NotifyingEvents, find its notification.
-4. Build one channelHandler for each channel of the notification, in channel name order, for the category it names, or the channel's only category when it names none, with the renderer for the notification's format.
-5. if there is no notification, use a single noChannelHandler.
-6. Return the handlers by event type.
+3. Return a function that, for an event type, finds its notification in the configuration and returns nothing when the type does not start with domain.NotificationPrefix.
+4. For a type with a notification, build one channelHandler for each channel of the notification, in channel name order, for the category it names, or the channel's only category when it names none, with the renderer for the notification's format.
+5. For a type without a notification, return a single noChannelHandler.
 
 #### Errors
 
 - **1.** if the loader fails, return the error.
 
-Every notifying type has a handler list, so a type without a notification is handled and delivered with a warning, never an error. Channels are rebuilt on every call, which is cheap; the configuration may have changed.
+Every type with the notification prefix has handlers, so a type without a notification is handled and delivered with a warning, never an error. Channels are rebuilt on every call, which is cheap; the configuration may have changed.
 
 ## newChannel(name string, cfg ChannelConfig, telegramToken string) Channel
 

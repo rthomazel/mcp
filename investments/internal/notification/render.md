@@ -20,7 +20,7 @@ No fields.
 
 ## NewRenderers(store domain.Store) map[string]map[string]Renderer
 
-Return the renderer for each event type of domain.NotifyingEvents under defaultFormat.
+Return the renderer for domain.Events.SnapshotIncomplete and domain.Events.NotificationFailed under defaultFormat.
 
 ## SnapshotIncompleteRenderer.Render(ctx Context, event domain.Event) (string, error)
 

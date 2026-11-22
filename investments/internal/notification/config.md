@@ -66,7 +66,7 @@ The file is read on every call. Passes are thirty seconds apart and the file is 
 1. if Version is not supportedVersion, return an error naming the version.
 2. if a channel key is not a known implementation, or has an empty categories map, or a blank category name, return an error naming it.
 3. if a Telegram category has no chat_id, return an error naming the category.
-4. if a notification names an event type that is not in domain.NotifyingEvents, has a format other than defaultFormat, or has no channels, return an error naming it.
+4. if a notification names an event type that does not start with domain.NotificationPrefix, has a format other than defaultFormat, or has no channels, return an error naming it.
 5. if a notification names a channel that is not declared, or a category the channel does not have, or omits the category of a channel with more than one, return an error naming the notification and channel.
 6. Return nil.
 

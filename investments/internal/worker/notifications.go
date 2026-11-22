@@ -21,8 +21,12 @@ const (
 // HandlerSource provides the handlers registered for each event type, read
 // fresh on every pass so configuration changes apply without a restart.
 type HandlerSource interface {
-	Handlers(ctx context.Context) (map[string][]domain.EventHandler, error)
+	Handlers(ctx context.Context) (Handlers, error)
 }
+
+// Handlers returns the handlers registered for an event type; none means no
+// handler is registered.
+type Handlers func(eventType string) []domain.EventHandler
 
 // Notifications drains the outbox. Every retry fact lives on the event.
 type Notifications struct {
@@ -67,7 +71,7 @@ func (w *Notifications) RunOnce(ctx context.Context) {
 		slog.ErrorContext(ctx, "reading event handlers", "err", handlersErr)
 	}
 
-	events, err := w.store.ListDueEvents(ctx, batchLimit)
+	events, err := w.store.ListDueEvents(ctx, domain.NotificationPrefix, batchLimit)
 	if err != nil {
 		slog.ErrorContext(ctx, "listing due events", "err", err)
 
@@ -79,14 +83,14 @@ func (w *Notifications) RunOnce(ctx context.Context) {
 	}
 }
 
-func (w *Notifications) handleEvent(ctx context.Context, event domain.Event, handlers map[string][]domain.EventHandler, handlersErr error) {
+func (w *Notifications) handleEvent(ctx context.Context, event domain.Event, handlers Handlers, handlersErr error) {
 	if handlersErr != nil {
 		w.save(ctx, event, domain.EventOutcome{Failed: true})
 
 		return
 	}
 
-	registered := handlers[event.Type]
+	registered := handlers(event.Type)
 	if len(registered) == 0 {
 		slog.ErrorContext(ctx, "no handler registered for event type", "id", event.ID, "type", event.Type)
 		w.save(ctx, event, domain.EventOutcome{Failed: true})

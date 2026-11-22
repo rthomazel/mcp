@@ -39,8 +39,11 @@ earliest time it may be tried again, which handlers already succeeded, when it w
 fully handled, and when delivery was given up on, if it was.
 
 **Event type.** A string of words separated by dots, naming what happened, for
-example snapshot.incomplete. Types are named in one central place in the domain,
-not as scattered literals.
+example notification.snapshot.incomplete. Types are named in one central place in the domain,
+not as scattered literals. An event that produces a notification has a type starting with
+`notification.`; the notifications worker handles only those, and other types are left
+for workers with other side effects, which follow the same pattern of handlers, retries
+and backoff.
 
 **Outbox.** The table of events. It is both the queue that handling works from and
 a durable history of what was recorded.
@@ -96,8 +99,9 @@ for handling. Nothing is recorded on a read.
 
 ### Handling
 
-A worker runs inside the server process, like the daily job. It checks the outbox
-twice per minute, and once immediately on startup. For each event that is not fully
+The notifications worker runs inside the server process, like the daily job. It checks
+the outbox twice per minute, and once immediately on startup, looking only at events
+whose type starts with `notification.`. For each such event that is not fully
 handled, has not been given up on, was recorded within the last week, and whose backoff
 has passed, it runs every handler
 registered for the event's type that has not yet succeeded for it.
@@ -256,7 +260,7 @@ channels:
   stub: {}                   # no categories key: the channel has one implicit category, default
 
 notifications:
-  snapshot.incomplete:
+  notification.snapshot.incomplete:
     format: plain            # required, plain is the only format
     channels:
       telegram: portfolio
@@ -275,7 +279,7 @@ notifications:
   two is invalid. Category names are free-form, non-blank and unique within the channel.
 - Each implementation validates its own settings. Telegram needs a non-empty `chat_id` for
   each category; the stub needs none.
-- Each key under `notifications` is an event type that notifies. An unknown type is invalid.
+- Each key under `notifications` is an event type starting with `notification.`; any other type is invalid.
 - Each notification has a `format`, which must be `plain`, and a non-empty `channels`
   map from a declared channel to one of its categories, so an event reaches at most one
   category of a channel. The category may be omitted only when the channel has exactly

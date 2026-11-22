@@ -23,7 +23,7 @@
 19. GetStatus(ctx Context) (Status, error)
 20. GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
 21. RecordEvent(ctx Context, draft DraftEvent) (created bool, err error)
-22. ListDueEvents(ctx Context, limit int) ([]Event, error)
+22. ListDueEvents(ctx Context, typePrefix string, limit int) ([]Event, error)
 23. SaveEventOutcome(ctx Context, id int64, outcome EventOutcome) error
 24. RemoveEvent(ctx Context, id int64) error
 25. PruneEvents(ctx Context) (int, error)
@@ -115,9 +115,9 @@ Returns the securities value, and cash and account equity where cash snapshots e
 
 Validates draft and inserts it into the outbox. When the draft has a subject and an event of the same type and subject already exists, does nothing and reports created false, so a monitor announces each subject once; a removed event no longer counts. Returns ErrInvalidInput for an invalid draft.
 
-### ListDueEvents(ctx Context, limit int) ([]Event, error)
+### ListDueEvents(ctx Context, typePrefix string, limit int) ([]Event, error)
 
-Returns up to limit events that Event.Eligible accepts at the store's current time, oldest first by recorded time then id: not fully handled, not given up on, not yet expired, and past their backoff. Expired and given-up events are never returned. Returns ErrInvalidInput for a non-positive limit.
+Returns up to limit events whose type starts with typePrefix, empty for any, that Event.Eligible accepts at the store's current time, oldest first by recorded time then id: not fully handled, not given up on, not yet expired, and past their backoff. Expired and given-up events are never returned. Events of other types are not read, so one kind of worker never sees or fails another kind's events. Returns ErrInvalidInput for a non-positive limit.
 
 ### SaveEventOutcome(ctx Context, id int64, outcome EventOutcome) error
 

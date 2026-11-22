@@ -1,7 +1,7 @@
 # Constants
 
 insertEventSQL = insert an events row from type, subject and data, with expired_at set to now plus EventMaxAge, ON CONFLICT (type, subject) WHERE subject IS NOT NULL DO NOTHING, returning the id; no row comes back when the conflict was hit.
-dueEventsSQL = select the full events rows that are not processed, not given up on, whose expired_at is after now, and whose backoff_until is null or not after now, ordered by created_at then id, limited. It mirrors domain.Event.Eligible.
+dueEventsSQL = select the full events rows that are not processed, not given up on, whose expired_at is after now, whose backoff_until is null or not after now, and whose type starts with the prefix (starts_with, so underscores in types are not wildcards), ordered by created_at then id, limited. It mirrors domain.Event.Eligible.
 lockEventSQL = select the full row of one event by id FOR UPDATE.
 saveEventSQL = update one event: set handled_by to its names plus the new ones without duplicates, processed_at when handled, failures, backoff_until and given_up_at as the caller computed.
 removeEventSQL = delete one event by id when processed_at is null and either given_up_at is set or expired_at is not after now, returning the id.
@@ -32,10 +32,10 @@ expiredEventsSQL = select the full rows with processed_at null and expired_at no
 
 The one way an event is written. A change that must record an event in its own unit of work calls it with its transaction, so the event exists if and only if the change committed; RecordEvent and the give-up path in SaveEventOutcome are the callers today.
 
-## Store.ListDueEvents(ctx Context, limit int) ([]domain.Event, error)
+## Store.ListDueEvents(ctx Context, typePrefix string, limit int) ([]domain.Event, error)
 
 1. Return domain.ErrInvalidInput when limit is not positive.
-2. Select through dueEventsSQL with the store's clock as now.
+2. Select through dueEventsSQL with the store's clock as now and typePrefix.
 3. Convert each row, with a null backoff, processed or given-up time as nil.
 
 #### Errors

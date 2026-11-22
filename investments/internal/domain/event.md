@@ -9,14 +9,14 @@ EventRetention = 1 year, how long after it was fully handled an event is kept.
 
 ## Events
 
-1. Events.SnapshotIncomplete = "snapshot.incomplete"
+1. Events.SnapshotIncomplete = "notification.snapshot.incomplete"
 2. Events.NotificationFailed = "notification.failed"
 
 Event types are dot-separated words, named here and nowhere else.
 
-## NotifyingEvents = Events.SnapshotIncomplete, Events.NotificationFailed
+## NotificationPrefix = "notification."
 
-The types that notify, in a stable order. Every one of them has a notification handler; the notifications configuration routes them.
+Starts the type of every event that produces a notification. The convention replaces a list of notifying types: the notifications worker selects events by it, and the notifications file may configure only types that have it. Events of other types belong to other workers.
 
 # Types
 
@@ -77,6 +77,10 @@ Payload of Events.NotificationFailed. It never carries the failed event's own pa
 One side effect attached to one event type. Name is persisted in Event.HandledBy, so it is stable: never reused for different behavior, and not removed while events that name it may be in flight. A handler may run more than once for an event, since delivery is at least once.
 
 # Functions
+
+## IsNotification(eventType string) bool
+
+Report whether eventType starts with NotificationPrefix.
 
 ## ValidEventType(eventType string) bool
 

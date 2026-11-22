@@ -45,6 +45,13 @@ func TestDraftEventValidate(t *testing.T) {
 	}
 }
 
+func TestIsNotification(t *testing.T) {
+	assert.True(t, IsNotification(Events.SnapshotIncomplete))
+	assert.True(t, IsNotification(Events.NotificationFailed))
+	assert.False(t, IsNotification("price.moved"))
+	assert.False(t, IsNotification("notifications.x"))
+}
+
 func TestEventOutcomeValidate(t *testing.T) {
 	assert.NoError(t, EventOutcome{Handled: true}.Validate())
 	assert.ErrorIs(t, EventOutcome{Handled: true, Failed: true}.Validate(), ErrInvalidInput)

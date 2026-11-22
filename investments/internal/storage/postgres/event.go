@@ -29,8 +29,9 @@ SELECT ` + eventColumns + ` FROM events
 WHERE processed_at IS NULL AND given_up_at IS NULL
   AND expired_at > $1
   AND (backoff_until IS NULL OR backoff_until <= $1)
+  AND starts_with(type, $2)
 ORDER BY created_at, id
-LIMIT $2`
+LIMIT $3`
 
 	lockEventSQL = `SELECT ` + eventColumns + ` FROM events WHERE id = $1 FOR UPDATE`
 
@@ -105,13 +106,13 @@ func (s *Store) insertEvent(ctx context.Context, tx *sqlx.Tx, draft domain.Draft
 	return true, nil
 }
 
-// ListDueEvents returns up to limit events that are due for a handling pass.
-func (s *Store) ListDueEvents(ctx context.Context, limit int) ([]domain.Event, error) {
+// ListDueEvents returns up to limit events due for a handling pass whose type starts with typePrefix.
+func (s *Store) ListDueEvents(ctx context.Context, typePrefix string, limit int) ([]domain.Event, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("%w: limit must be positive", domain.ErrInvalidInput)
 	}
 
-	return s.queryEvents(ctx, s.db, dueEventsSQL, s.clock(), limit)
+	return s.queryEvents(ctx, s.db, dueEventsSQL, s.clock(), typePrefix, limit)
 }
 
 // SaveEventOutcome applies the outcome of one handling pass in one transaction.

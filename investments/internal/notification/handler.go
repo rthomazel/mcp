@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
+	"github.com/rthomazel/mcp/investments/internal/worker"
 )
 
 const (
@@ -42,7 +43,7 @@ type noChannelHandler struct {
 
 // Handlers returns the handlers of each notifying event type. A type without
 // channels is handled with a warning, never an error.
-func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, error) {
+func (s *Source) Handlers(_ context.Context) (worker.Handlers, error) {
 	cfg, err := s.loader.Current()
 	if err != nil {
 		return nil, err
@@ -53,32 +54,35 @@ func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, 
 		channels[name] = newChannel(name, channel, s.telegramToken)
 	}
 
-	handlers := make(map[string][]domain.EventHandler, len(domain.NotifyingEvents))
+	return func(eventType string) []domain.EventHandler {
+		if !domain.IsNotification(eventType) {
+			return nil
+		}
 
-	for _, eventType := range domain.NotifyingEvents {
 		notification, ok := cfg.Notifications[eventType]
 		if !ok {
-			handlers[eventType] = []domain.EventHandler{&noChannelHandler{eventType: eventType}}
-
-			continue
+			return []domain.EventHandler{&noChannelHandler{eventType: eventType}}
 		}
+
+		handlers := make([]domain.EventHandler, 0, len(notification.Channels))
 
 		for _, channelName := range slices.Sorted(maps.Keys(notification.Channels)) {
 			category, err := cfg.resolveCategory(eventType, channelName, notification.Channels[channelName])
 			if err != nil {
-				return nil, err
+				// Validate already rejected this; a handler that always fails keeps it loud.
+				return []domain.EventHandler{failingHandler{err: err}}
 			}
 
-			handlers[eventType] = append(handlers[eventType], &channelHandler{
+			handlers = append(handlers, &channelHandler{
 				name:     channelHandlerName(channelName, category),
 				renderer: s.renderers[eventType][notification.Format],
 				channel:  channels[channelName],
 				category: category,
 			})
 		}
-	}
 
-	return handlers, nil
+		return handlers
+	}, nil
 }
 
 func newChannel(name string, cfg ChannelConfig, telegramToken string) Channel {
@@ -116,3 +120,10 @@ func (h *noChannelHandler) Handle(ctx context.Context, _ domain.Event) error {
 
 	return nil
 }
+
+// failingHandler reports a configuration that passed validation yet cannot be resolved.
+type failingHandler struct{ err error }
+
+func (h failingHandler) Name() string { return handlerNamePrefix + ".invalid" }
+
+func (h failingHandler) Handle(context.Context, domain.Event) error { return h.err }

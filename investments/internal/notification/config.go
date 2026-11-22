@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 
@@ -141,7 +140,7 @@ func (c Config) Validate() error {
 	}
 
 	for eventType, notification := range c.Notifications {
-		if !slices.Contains(domain.NotifyingEvents, eventType) {
+		if !domain.IsNotification(eventType) {
 			return fmt.Errorf("notification for unknown event type %q", eventType)
 		}
 

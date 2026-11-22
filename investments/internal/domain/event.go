@@ -28,12 +28,19 @@ type EventTypes struct {
 
 // Events holds the event type names, dot-separated lowercase words.
 var Events = EventTypes{
-	SnapshotIncomplete: "snapshot.incomplete",
+	SnapshotIncomplete: "notification.snapshot.incomplete",
 	NotificationFailed: "notification.failed",
 }
 
-// NotifyingEvents are the types that notify, in a stable order.
-var NotifyingEvents = []string{Events.SnapshotIncomplete, Events.NotificationFailed}
+// NotificationPrefix starts the type of every event that produces a notification.
+// The convention replaces a list: the notifications worker selects by it, and the
+// notifications file may configure only types that have it.
+const NotificationPrefix = "notification."
+
+// IsNotification reports whether the event type produces a notification.
+func IsNotification(eventType string) bool {
+	return strings.HasPrefix(eventType, NotificationPrefix)
+}
 
 var eventTypePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$`)
 

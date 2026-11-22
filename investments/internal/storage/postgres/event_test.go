@@ -57,36 +57,36 @@ func TestListDueEventsRespectsEligibility(t *testing.T) {
 	recordDraft(t, store, "a.one", nil)
 	recordDraft(t, store, "a.two", nil)
 
-	due, err := store.ListDueEvents(ctx, 10)
+	due, err := store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	require.Len(t, due, 2)
 	assert.Equal(t, "a.one", due[0].Type)
 	assert.Equal(t, now.Add(domain.EventMaxAge), due[0].ExpiredAt.UTC())
 	assert.Empty(t, due[0].HandledBy)
 
-	_, err = store.ListDueEvents(ctx, 0)
+	_, err = store.ListDueEvents(ctx, "", 0)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 
-	limited, err := store.ListDueEvents(ctx, 1)
+	limited, err := store.ListDueEvents(ctx, "", 1)
 	require.NoError(t, err)
 	assert.Len(t, limited, 1)
 
 	// A failure postpones the event until its backoff passes.
 	require.NoError(t, store.SaveEventOutcome(ctx, due[0].ID, domain.EventOutcome{Failed: true}))
 
-	due, err = store.ListDueEvents(ctx, 10)
+	due, err = store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	require.Len(t, due, 1)
 	assert.Equal(t, "a.two", due[0].Type)
 
 	now = now.Add(domain.EventBackoff(1))
-	due, err = store.ListDueEvents(ctx, 10)
+	due, err = store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	assert.Len(t, due, 2)
 
 	// Past ExpiredAt nothing is due.
 	now = now.Add(domain.EventMaxAge)
-	due, err = store.ListDueEvents(ctx, 10)
+	due, err = store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	assert.Empty(t, due)
 }
@@ -96,7 +96,7 @@ func TestSaveEventOutcomeMergesHandlersAndMarksHandled(t *testing.T) {
 	ctx := context.Background()
 	recordDraft(t, store, "a.b", nil)
 
-	due, err := store.ListDueEvents(ctx, 1)
+	due, err := store.ListDueEvents(ctx, "", 1)
 	require.NoError(t, err)
 
 	id := due[0].ID
@@ -123,7 +123,7 @@ func TestGivingUpAnnouncesOnceAndNeverCascades(t *testing.T) {
 	recordDraft(t, store, domain.Events.SnapshotIncomplete, nil)
 
 	for range domain.MaxEventFailures {
-		due, err := store.ListDueEvents(ctx, 10)
+		due, err := store.ListDueEvents(ctx, "", 10)
 		require.NoError(t, err)
 		require.NotEmpty(t, due)
 
@@ -142,7 +142,7 @@ func TestGivingUpAnnouncesOnceAndNeverCascades(t *testing.T) {
 	assert.Equal(t, domain.MaxEventFailures, status.GivenUpEvents[0].Failures)
 	assert.False(t, status.Healthy)
 
-	due, err := store.ListDueEvents(ctx, 10)
+	due, err := store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	require.Len(t, due, 1)
 	assert.Equal(t, domain.Events.NotificationFailed, due[0].Type)
@@ -172,7 +172,7 @@ func TestRemoveEvent(t *testing.T) {
 	recordDraft(t, store, "a.handled", nil)
 	recordDraft(t, store, "a.failing", nil)
 
-	due, err := store.ListDueEvents(ctx, 10)
+	due, err := store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	require.Len(t, due, 3)
 
@@ -208,7 +208,7 @@ func TestPruneEventsKeepsUnhandledAndRecentEvents(t *testing.T) {
 	recordDraft(t, store, "a.old", nil)
 	recordDraft(t, store, "a.pending", nil)
 
-	due, err := store.ListDueEvents(ctx, 10)
+	due, err := store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	require.NoError(t, store.SaveEventOutcome(ctx, due[0].ID, domain.EventOutcome{Handled: true}))
 
@@ -225,4 +225,22 @@ func TestPruneEventsKeepsUnhandledAndRecentEvents(t *testing.T) {
 	status, err := store.GetStatus(ctx)
 	require.NoError(t, err)
 	assert.Len(t, status.ExpiredEvents, 1)
+}
+
+func TestListDueEventsFiltersByTypePrefix(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	recordDraft(t, store, "notification.a", nil)
+	recordDraft(t, store, "notificationx.b", nil)
+	recordDraft(t, store, "other.c", nil)
+
+	due, err := store.ListDueEvents(ctx, "notification.", 10)
+	require.NoError(t, err)
+	require.Len(t, due, 1)
+	assert.Equal(t, "notification.a", due[0].Type)
+
+	due, err = store.ListDueEvents(ctx, "", 10)
+	require.NoError(t, err)
+	assert.Len(t, due, 3)
 }

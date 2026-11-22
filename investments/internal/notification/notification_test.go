@@ -28,7 +28,7 @@ channels:
       system: {chat_id: "2"}
   stub: {}
 notifications:
-  snapshot.incomplete:
+  notification.snapshot.incomplete:
     format: plain
     channels:
       telegram: portfolio
@@ -51,7 +51,7 @@ func TestLoaderReadsAValidFile(t *testing.T) {
 	assert.Equal(t, 1, cfg.Version)
 	assert.Equal(t, map[string]string{"chat_id": "2"}, cfg.Channels["telegram"].Categories["system"])
 	assert.Equal(t, map[string]map[string]string{"default": {}}, cfg.Channels["stub"].Categories)
-	assert.Equal(t, "portfolio", cfg.Notifications["snapshot.incomplete"].Channels["telegram"])
+	assert.Equal(t, "portfolio", cfg.Notifications["notification.snapshot.incomplete"].Channels["telegram"])
 }
 
 func TestChannelWrittenAsInlineSettingsHasOneDefaultCategory(t *testing.T) {
@@ -113,13 +113,13 @@ func TestConfigValidateRejects(t *testing.T) {
 		"inline telegram":     "version: 1\nchannels: {telegram: {}}",
 		"duplicate key":       "version: 1\nchannels: {stub: {}, stub: {}}",
 		"unknown event":       head + "notifications: {other.thing: {format: plain, channels: {stub: ''}}}",
-		"missing format":      head + "notifications: {snapshot.incomplete: {channels: {stub: ''}}}",
-		"other format":        head + "notifications: {snapshot.incomplete: {format: html, channels: {stub: ''}}}",
-		"no channels":         head + "notifications: {snapshot.incomplete: {format: plain}}",
-		"empty channels":      head + "notifications: {snapshot.incomplete: {format: plain, channels: {}}}",
-		"undeclared channel":  head + "notifications: {snapshot.incomplete: {format: plain, channels: {email: ''}}}",
-		"undeclared category": head + "notifications: {snapshot.incomplete: {format: plain, channels: {telegram: c}}}",
-		"category left out":   head + "notifications: {snapshot.incomplete: {format: plain, channels: {telegram: ''}}}",
+		"missing format":      head + "notifications: {notification.snapshot.incomplete: {channels: {stub: ''}}}",
+		"other format":        head + "notifications: {notification.snapshot.incomplete: {format: html, channels: {stub: ''}}}",
+		"no channels":         head + "notifications: {notification.snapshot.incomplete: {format: plain}}",
+		"empty channels":      head + "notifications: {notification.snapshot.incomplete: {format: plain, channels: {}}}",
+		"undeclared channel":  head + "notifications: {notification.snapshot.incomplete: {format: plain, channels: {email: ''}}}",
+		"undeclared category": head + "notifications: {notification.snapshot.incomplete: {format: plain, channels: {telegram: c}}}",
+		"category left out":   head + "notifications: {notification.snapshot.incomplete: {format: plain, channels: {telegram: ''}}}",
 	}
 
 	for name, content := range tests {
@@ -231,12 +231,12 @@ func TestRenderers(t *testing.T) {
 	_, err = empty[domain.Events.SnapshotIncomplete][defaultFormat].Render(context.Background(), domain.Event{Data: []byte("[")})
 	assert.Error(t, err)
 
-	failed, err := json.Marshal(domain.NotificationFailedData{EventID: 1, EventType: "snapshot.incomplete", RecordedAt: day, Failures: 10})
+	failed, err := json.Marshal(domain.NotificationFailedData{EventID: 1, EventType: "notification.snapshot.incomplete", RecordedAt: day, Failures: 10})
 	require.NoError(t, err)
 
 	text, err = renderers[domain.Events.NotificationFailed][defaultFormat].Render(context.Background(), domain.Event{Data: failed})
 	require.NoError(t, err)
-	assert.Contains(t, text, "snapshot.incomplete")
+	assert.Contains(t, text, "notification.snapshot.incomplete")
 	assert.Contains(t, text, "10")
 }
 
@@ -248,7 +248,7 @@ func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
 
 	names := func(eventType string) []string {
 		var out []string
-		for _, handler := range handlers[eventType] {
+		for _, handler := range handlers(eventType) {
 			out = append(out, handler.Name())
 		}
 
@@ -261,8 +261,8 @@ func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
 	unconfigured := NewSource(NewLoader(""), &fakeStore{}, "")
 	handlers, err = unconfigured.Handlers(context.Background())
 	require.NoError(t, err)
-	assert.Len(t, handlers, len(domain.NotifyingEvents))
-	assert.NoError(t, handlers[domain.Events.SnapshotIncomplete][0].Handle(context.Background(), domain.Event{}))
+	assert.NoError(t, handlers(domain.Events.SnapshotIncomplete)[0].Handle(context.Background(), domain.Event{}))
+	assert.Nil(t, handlers("price.moved"), "an event that is not a notification has no handler here")
 }
 
 func TestSourceFailsOnInvalidConfigurationWithoutAFallback(t *testing.T) {
