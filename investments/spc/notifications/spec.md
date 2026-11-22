@@ -297,9 +297,16 @@ notifications:
 ### Telegram channel implementation
 
 The Telegram channel implementation sends through the Telegram Bot API from the operator's bot. Each
-Telegram category is configured with its own chat, which can be a direct chat with
-the operator, a group or a broadcast channel; two categories can use different chats, and can be set to
-the same one if the operator wants.
+Telegram category is configured with its own chat. The intended setup is one group
+per category, with the bot added to each group, so each category has its own
+conversation and mute setting. A bot has a single direct chat with the operator, so
+that chat suits only one category; a broadcast channel works when the bot is an
+administrator of it. Two categories can be set to the same chat if the operator wants.
+Topics within one group are not supported.
+
+- The chat identifier of a group is negative. When a group is upgraded to a supergroup,
+  for example by enabling topics, its identifier changes and the configuration must be
+  updated to the new one.
 
 - A non-success response from Telegram, or a failure to reach it, is reported to
   the interface as a failure to deliver.
