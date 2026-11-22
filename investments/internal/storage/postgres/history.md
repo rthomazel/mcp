@@ -5,6 +5,8 @@ dailySeriesSQL = the daily series as one relation: every distinct date in snapsh
 historyPointsSQL = from dailySeriesSQL within the range, group dates into windows of the filter's day count, the window number being the whole days from the range start divided by it, and keep the last date of each window, ordered by date ascending.
 seriesSummarySQL = over one value column of dailySeriesSQL, null values excluded: the latest row in the range; the maximum over all rows on or before the range end with the earliest date winning a tie; latest minus that maximum, absolute and as a percent; the baseline, the last row on or before the range start, else the first row in the range; change from the baseline, absolute and as a percent; the highest and lowest rows in the range; and the largest peak-to-trough fall within the range, the deepest percent below a running maximum with the earliest trough winning a tie, with its peak and trough dates and whether a later row reaches the peak again. All arithmetic in SQL, always over daily rows whatever the window.
 netContributionsSQL = sum the amounts of DEPOSIT and WITHDRAWAL cash_transactions whose effective date is after the equity baseline date through the latest equity date, zero when there are none.
+maxDrawdownLevels = 100, the most levels one state reports.
+drawdownLevelsSQL = over dailySeriesSQL securities value, take each row's percent below the running maximum of the values up to and including its date, zero when the maximum is zero; take the latest row and the all-time high date, the earliest date reaching the maximum; generate the levels, minus the increment times one up to the deepest multiple the latest drawdown reaches, at most maxDrawdownLevels; and for each level the crossing, the date of the first row after the most recent row whose percent is above the level. Percent values are in percent units, computed by Postgres with trim_scale, as in seriesSummarySQL.
 
 # Functions
 
@@ -50,3 +52,20 @@ All-time high is bounded by the range end so that a past range is not measured a
 Percent values are in percent units, such as -12.5, computed by Postgres. A zero baseline gives no change percent rather than an error.
 Reads are independent selects on one handle, no transaction, as in GetStatus.
 Decimals are rendered with trim_scale, so a division does not leave trailing zeros. The summary SQL is one template over the value column, securities or equity, so both series use the same definitions.
+
+## Store.GetDrawdownState(ctx Context, increment domain.Decimal) (domain.DrawdownState, error)
+
+1. if increment is not positive, return domain.ErrInvalidInput.
+2. Select the state via drawdownLevelsSQL.
+3. if the series is empty, return an empty state.
+4. Return the state, its levels ordered shallowest first.
+
+#### Errors
+
+- **1.** return domain.ErrInvalidInput naming the increment.
+
+---
+
+- **2.** if the query fails, return the wrapped error.
+
+It reads the same dailySeriesSQL as the value history, so an all-cash date counts with securities value zero and the figure agrees with GetValueHistory. The percent of a row is judged against the running maximum, so a new all-time high is zero and clears every level. At most maxDrawdownLevels levels are returned, so a tiny increment cannot produce an unbounded result; the deeper levels are not reported. Reads are independent selects on one handle, no transaction.

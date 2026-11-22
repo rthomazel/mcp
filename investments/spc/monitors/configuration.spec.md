@@ -12,7 +12,7 @@ agents: claude
 ## Status
 
 Draft. It extends the monitor mechanism of the notifications spec. The first monitor
-with settings, a daily gain in securities value, comes in its own spec.
+with settings, the portfolio drawdown, has its own spec.
 
 ## Intent
 
@@ -30,7 +30,7 @@ a dashboard that edits both can replace the files later.
 
 **Monitor name.** The identity of a monitor in the file. For a monitor that records a
 notification, it is the event type without the notification prefix: the monitor
-portfolio.daily-gain records notification.portfolio.daily-gain. The convention keeps the
+portfolio.drawdown records notification.portfolio.drawdown. The convention keeps the
 two names recognizably paired; they are separate names, and the file never mentions event
 types.
 
@@ -55,9 +55,9 @@ version: 1
 
 monitors:
   snapshot.incomplete: {}        # no value: enabled, no settings
-  portfolio.daily-gain:
+  portfolio.drawdown:
     disabled: false              # optional, false by default
-    threshold_pct: "3"           # settings of this monitor
+    increment_pct: "3"           # settings of this monitor
 ```
 
 - `version` must be the supported version; any other value rejects the whole file.
@@ -173,3 +173,4 @@ announcing an incomplete snapshot until the operator adds the entry shown above.
 - Related: 2026-11-21-notifications, the monitor mechanism and the configuration file this
   one follows.
 - Related: 2026-11-21-monitor-snapshot-incomplete, the monitor that gains an entry name.
+- Related: 2026-11-22-monitor-portfolio-drawdown, the first monitor with settings.

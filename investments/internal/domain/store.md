@@ -10,6 +10,7 @@
 6. GetPortfolio(ctx Context, date *Date) (Portfolio, error)
 7. GetStatus(ctx Context) (Status, error)
 8. GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
+9. GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
 
 The generic store, for everything that has no narrower store: instruments, the ledger and the read-only reports. Groups of related methods have their own stores below. Tests mock each store with mockery. Implemented by internal/storage/postgres.
 Each method of every store is a self-contained unit of work in its own transaction; composing several store calls into one transaction is not supported.
@@ -45,6 +46,10 @@ Reports freshness and health as of today in the market timezone: per held instru
 ### GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
 
 Returns the securities value, and cash and account equity where cash snapshots exist, over the range with one point per window of days, with summary measures: latest value, all-time high, drawdown from it, change from the baseline, range high and low and maximum drawdown. Returns ErrInvalidInput for a negative window, an inverted range or a series over the point limit. Changes in value, not returns.
+
+### GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
+
+Returns the drawdown of the latest securities value from the all-time high, and for each multiple of increment the drawdown is at or below the date its current stay at that level began, over the series GetValueHistory uses. The all-time high is over every stored date, whatever the range. Returns ErrInvalidInput for an increment that is not positive, and an empty state, no date and no levels, when there are no snapshots. Changes in value, not returns.
 
 ## CashStore
 

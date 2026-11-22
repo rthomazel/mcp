@@ -506,4 +506,5 @@ These were explored and are recorded so the thinking is not lost; none is planne
 - Related: 2026-09-17-core-event-bus, the walk-in service's outbox this follows.
 - Related: 2026-11-21-monitor-snapshot-incomplete, the first monitor.
 - Related: 2026-11-22-monitors-configuration, which monitors run and their settings.
+- Related: 2026-11-22-monitor-portfolio-drawdown, the first monitor with settings.
 - Related: 2026-11-13-investments-mcp-plan, the daily schedule the first monitor follows.

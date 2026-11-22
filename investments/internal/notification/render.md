@@ -12,6 +12,10 @@ Turns an event into plain, channel-neutral text, with no markup, so no handler i
 
 1. updates domain.UpdateStore
 
+## PortfolioDrawdownRenderer
+
+No fields.
+
 ## NotificationFailedRenderer
 
 No fields.
@@ -20,7 +24,7 @@ No fields.
 
 ## NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer
 
-Return the renderer for domain.Events.SnapshotIncomplete and domain.Events.NotificationFailed under defaultFormat.
+Return the renderer for domain.Events.SnapshotIncomplete, domain.Events.PortfolioDrawdown and domain.Events.NotificationFailed under defaultFormat.
 
 ## SnapshotIncompleteRenderer.Render(ctx Context, event domain.Event) (string, error)
 
@@ -39,6 +43,17 @@ Return the renderer for domain.Events.SnapshotIncomplete and domain.Events.Notif
 - **2.** if listing fails, return the wrapped error.
 
 Only symbols, dates and counts reach the message. The no-run wording covers a price refresh job that never ran.
+
+## PortfolioDrawdownRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as PortfolioDrawdownData.
+2. Return a message naming the level crossed, the current drawdown and its date, the date of the high and the crossing date, and saying that this is a change in value, not investment return, so sales and withdrawals lower it too.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+The message is built from the payload alone and carries percentages and dates only, no balances.
 
 ## NotificationFailedRenderer.Render(ctx Context, event domain.Event) (string, error)
 

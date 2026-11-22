@@ -49,6 +49,22 @@ A range that only rises has a zero drawdown, with the trough on the peak date an
 
 Measures over one series, securities value or account equity. A change in value, not an investment return: a deposit or a purchase raises securities value without being a gain.
 
+## DrawdownLevel
+
+1. Level Decimal, a negative percent that is a multiple of the increment, for example "-6"
+2. CrossedOn Date, the first date of the current stay at or below the level
+
+The day after the most recent date whose drawdown was shallower than the level. A drawdown of zero is shallower than every level, so a crossing always exists.
+
+## DrawdownState
+
+1. Date Date, the latest date of the series
+2. DrawdownPercent Decimal, the latest value as a percent of the all-time high minus one hundred, zero or negative
+3. HighDate Date, the all-time high through Date, the earliest date winning a tie
+4. Levels []DrawdownLevel, every level the drawdown is at or below, shallowest first, capped by the store
+
+The securities value drawdown over the same daily series and the same all-time high as SeriesSummary, so FromHighPercent of the latest date and DrawdownPercent agree. No levels means the drawdown is shallower than the first.
+
 ## ValueHistory
 
 1. From Date, the resolved range start
