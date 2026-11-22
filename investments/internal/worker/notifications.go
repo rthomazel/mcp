@@ -11,12 +11,13 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
-const (
-	pollInterval   = 30 * time.Second
-	pruneInterval  = 24 * time.Hour
-	batchLimit     = 100
-	handlerTimeout = 30 * time.Second
-)
+// Settings are the worker's tunables, taken from the server configuration.
+type Settings struct {
+	PollInterval   time.Duration // how often to look for due events
+	PruneInterval  time.Duration // how often to prune handled events
+	BatchLimit     int           // events taken per pass
+	HandlerTimeout time.Duration // deadline for one handler call
+}
 
 // HandlerSource provides the handlers registered for each event type, read
 // fresh on every pass so configuration changes apply without a restart.
@@ -30,13 +31,14 @@ type Handlers func(eventType string) []domain.EventHandler
 
 // Notifications drains the outbox. Every retry fact lives on the event.
 type Notifications struct {
-	store  domain.Store
-	source HandlerSource
+	store    domain.Store
+	source   HandlerSource
+	settings Settings
 }
 
 // NewNotifications builds the notifications worker.
-func NewNotifications(store domain.Store, source HandlerSource) *Notifications {
-	return &Notifications{store: store, source: source}
+func NewNotifications(store domain.Store, source HandlerSource, settings Settings) *Notifications {
+	return &Notifications{store: store, source: source, settings: settings}
 }
 
 // Run blocks until ctx is cancelled. A failing pass never stops the loop.
@@ -44,10 +46,10 @@ func (w *Notifications) Run(ctx context.Context) {
 	w.RunOnce(ctx)
 	w.prune(ctx)
 
-	poll := time.NewTicker(pollInterval)
+	poll := time.NewTicker(w.settings.PollInterval)
 	defer poll.Stop()
 
-	prune := time.NewTicker(pruneInterval)
+	prune := time.NewTicker(w.settings.PruneInterval)
 	defer prune.Stop()
 
 	for {
@@ -71,7 +73,7 @@ func (w *Notifications) RunOnce(ctx context.Context) {
 		slog.ErrorContext(ctx, "reading event handlers", "err", handlersErr)
 	}
 
-	events, err := w.store.ListDueEvents(ctx, domain.NotificationPrefix, batchLimit)
+	events, err := w.store.ListDueEvents(ctx, domain.NotificationPrefix, w.settings.BatchLimit)
 	if err != nil {
 		slog.ErrorContext(ctx, "listing due events", "err", err)
 
@@ -122,7 +124,7 @@ func (w *Notifications) handleEvent(ctx context.Context, event domain.Event, han
 }
 
 func (w *Notifications) run(ctx context.Context, handler domain.EventHandler, event domain.Event) error {
-	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
+	ctx, cancel := context.WithTimeout(ctx, w.settings.HandlerTimeout)
 	defer cancel()
 
 	return handler.Handle(ctx, event)

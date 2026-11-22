@@ -9,16 +9,14 @@ import (
 	"time"
 )
 
-const (
-	// MaxEventFailures is the failed attempts after which an event is given up on.
-	MaxEventFailures = 10
-	// EventBackoffBase is the delay after the first failure; each further failure doubles it.
-	EventBackoffBase = 30 * time.Second
-	// EventMaxAge is how long after it was recorded an event is still considered for handling.
-	EventMaxAge = 7 * 24 * time.Hour
-	// EventRetention is how long after it was fully handled an event is kept.
-	EventRetention = 365 * 24 * time.Hour
-)
+// EventPolicy is how the outbox retries, expires and retains events. The
+// values come from the server configuration.
+type EventPolicy struct {
+	MaxFailures int           // failed attempts after which an event is given up on
+	BackoffBase time.Duration // delay after the first failure; each further failure doubles it
+	MaxAge      time.Duration // how long after it was recorded an event is still considered for handling
+	Retention   time.Duration // how long after it was fully handled an event is kept
+}
 
 // EventTypes names the event types in one place.
 type EventTypes struct {
@@ -128,13 +126,13 @@ func (o EventOutcome) Validate() error {
 	return nil
 }
 
-// EventBackoff is the delay after the given number of failures, doubling from EventBackoffBase.
-func EventBackoff(failures int) time.Duration {
+// Backoff is the delay after the given number of failures, doubling from BackoffBase.
+func (p EventPolicy) Backoff(failures int) time.Duration {
 	if failures < 1 {
 		return 0
 	}
 
-	return EventBackoffBase << (failures - 1)
+	return p.BackoffBase << (failures - 1)
 }
 
 // Eligible reports whether the event is due for a handling pass at now.

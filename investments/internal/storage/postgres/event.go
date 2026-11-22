@@ -94,7 +94,7 @@ func (s *Store) insertEvent(ctx context.Context, tx *sqlx.Tx, draft domain.Draft
 
 	var id int64
 
-	err := tx.GetContext(ctx, &id, insertEventSQL, draft.Type, draft.Subject, []byte(data), now, domain.EventMaxAge.Seconds())
+	err := tx.GetContext(ctx, &id, insertEventSQL, draft.Type, draft.Subject, []byte(data), now, s.events.MaxAge.Seconds())
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -148,10 +148,10 @@ func (s *Store) SaveEventOutcome(ctx context.Context, id int64, outcome domain.E
 		if outcome.Failed {
 			failures++
 
-			next := now.Add(domain.EventBackoff(failures))
+			next := now.Add(s.events.Backoff(failures))
 			backoffUntil = &next
 
-			if failures >= domain.MaxEventFailures {
+			if failures >= s.events.MaxFailures {
 				givenUpAt = &now
 
 				if err := s.giveUp(ctx, tx, event, failures, now); err != nil {
@@ -225,9 +225,9 @@ func (s *Store) RemoveEvent(ctx context.Context, id int64) error {
 	return fmt.Errorf("%w: event %d", domain.ErrEventNotRemovable, id)
 }
 
-// PruneEvents deletes fully handled events kept for EventRetention or longer.
+// PruneEvents deletes fully handled events kept for the retention or longer.
 func (s *Store) PruneEvents(ctx context.Context) (int, error) {
-	result, err := s.db.ExecContext(ctx, pruneEventsSQL, s.clock().Add(-domain.EventRetention))
+	result, err := s.db.ExecContext(ctx, pruneEventsSQL, s.clock().Add(-s.events.Retention))
 	if err != nil {
 		return 0, fmt.Errorf("pruning events: %w", err)
 	}

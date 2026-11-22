@@ -58,10 +58,12 @@ func TestEventOutcomeValidate(t *testing.T) {
 }
 
 func TestEventBackoffDoubles(t *testing.T) {
-	assert.Equal(t, time.Duration(0), EventBackoff(0))
-	assert.Equal(t, 30*time.Second, EventBackoff(1))
-	assert.Equal(t, time.Minute, EventBackoff(2))
-	assert.Equal(t, 30*time.Second<<8, EventBackoff(9))
+	policy := EventPolicy{BackoffBase: 30 * time.Second}
+
+	assert.Equal(t, time.Duration(0), policy.Backoff(0))
+	assert.Equal(t, 30*time.Second, policy.Backoff(1))
+	assert.Equal(t, time.Minute, policy.Backoff(2))
+	assert.Equal(t, 30*time.Second<<8, policy.Backoff(9))
 }
 
 func TestEventEligibleAndExpired(t *testing.T) {

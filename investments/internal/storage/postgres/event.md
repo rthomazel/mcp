@@ -1,11 +1,11 @@
 # Constants
 
-insertEventSQL = insert an events row from type, subject and data, with expired_at set to now plus EventMaxAge, ON CONFLICT (type, subject) WHERE subject IS NOT NULL DO NOTHING, returning the id; no row comes back when the conflict was hit.
+insertEventSQL = insert an events row from type, subject and data, with expired_at set to now plus the policy's MaxAge, ON CONFLICT (type, subject) WHERE subject IS NOT NULL DO NOTHING, returning the id; no row comes back when the conflict was hit.
 dueEventsSQL = select the full events rows that are not processed, not given up on, whose expired_at is after now, whose backoff_until is null or not after now, and whose type starts with the prefix (starts_with, so underscores in types are not wildcards), ordered by created_at then id, limited. It mirrors domain.Event.Eligible.
 lockEventSQL = select the full row of one event by id FOR UPDATE.
 saveEventSQL = update one event: set handled_by to its names plus the new ones without duplicates, processed_at when handled, failures, backoff_until and given_up_at as the caller computed.
 removeEventSQL = delete one event by id when processed_at is null and either given_up_at is set or expired_at is not after now, returning the id.
-pruneEventsSQL = delete the events whose processed_at is EventRetention or longer before now.
+pruneEventsSQL = delete the events whose processed_at is the policy's Retention or longer before now.
 givenUpEventsSQL = select the full rows with processed_at null, given_up_at set and expired_at after now, newest first by created_at then id, limited.
 expiredEventsSQL = select the full rows with processed_at null and expired_at not after now, newest first by created_at then id, limited.
 
@@ -50,8 +50,8 @@ An expired or given-up event is never selected, so it cannot block, slow or crow
 2. Run inside withTx:
    1. Lock the event through lockEventSQL.
    2. Merge outcome.Succeeded into the handled names.
-   3. if outcome.Failed, add one failure and set backoff_until to now plus domain.EventBackoff of the new count.
-   4. if the new count reached domain.MaxEventFailures, set given_up_at to now and log an error naming the id, type and failure count.
+   3. if outcome.Failed, add one failure and set backoff_until to now plus the policy's Backoff of the new count.
+   4. if the new count reached the policy's MaxFailures, set given_up_at to now and log an error naming the id, type and failure count.
    5. if given up and the type is not domain.Events.NotificationFailed, record a notification-failed event through insertEvent carrying the id, type, recorded time and failure count.
    6. if outcome.Handled, set processed_at to now.
    7. Save through saveEventSQL.

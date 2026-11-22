@@ -17,7 +17,7 @@ import (
 func newYork(t *testing.T) *time.Location {
 	t.Helper()
 
-	location, err := time.LoadLocation(marketTimezone)
+	location, err := time.LoadLocation("America/New_York")
 	require.NoError(t, err)
 
 	return location
@@ -69,18 +69,18 @@ func TestNextRunIgnoresHostZone(t *testing.T) {
 }
 
 func TestRunTimesDescription(t *testing.T) {
-	assert.Equal(t, "06:00, 20:30 America/New_York", RunTimesDescription())
+	assert.Equal(t, "06:00, 20:30 America/New_York", RunTimesDescription("America/New_York"))
 }
 
 func TestNewSchedulerUsesTheMarketZone(t *testing.T) {
-	scheduler, err := NewScheduler(nil)
+	scheduler, err := NewScheduler(nil, "America/New_York")
 
 	require.NoError(t, err)
-	assert.Equal(t, marketTimezone, scheduler.location.String())
+	assert.Equal(t, "America/New_York", scheduler.location.String())
 }
 
 func TestSchedulerStopsWhenCancelled(t *testing.T) {
-	scheduler, err := NewScheduler(nil)
+	scheduler, err := NewScheduler(nil, "America/New_York")
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

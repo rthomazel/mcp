@@ -12,6 +12,7 @@ import (
 
 	"github.com/rthomazel/mcp/investments/internal/config"
 	"github.com/rthomazel/mcp/investments/internal/data"
+	"github.com/rthomazel/mcp/investments/internal/domain"
 	"github.com/rthomazel/mcp/investments/internal/handlers"
 	"github.com/rthomazel/mcp/investments/internal/marketdata"
 	"github.com/rthomazel/mcp/investments/internal/monitor"
@@ -39,7 +40,13 @@ func run() error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	store, cleanup, err := postgres.Open(cfg.DSN, cfg.StalePriceDays)
+	store, cleanup, err := postgres.Open(cfg.DSN, postgres.Settings{
+		StalePriceDays: cfg.StalePriceDays, MarketTimezone: cfg.MarketTimezone, MaxHistoryPoints: cfg.MaxHistoryPoints,
+		Events: domain.EventPolicy{
+			MaxFailures: cfg.EventMaxFailures, BackoffBase: cfg.EventBackoffBase,
+			MaxAge: cfg.EventMaxAge, Retention: cfg.EventRetention,
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("opening store: %w", err)
 	}
@@ -53,12 +60,12 @@ func run() error {
 	refresher := marketdata.NewRefresher(store, provider)
 	job := data.NewJob(store, refresher, provider.Name())
 
-	scheduler, err := data.NewScheduler(job)
+	scheduler, err := data.NewScheduler(job, cfg.MarketTimezone)
 	if err != nil {
 		return fmt.Errorf("building scheduler: %w", err)
 	}
 
-	slog.Info("daily job enabled", "provider", provider.Name(), "run_times", data.RunTimesDescription())
+	slog.Info("daily job enabled", "provider", provider.Name(), "run_times", data.RunTimesDescription(cfg.MarketTimezone))
 
 	ctx, stop := context.WithCancel(context.Background())
 
@@ -66,7 +73,7 @@ func run() error {
 
 	running.Go(func() { scheduler.Run(ctx) })
 
-	monitors, err := monitor.NewScheduler([]monitor.Monitor{monitor.NewSnapshotIncomplete(store)})
+	monitors, err := monitor.NewScheduler([]monitor.Monitor{monitor.NewSnapshotIncomplete(store)}, cfg.MarketTimezone, cfg.MonitorTimeout)
 	if err != nil {
 		stop()
 
@@ -74,7 +81,10 @@ func run() error {
 	}
 
 	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, cfg.TelegramBotToken)
-	worker := worker.NewNotifications(store, source)
+	worker := worker.NewNotifications(store, source, worker.Settings{
+		PollInterval: cfg.WorkerPollInterval, PruneInterval: cfg.WorkerPruneInterval,
+		BatchLimit: cfg.WorkerBatchLimit, HandlerTimeout: cfg.WorkerHandlerTimeout,
+	})
 
 	running.Go(func() { monitors.Run(ctx) })
 	running.Go(func() { worker.Run(ctx) })

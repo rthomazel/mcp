@@ -1,7 +1,3 @@
-# Constants
-
-MaxHistoryPoints = 1000, exported for the store, the most points one query returns. A longer series is rejected with a hint to use a larger window or a narrower range, never silently truncated.
-
 # Types
 
 ## HistoryFilter

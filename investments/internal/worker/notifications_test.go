@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,6 +44,12 @@ func (s *fakeStore) PruneEvents(context.Context) (int, error) {
 	return 0, nil
 }
 
+func newWorker(store domain.Store, source HandlerSource) *Notifications {
+	return NewNotifications(store, source, Settings{
+		PollInterval: time.Second, PruneInterval: time.Hour, BatchLimit: 100, HandlerTimeout: time.Second,
+	})
+}
+
 type fakeHandler struct {
 	name  string
 	err   error
@@ -70,7 +77,7 @@ func TestRunOnceHandlesEveryHandler(t *testing.T) {
 	a, b := &fakeHandler{name: "a"}, &fakeHandler{name: "b"}
 	store := &fakeStore{due: []domain.Event{{ID: 1, Type: "x"}}}
 
-	NewNotifications(store, fakeSource{handlers: map[string][]domain.EventHandler{"x": {a, b}}}).RunOnce(context.Background())
+	newWorker(store, fakeSource{handlers: map[string][]domain.EventHandler{"x": {a, b}}}).RunOnce(context.Background())
 
 	assert.Equal(t, domain.EventOutcome{Succeeded: []string{"a", "b"}, Handled: true}, store.outcomes[1])
 	assert.Equal(t, "notification.", store.prefix, "only notification events are taken")
@@ -80,7 +87,7 @@ func TestRunOnceRetriesOnlyTheFailedHandler(t *testing.T) {
 	done, failing := &fakeHandler{name: "a"}, &fakeHandler{name: "b", err: errors.New("down")}
 	store := &fakeStore{due: []domain.Event{{ID: 1, Type: "x", HandledBy: []string{"a"}}}}
 
-	NewNotifications(store, fakeSource{handlers: map[string][]domain.EventHandler{"x": {done, failing}}}).RunOnce(context.Background())
+	newWorker(store, fakeSource{handlers: map[string][]domain.EventHandler{"x": {done, failing}}}).RunOnce(context.Background())
 
 	assert.Zero(t, done.calls)
 	assert.Equal(t, 1, failing.calls)
@@ -91,7 +98,7 @@ func TestRunOnceFailsOtherHandlersIndependently(t *testing.T) {
 	failing, ok := &fakeHandler{name: "a", err: errors.New("down")}, &fakeHandler{name: "b"}
 	store := &fakeStore{due: []domain.Event{{ID: 1, Type: "x"}}}
 
-	NewNotifications(store, fakeSource{handlers: map[string][]domain.EventHandler{"x": {failing, ok}}}).RunOnce(context.Background())
+	newWorker(store, fakeSource{handlers: map[string][]domain.EventHandler{"x": {failing, ok}}}).RunOnce(context.Background())
 
 	assert.Equal(t, domain.EventOutcome{Succeeded: []string{"b"}, Failed: true}, store.outcomes[1])
 }
@@ -99,7 +106,7 @@ func TestRunOnceFailsOtherHandlersIndependently(t *testing.T) {
 func TestRunOnceLeavesAnEventWithoutHandlersUntouched(t *testing.T) {
 	store := &fakeStore{due: []domain.Event{{ID: 1, Type: "unknown"}}}
 
-	NewNotifications(store, fakeSource{handlers: map[string][]domain.EventHandler{}}).RunOnce(context.Background())
+	newWorker(store, fakeSource{handlers: map[string][]domain.EventHandler{}}).RunOnce(context.Background())
 
 	assert.Empty(t, store.outcomes, "no failure is counted")
 }
@@ -107,7 +114,7 @@ func TestRunOnceLeavesAnEventWithoutHandlersUntouched(t *testing.T) {
 func TestRunOnceFailsEventsWhenHandlersAreUnavailable(t *testing.T) {
 	store := &fakeStore{due: []domain.Event{{ID: 1, Type: "x"}}}
 
-	NewNotifications(store, fakeSource{err: errors.New("bad config")}).RunOnce(context.Background())
+	newWorker(store, fakeSource{err: errors.New("bad config")}).RunOnce(context.Background())
 
 	assert.Equal(t, domain.EventOutcome{Failed: true}, store.outcomes[1])
 }
@@ -115,7 +122,7 @@ func TestRunOnceFailsEventsWhenHandlersAreUnavailable(t *testing.T) {
 func TestRunOnceStopsWhenListingFails(t *testing.T) {
 	store := &fakeStore{listErr: errors.New("db down")}
 
-	NewNotifications(store, fakeSource{}).RunOnce(context.Background())
+	newWorker(store, fakeSource{}).RunOnce(context.Background())
 
 	assert.Empty(t, store.outcomes)
 }
@@ -125,7 +132,7 @@ func TestRunStopsOnCancelAfterOnePassAndPrune(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	NewNotifications(store, fakeSource{}).Run(ctx)
+	newWorker(store, fakeSource{}).Run(ctx)
 
 	require.Equal(t, 1, store.pruned)
 }

@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-const (
-	marketTimezone = "America/New_York"
-	monitorTimeout = 2 * time.Minute
-)
-
 // ClockTime is a time of day in the market timezone.
 type ClockTime struct {
 	Hour   int
@@ -31,17 +26,18 @@ type Monitor interface {
 type Scheduler struct {
 	monitors []Monitor
 	location *time.Location
+	timeout  time.Duration
 	clock    func() time.Time
 }
 
-// NewScheduler builds a Scheduler in the market timezone.
-func NewScheduler(monitors []Monitor) (*Scheduler, error) {
-	location, err := time.LoadLocation(marketTimezone)
+// NewScheduler builds a Scheduler in the market timezone, with timeout as the deadline of one run.
+func NewScheduler(monitors []Monitor, timezone string, timeout time.Duration) (*Scheduler, error) {
+	location, err := time.LoadLocation(timezone)
 	if err != nil {
-		return nil, fmt.Errorf("loading timezone %s: %w", marketTimezone, err)
+		return nil, fmt.Errorf("loading timezone %s: %w", timezone, err)
 	}
 
-	return &Scheduler{monitors: monitors, location: location, clock: time.Now}, nil
+	return &Scheduler{monitors: monitors, location: location, timeout: timeout, clock: time.Now}, nil
 }
 
 // Run blocks until ctx is cancelled, with one loop for each monitor. A failing
@@ -83,7 +79,7 @@ func (s *Scheduler) loop(ctx context.Context, monitor Monitor) {
 }
 
 func (s *Scheduler) runOnce(ctx context.Context, monitor Monitor) {
-	ctx, cancel := context.WithTimeout(ctx, monitorTimeout)
+	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
 	if err := monitor.Run(ctx); err != nil {

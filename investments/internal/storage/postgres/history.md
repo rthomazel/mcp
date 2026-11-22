@@ -15,7 +15,7 @@ netContributionsSQL = sum the amounts of DEPOSIT and WITHDRAWAL cash_transaction
 3. if there are none, return an empty history with the window and no summaries.
 4. Resolve From to the earliest date and To to the latest date when absent.
 5. Select the points via historyPointsSQL.
-6. if there are more than MaxHistoryPoints, reject.
+6. if there are more than the configured maximum number of points, a Store setting,, reject.
 7. if there are no points, return the empty history for the resolved range.
 8. Compute the securities summary via seriesSummarySQL over securities value.
 9. if any point in the range has a cash snapshot, compute the equity summary via seriesSummarySQL over account equity, and the net contributions via netContributionsSQL.

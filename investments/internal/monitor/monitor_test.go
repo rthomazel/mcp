@@ -16,7 +16,7 @@ import (
 func newYork(t *testing.T) *time.Location {
 	t.Helper()
 
-	location, err := time.LoadLocation(marketTimezone)
+	location, err := time.LoadLocation("America/New_York")
 	require.NoError(t, err)
 
 	return location

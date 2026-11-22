@@ -121,7 +121,7 @@ Returns up to limit events whose type starts with typePrefix, empty for any, tha
 
 ### SaveEventOutcome(ctx Context, id int64, outcome EventOutcome) error
 
-Applies the outcome of one handling pass in one transaction: adds the succeeded handler names to the event, sets it fully handled when the outcome says so, and for a failure counts it and postpones the next attempt by EventBackoff. When the count reaches MaxEventFailures the event is given up on instead, an error is logged naming its id, type and failure count and never its payload, and a notification-failed event is recorded in the same transaction, except for an event that is itself notification-failed, which only logs. Returns ErrInvalidInput for an invalid outcome and ErrEventNotFound when the event is gone.
+Applies the outcome of one handling pass in one transaction: adds the succeeded handler names to the event, sets it fully handled when the outcome says so, and for a failure counts it and postpones the next attempt by the policy's backoff for the new count. When the count reaches the policy's maximum failures the event is given up on instead, an error is logged naming its id, type and failure count and never its payload, and a notification-failed event is recorded in the same transaction, except for an event that is itself notification-failed, which only logs. Returns ErrInvalidInput for an invalid outcome and ErrEventNotFound when the event is gone.
 
 ### RemoveEvent(ctx Context, id int64) error
 
@@ -129,4 +129,4 @@ Deletes an event that was given up on or has expired. Returns ErrEventNotFound f
 
 ### PruneEvents(ctx Context) (int, error)
 
-Deletes fully handled events whose handling finished EventRetention or longer ago, and returns how many. Events not fully handled are never deleted, however old.
+Deletes fully handled events whose handling finished the policy's retention or longer ago, and returns how many. Events not fully handled are never deleted, however old.

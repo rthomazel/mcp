@@ -1,6 +1,6 @@
 # Constants
 
-runTimes = 06:00 and 20:30 in the market timezone (America/New_York), the two daily run times.
+runTimes = 06:00 and 20:30 in the market timezone, the two daily run times. The market timezone is the server configuration's, shared with the monitors and with today's date; it defaults to America/New_York.
 
 # Types
 
@@ -12,11 +12,11 @@ runTimes = 06:00 and 20:30 in the market timezone (America/New_York), the two da
 
 # Functions
 
-## NewScheduler(job *Job) (*Scheduler, error)
+## NewScheduler(job *Job, timezone string) (*Scheduler, error)
 
 Build a Scheduler in the market timezone, loaded from the embedded tzdata, using the real clock. Returns the wrapped error when the zone cannot be loaded.
 
-## RunTimesDescription() string
+## RunTimesDescription(timezone string) string
 
 Render the run times for the startup log, for example the two times followed by the market timezone name.
 

@@ -310,6 +310,15 @@ the same one if the operator wants.
 - The operator verifies delivery to Telegram themself; the system provides no test
   message.
 
+### Tunable values
+
+The figures in this spec, such as ten failures, the thirty second backoff base, a week
+before an event expires, a year of retention, the thirty second poll and the market
+time zone, are defaults. Each can be overridden by an environment variable of the
+server configuration, which the operator is not expected to set. Nothing in the code
+holds these values except the defaults of the server configuration, and the notifications
+file is not where they live: it only says where messages go.
+
 ### Retention
 
 Fully handled events are deleted after one year, by a periodic cleanup run in the same

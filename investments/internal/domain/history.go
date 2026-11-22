@@ -2,9 +2,6 @@ package domain
 
 import "fmt"
 
-// MaxHistoryPoints is the most points one history query returns.
-const MaxHistoryPoints = 1000
-
 // HistoryFilter selects the range and the spacing of the returned points.
 // Windows are counted from the resolved range start, so the last may be shorter.
 type HistoryFilter struct {

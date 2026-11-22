@@ -61,7 +61,7 @@ func TestListDueEventsRespectsEligibility(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, due, 2)
 	assert.Equal(t, "a.one", due[0].Type)
-	assert.Equal(t, now.Add(domain.EventMaxAge), due[0].ExpiredAt.UTC())
+	assert.Equal(t, now.Add(store.events.MaxAge), due[0].ExpiredAt.UTC())
 	assert.Empty(t, due[0].HandledBy)
 
 	_, err = store.ListDueEvents(ctx, "", 0)
@@ -79,13 +79,13 @@ func TestListDueEventsRespectsEligibility(t *testing.T) {
 	require.Len(t, due, 1)
 	assert.Equal(t, "a.two", due[0].Type)
 
-	now = now.Add(domain.EventBackoff(1))
+	now = now.Add(store.events.Backoff(1))
 	due, err = store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	assert.Len(t, due, 2)
 
 	// Past ExpiredAt nothing is due.
-	now = now.Add(domain.EventMaxAge)
+	now = now.Add(store.events.MaxAge)
 	due, err = store.ListDueEvents(ctx, "", 10)
 	require.NoError(t, err)
 	assert.Empty(t, due)
@@ -122,7 +122,7 @@ func TestGivingUpAnnouncesOnceAndNeverCascades(t *testing.T) {
 	setClock(store, &now)
 	recordDraft(t, store, domain.Events.SnapshotIncomplete, nil)
 
-	for range domain.MaxEventFailures {
+	for range store.events.MaxFailures {
 		due, err := store.ListDueEvents(ctx, "", 10)
 		require.NoError(t, err)
 		require.NotEmpty(t, due)
@@ -139,7 +139,7 @@ func TestGivingUpAnnouncesOnceAndNeverCascades(t *testing.T) {
 	status, err := store.GetStatus(ctx)
 	require.NoError(t, err)
 	require.Len(t, status.GivenUpEvents, 1)
-	assert.Equal(t, domain.MaxEventFailures, status.GivenUpEvents[0].Failures)
+	assert.Equal(t, store.events.MaxFailures, status.GivenUpEvents[0].Failures)
 	assert.False(t, status.Healthy)
 
 	due, err := store.ListDueEvents(ctx, "", 10)
@@ -150,10 +150,10 @@ func TestGivingUpAnnouncesOnceAndNeverCascades(t *testing.T) {
 	var data domain.NotificationFailedData
 	require.NoError(t, json.Unmarshal(due[0].Data, &data))
 	assert.Equal(t, domain.Events.SnapshotIncomplete, data.EventType)
-	assert.Equal(t, domain.MaxEventFailures, data.Failures)
+	assert.Equal(t, store.events.MaxFailures, data.Failures)
 
 	// The announcement itself failing gives up without another announcement.
-	for range domain.MaxEventFailures {
+	for range store.events.MaxFailures {
 		require.NoError(t, store.SaveEventOutcome(ctx, due[0].ID, domain.EventOutcome{Failed: true}))
 	}
 
@@ -178,7 +178,7 @@ func TestRemoveEvent(t *testing.T) {
 
 	require.NoError(t, store.SaveEventOutcome(ctx, due[1].ID, domain.EventOutcome{Handled: true}))
 
-	for range domain.MaxEventFailures {
+	for range store.events.MaxFailures {
 		require.NoError(t, store.SaveEventOutcome(ctx, due[2].ID, domain.EventOutcome{Failed: true}))
 	}
 
@@ -189,7 +189,7 @@ func TestRemoveEvent(t *testing.T) {
 	assert.ErrorIs(t, store.RemoveEvent(ctx, due[2].ID), domain.ErrEventNotFound)
 
 	// A pending event becomes removable once expired, and shows as expired.
-	now = now.Add(domain.EventMaxAge)
+	now = now.Add(store.events.MaxAge)
 
 	status, err := store.GetStatus(ctx)
 	require.NoError(t, err)
@@ -216,7 +216,7 @@ func TestPruneEventsKeepsUnhandledAndRecentEvents(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, count)
 
-	now = now.Add(domain.EventRetention + time.Hour)
+	now = now.Add(store.events.Retention + time.Hour)
 
 	count, err = store.PruneEvents(ctx)
 	require.NoError(t, err)

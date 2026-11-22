@@ -1,8 +1,5 @@
 # Constants
 
-marketTimezone = "America/New_York", the timezone of the run times; the host timezone never matters.
-monitorTimeout = 2 minutes, the deadline for one run.
-
 # Types
 
 ## ClockTime
@@ -16,7 +13,8 @@ A time of day in the market timezone.
 
 1. monitors []Monitor
 2. location *Location
-3. clock func() Time
+3. timeout Duration, the deadline for one run, from the server configuration
+4. clock func() Time
 
 # Interfaces
 
@@ -30,16 +28,16 @@ A job that judges a condition on the current state and records an event when it 
 
 # Functions
 
-## NewScheduler(monitors []Monitor) (*Scheduler, error)
+## NewScheduler(monitors []Monitor, timezone string, timeout Duration) (*Scheduler, error)
 
-Build a Scheduler in marketTimezone loaded from the embedded tzdata, using the real clock. Returns the wrapped error when the zone cannot be loaded.
+Build a Scheduler in the given market timezone, the server configuration's, never the host's, loaded from the embedded tzdata, using the real clock. Returns the wrapped error when the zone cannot be loaded.
 
 ## Scheduler.Run(ctx Context)
 
 1. Start one loop for each monitor and wait for them all.
 2. In a loop, compute the next run time with nextRun and log it at info level.
 3. Wait until then; if ctx is cancelled, log that the monitor stopped at info level and return.
-4. Run the monitor with monitorTimeout, logging a failure at error level.
+4. Run the monitor with the scheduler's timeout, logging a failure at error level.
 5. Repeat from step 2.
 
 A failing monitor never stops its loop or the other monitors. There is no run at startup: if the server was down at the monitor's time, the next scheduled time judges the state then. The scheduler runs inside the server process.

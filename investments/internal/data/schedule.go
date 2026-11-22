@@ -9,8 +9,7 @@ import (
 )
 
 const (
-	marketTimezone = "America/New_York"
-	runTimeout     = 30 * time.Minute
+	runTimeout = 30 * time.Minute
 )
 
 // runTimes are the daily run times as minutes after local midnight, ascending:
@@ -18,13 +17,13 @@ const (
 var runTimes = []int{6 * 60, 20*60 + 30}
 
 // RunTimesDescription renders the run times for the startup log.
-func RunTimesDescription() string {
+func RunTimesDescription(timezone string) string {
 	parts := make([]string, 0, len(runTimes))
 	for _, minutes := range runTimes {
 		parts = append(parts, fmt.Sprintf("%02d:%02d", minutes/60, minutes%60))
 	}
 
-	return strings.Join(parts, ", ") + " " + marketTimezone
+	return strings.Join(parts, ", ") + " " + timezone
 }
 
 // Scheduler runs the job at the daily run times in the market timezone. It
@@ -36,10 +35,10 @@ type Scheduler struct {
 }
 
 // NewScheduler builds a Scheduler in the market timezone.
-func NewScheduler(job *Job) (*Scheduler, error) {
-	location, err := time.LoadLocation(marketTimezone)
+func NewScheduler(job *Job, timezone string) (*Scheduler, error) {
+	location, err := time.LoadLocation(timezone)
 	if err != nil {
-		return nil, fmt.Errorf("loading timezone %s: %w", marketTimezone, err)
+		return nil, fmt.Errorf("loading timezone %s: %w", timezone, err)
 	}
 
 	return &Scheduler{job: job, location: location, clock: time.Now}, nil

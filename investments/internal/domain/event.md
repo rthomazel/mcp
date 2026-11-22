@@ -1,9 +1,13 @@
-# Constants
+# Types
 
-MaxEventFailures = 10, the failed attempts after which an event is given up on.
-EventBackoffBase = 30 seconds, the delay after the first failure; each further failure doubles it.
-EventMaxAge = 7 days, how long after it was recorded an event is still considered for handling; it sets the event's ExpiredAt.
-EventRetention = 1 year, how long after it was fully handled an event is kept.
+## EventPolicy
+
+1. MaxFailures int, the failed attempts after which an event is given up on
+2. BackoffBase Duration, the delay after the first failure; each further failure doubles it
+3. MaxAge Duration, how long after it was recorded an event is still considered for handling; it sets the event's ExpiredAt
+4. Retention Duration, how long after it was fully handled an event is kept
+
+How the outbox retries, expires and retains events. The values are server configuration with defaults of 10 failures, 30 seconds, 7 days and 1 year, set by environment variables; the domain holds no values.
 
 # Vars
 
@@ -29,9 +33,9 @@ Starts the type of every event that produces a notification. The convention repl
 5. Failures int
 6. BackoffUntil *Time, the earliest time of the next attempt, nil before the first failure
 7. CreatedAt Time
-8. ExpiredAt Time, the time from which the event is expired, CreatedAt plus EventMaxAge, fixed when it is recorded
+8. ExpiredAt Time, the time from which the event is expired, CreatedAt plus the policy's MaxAge, fixed when it is recorded
 9. ProcessedAt *Time, set when every registered handler has succeeded
-10. GivenUpAt *Time, set when Failures reached MaxEventFailures
+10. GivenUpAt *Time, set when Failures reached the policy's MaxFailures
 11. HandledBy []string, the names of the handlers that already succeeded
 
 One row of the outbox. An event is pending until ProcessedAt or GivenUpAt is set. It is expired when it is not fully handled and ExpiredAt is not after the reference time, whether or not it was given up on. Events are identified by ID, which status exposes because they have no natural key.
@@ -99,9 +103,9 @@ Mirrors the events table checks.
 
 Return ErrInvalidInput when Handled and Failed are both true.
 
-## EventBackoff(failures int) Duration
+## EventPolicy.Backoff(failures int) Duration
 
-Return EventBackoffBase multiplied by two to the power failures minus one: 30 seconds after the first failure, a minute after the second, and so on, a little over an hour after the eighth and a little over two hours after the ninth. Zero for a count below one.
+Return BackoffBase multiplied by two to the power failures minus one: 30 seconds after the first failure, a minute after the second, and so on, a little over an hour after the eighth and a little over two hours after the ninth. Zero for a count below one.
 
 Never used for the last failure, which gives up instead of retrying.
 
