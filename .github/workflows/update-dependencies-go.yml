@@ -48,3 +48,4 @@ jobs:
           golangci-lint-files: .github/workflows/${{ matrix.module }}-pr.yml
           working-directory: ${{ matrix.module }}
           pr-branch: chore/update-dependencies-go-${{ matrix.module }}
+          pr-title: "chore(deps): weekly Go dependency update ${{ matrix.module }}"
