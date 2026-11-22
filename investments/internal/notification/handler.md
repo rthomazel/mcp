@@ -12,7 +12,7 @@ noChannelHandlerName = "notification.none".
 3. renderers map[string]map[string]Renderer
 4. telegramToken string, the bot token from the server configuration
 
-Implements outbox.HandlerSource. It is the one notification handler, expanded for the current configuration, so the worker sees plain domain.EventHandler values.
+Implements worker.HandlerSource. It is the one notification handler, expanded for the current configuration, so the worker sees plain domain.EventHandler values.
 
 ## channelHandler
 

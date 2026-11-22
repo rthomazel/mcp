@@ -16,7 +16,7 @@ const (
 )
 
 // Source is the one notification handler, expanded for the current
-// configuration. It implements outbox.HandlerSource.
+// configuration. It implements worker.HandlerSource.
 type Source struct {
 	loader        *Loader
 	store         domain.Store

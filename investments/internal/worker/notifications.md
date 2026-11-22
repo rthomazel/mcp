@@ -7,13 +7,12 @@ handlerTimeout = 30 seconds, the deadline for one handler call.
 
 # Types
 
-## Worker
+## Notifications
 
 1. store domain.Store
 2. source HandlerSource
-3. clock func() Time
 
-Drains the outbox. It holds no state beyond its dependencies; every retry fact lives on the event.
+The notifications worker: drains the outbox. It holds no state beyond its dependencies and reads no clock; every retry fact lives on the event, and the store decides what is due.
 
 # Interfaces
 
@@ -25,11 +24,11 @@ The handlers registered for each event type, read fresh on every pass so configu
 
 # Functions
 
-## NewWorker(store domain.Store, source HandlerSource) *Worker
+## NewNotifications(store domain.Store, source HandlerSource) *Notifications
 
-Build a Worker using the real clock.
+Build the notifications worker.
 
-## Worker.Run(ctx Context)
+## Notifications.Run(ctx Context)
 
 1. Run one pass immediately and prune once.
 2. Every pollInterval run another pass, and every pruneInterval prune.
@@ -37,7 +36,7 @@ Build a Worker using the real clock.
 
 A failing pass never stops the loop. The worker runs inside the server process, started from main.
 
-## Worker.RunOnce(ctx Context)
+## Notifications.RunOnce(ctx Context)
 
 1. Read the handlers from source.
 2. List the due events through store.ListDueEvents with batchLimit.
@@ -53,7 +52,7 @@ A failing pass never stops the loop. The worker runs inside the server process, 
 
 The handlers are read before the events are listed, so a broken configuration is logged on every pass, even when no event is due. One pass can be driven directly, so tests need no timer.
 
-## Worker.handleEvent(ctx Context, event domain.Event, handlers map[string][]domain.EventHandler, handlersErr error)
+## Notifications.handleEvent(ctx Context, event domain.Event, handlers map[string][]domain.EventHandler, handlersErr error)
 
 1. if handlersErr is set, save a failed outcome and return.
 2. Look up the handlers registered for event.Type.
@@ -71,6 +70,6 @@ The handlers are read before the events are listed, so a broken configuration is
 
 Retries are per handler: a handler already in HandledBy is skipped, so a failing sibling never reruns it. An event whose handlers have all succeeded before, for example because a route was removed, becomes fully handled here. A failed outcome counts toward the ten failures per event, however many handlers failed. An event with no registered handler is an error, not a skip.
 
-## Worker.prune(ctx Context)
+## Notifications.prune(ctx Context)
 
 Delete the expired history through store.PruneEvents and log the number at info level when it is not zero, or the error at error level.

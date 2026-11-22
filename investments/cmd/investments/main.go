@@ -16,9 +16,9 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/marketdata"
 	"github.com/rthomazel/mcp/investments/internal/monitor"
 	"github.com/rthomazel/mcp/investments/internal/notification"
-	"github.com/rthomazel/mcp/investments/internal/outbox"
 	"github.com/rthomazel/mcp/investments/internal/provider/tiingo"
 	"github.com/rthomazel/mcp/investments/internal/storage/postgres"
+	"github.com/rthomazel/mcp/investments/internal/worker"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -74,7 +74,7 @@ func run() error {
 	}
 
 	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, cfg.TelegramBotToken)
-	worker := outbox.NewWorker(store, source)
+	worker := worker.NewNotifications(store, source)
 
 	running.Go(func() { monitors.Run(ctx) })
 	running.Go(func() { worker.Run(ctx) })
