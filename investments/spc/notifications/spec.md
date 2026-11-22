@@ -112,9 +112,10 @@ registered for the event's type that has not yet succeeded for it.
   with an exponential backoff, doubling from a base of thirty seconds.
 - When a handler succeeds, its name is recorded on the event.
 - An event is fully handled once every handler registered for its type has succeeded.
-- An event whose type has no registered handler is an error: it is logged at error
-  level and counts as a failure of the event like any other, so it is retried with
-  backoff and eventually given up on, and surfaces for attention.
+- An event whose type has no registered handler, for example because the type was
+  misspelled, is logged as a warning and left untouched: no failure is counted and it is
+  never given up on. It is looked at again on each pass until it expires, after which
+  status lists it as expired.
 - A failure of one event or handler does not stop the worker from handling the
   others, and store errors are logged without stopping it.
 - One pass of the worker can be driven on demand, so behavior is testable without
@@ -405,8 +406,8 @@ configuration, not by the monitor.
 - Consecutive failures double the delay from thirty seconds, and an event is not
   retried before its backoff has passed.
 - The worker checks about every thirty seconds and once at startup.
-- An event with no registered handler is logged as an error and retried like any
-  failure.
+- An event with no registered handler is logged as a warning and left untouched, with no
+  failure counted.
 - After ten failures an event is not retried again, an error is logged, a
   notification-failed event is recorded, and the event is listed in status with a needs
   attention verdict.

@@ -92,8 +92,7 @@ func (w *Notifications) handleEvent(ctx context.Context, event domain.Event, han
 
 	registered := handlers(event.Type)
 	if len(registered) == 0 {
-		slog.ErrorContext(ctx, "no handler registered for event type", "id", event.ID, "type", event.Type)
-		w.save(ctx, event, domain.EventOutcome{Failed: true})
+		slog.WarnContext(ctx, "no handler registered for event type, leaving the event untouched", "id", event.ID, "type", event.Type)
 
 		return
 	}

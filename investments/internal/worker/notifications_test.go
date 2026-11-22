@@ -96,12 +96,12 @@ func TestRunOnceFailsOtherHandlersIndependently(t *testing.T) {
 	assert.Equal(t, domain.EventOutcome{Succeeded: []string{"b"}, Failed: true}, store.outcomes[1])
 }
 
-func TestRunOnceFailsAnEventWithoutHandlers(t *testing.T) {
+func TestRunOnceLeavesAnEventWithoutHandlersUntouched(t *testing.T) {
 	store := &fakeStore{due: []domain.Event{{ID: 1, Type: "unknown"}}}
 
 	NewNotifications(store, fakeSource{handlers: map[string][]domain.EventHandler{}}).RunOnce(context.Background())
 
-	assert.Equal(t, domain.EventOutcome{Failed: true}, store.outcomes[1])
+	assert.Empty(t, store.outcomes, "no failure is counted")
 }
 
 func TestRunOnceFailsEventsWhenHandlersAreUnavailable(t *testing.T) {
