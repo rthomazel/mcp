@@ -38,7 +38,7 @@ Return the renderer for domain.Events.SnapshotIncomplete and domain.Events.Notif
 
 - **2.** if listing fails, return the wrapped error.
 
-Only symbols, dates and counts reach the message. The no-run wording covers a daily job that never ran.
+Only symbols, dates and counts reach the message. The no-run wording covers a price refresh job that never ran.
 
 ## NotificationFailedRenderer.Render(ctx Context, event domain.Event) (string, error)
 

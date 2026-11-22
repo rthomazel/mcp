@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
+	"github.com/rthomazel/mcp/investments/internal/worker/marketdata"
 )
 
 // View types render domain values for the agent: snake_case keys, exact

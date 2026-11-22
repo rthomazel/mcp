@@ -8,7 +8,7 @@
 4. TiingoAPIKey string, the market data credential, a server-side secret
 5. NotificationsConfigFile string, the path of the notifications configuration YAML file, empty meaning no file
 6. TelegramBotToken string, the Telegram bot credential, a server-side secret, empty meaning Telegram is unconfigured
-7. MarketTimezone string, the IANA zone of the market day, shared by the daily job, the monitors and today's date
+7. MarketTimezone string, the IANA zone of the market day, shared by the price refresh job, the monitors and today's date
 8. MaxHistoryPoints int, the most points one value history query returns; a longer series is rejected with a hint to use a larger window or a narrower range, never silently truncated
 9. EventMaxFailures int, the failed attempts after which an event is given up on
 10. EventBackoffBase Duration, the delay after the first failure; each further failure doubles it

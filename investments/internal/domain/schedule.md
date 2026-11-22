@@ -14,7 +14,7 @@ A time of day in the market timezone.
 3. Timeout Duration, the deadline for one run
 4. Run func(ctx Context) error
 
-Work that runs daily at fixed times. The daily job and each monitor are one task each.
+Work that runs daily at fixed times. The price refresh job and each monitor are one task each.
 
 ## Scheduler
 

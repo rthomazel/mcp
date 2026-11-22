@@ -75,7 +75,7 @@ func (s *jobStore) WriteSnapshot(_ context.Context, date domain.Date) (domain.Sn
 }
 
 func newJob(store *jobStore, provider *jobProvider) *Job {
-	return NewJob(store, NewRefresher(store, provider), "fake")
+	return NewJob(store, NewPriceRefresher(store, provider), "fake")
 }
 
 func twoInstruments() []domain.Instrument {

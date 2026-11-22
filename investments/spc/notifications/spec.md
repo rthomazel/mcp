@@ -99,7 +99,7 @@ for handling. Nothing is recorded on a read.
 
 ### Handling
 
-The notifications worker runs inside the server process, like the daily job. It checks
+The notifications worker runs inside the server process, like the price refresh job. It checks
 the outbox twice per minute, and once immediately on startup, looking only at events
 whose type starts with `notification.`. For each such event that is not fully
 handled, has not been given up on, was recorded within the last week, and whose backoff
@@ -328,9 +328,9 @@ operator removes them.
 
 ### Scheduled monitors
 
-The same scheduler that runs the daily job runs inside the server process and runs each
+The same scheduler that runs the price refresh job runs inside the server process and runs each
 monitor at its own time in the market timezone, so daylight saving changes keep the same local
-times. Monitors are independent of the daily job and of each other: a monitor does not know
+times. Monitors are independent of the price refresh job and of each other: a monitor does not know
 how or when the job ran, only what state it left. A monitor does not run at startup; if
 the server was down at its time, the next scheduled time judges the state then.
 
@@ -343,7 +343,7 @@ the server was down at its time, the next scheduled time judges the state then.
 - Monitors hold no state of their own beyond the outbox.
 
 Monitors exist because an event should follow observed state, not which run happened
-to execute. A monitor also catches what a producer cannot, such as a daily job that never
+to execute. A monitor also catches what a producer cannot, such as a price refresh job that never
 ran.
 
 Each monitor has its own spec under spc/monitors, one file per monitor. The first is
@@ -398,9 +398,9 @@ configuration, not by the monitor.
 - Categories separate investment notifications from system messages. The intended
   configuration sends delivery failures to the system category, which never falls back
   to the portfolio one.
-- Events can follow observed state: a scheduled monitor, not the daily job, records the
+- Events can follow observed state: a scheduled monitor, not the price refresh job, records the
   snapshot-incomplete event, so it does not depend on there being two
-  daily runs and also covers a run that never happened.
+  price refresh runs and also covers a run that never happened.
 - A monitor announces each subject at most once.
 
 ## Acceptance criteria

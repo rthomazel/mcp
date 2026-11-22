@@ -21,7 +21,7 @@ type Config struct {
 	// TelegramBotToken is a server-side secret, never logged or returned; empty means Telegram is unconfigured.
 	TelegramBotToken string
 
-	// MarketTimezone is the IANA zone of the market day, shared by the daily job, the monitors and today's date.
+	// MarketTimezone is the IANA zone of the market day, shared by the price refresh job, the monitors and today's date.
 	MarketTimezone string
 	// MaxHistoryPoints is the most points one value history query returns.
 	MaxHistoryPoints int

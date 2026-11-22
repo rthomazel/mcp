@@ -65,7 +65,7 @@ Returns the most recent stored price date for the instrument, or nil when it has
 
 ### LatestSessionDate(ctx Context) (*Date, error)
 
-Returns the most recent price date across all instruments, or nil when no prices exist. It is the date the daily job snapshots.
+Returns the most recent price date across all instruments, or nil when no prices exist. It is the date the price refresh job snapshots.
 
 ### WriteSnapshot(ctx Context, date Date) (SnapshotResult, error)
 

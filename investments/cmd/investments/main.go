@@ -13,12 +13,12 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/config"
 	"github.com/rthomazel/mcp/investments/internal/domain"
 	"github.com/rthomazel/mcp/investments/internal/handlers"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
-	"github.com/rthomazel/mcp/investments/internal/monitor"
-	"github.com/rthomazel/mcp/investments/internal/notification"
 	"github.com/rthomazel/mcp/investments/internal/provider/tiingo"
 	"github.com/rthomazel/mcp/investments/internal/storage/postgres"
-	"github.com/rthomazel/mcp/investments/internal/worker"
+	"github.com/rthomazel/mcp/investments/internal/worker/marketdata"
+	"github.com/rthomazel/mcp/investments/internal/worker/monitor"
+	"github.com/rthomazel/mcp/investments/internal/worker/notification"
+	"github.com/rthomazel/mcp/investments/internal/worker/outbox"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -56,10 +56,10 @@ func run() error {
 	}
 
 	provider := tiingo.NewClient(cfg.TiingoAPIKey, "")
-	refresher := marketdata.NewRefresher(store, provider)
+	refresher := marketdata.NewPriceRefresher(store, provider)
 	job := marketdata.NewJob(store, refresher, provider.Name())
 
-	tasks := []domain.ScheduledTask{marketdata.DailyTask(job)}
+	tasks := []domain.ScheduledTask{marketdata.RefreshTask(job)}
 
 	for _, m := range []monitor.Monitor{monitor.NewSnapshotIncomplete(store)} {
 		tasks = append(tasks, monitor.Task(m, cfg.MonitorTimeout))
@@ -70,7 +70,7 @@ func run() error {
 		return fmt.Errorf("building scheduler: %w", err)
 	}
 
-	slog.Info("daily job enabled", "provider", provider.Name(), "run_times", marketdata.RunTimesDescription(cfg.MarketTimezone))
+	slog.Info("price refresh job enabled", "provider", provider.Name(), "run_times", marketdata.RunTimesDescription(cfg.MarketTimezone))
 
 	ctx, stop := context.WithCancel(context.Background())
 
@@ -79,12 +79,12 @@ func run() error {
 	running.Go(func() { scheduler.Run(ctx) })
 
 	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, cfg.TelegramBotToken)
-	worker := worker.NewNotifications(store, source, worker.Settings{
+	notifications := outbox.NewNotifications(store, source, outbox.Settings{
 		PollInterval: cfg.WorkerPollInterval, PruneInterval: cfg.WorkerPruneInterval,
 		BatchLimit: cfg.WorkerBatchLimit, HandlerTimeout: cfg.WorkerHandlerTimeout,
 	})
 
-	running.Go(func() { worker.Run(ctx) })
+	running.Go(func() { notifications.Run(ctx) })
 
 	defer func() {
 		stop()

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
+	"github.com/rthomazel/mcp/investments/internal/worker/marketdata"
 )
 
 func day(d int) domain.Date { return time.Date(2026, 11, d, 0, 0, 0, 0, time.UTC) }
@@ -165,7 +165,7 @@ func newBar(d int) domain.PriceBar {
 }
 
 func newHandler(store *fakeStore, provider *fakeProvider) *Handler {
-	return New(store, marketdata.NewRefresher(store, provider), time.Minute)
+	return New(store, marketdata.NewPriceRefresher(store, provider), time.Minute)
 }
 
 func twoInstruments() []domain.Instrument {
@@ -579,7 +579,7 @@ func TestRefreshPrices(t *testing.T) {
 		store := &fakeStore{instruments: twoInstruments(), positions: held}
 		provider := &cancelingProvider{cancel: cancel}
 
-		handler := New(store, marketdata.NewRefresher(store, provider), time.Minute)
+		handler := New(store, marketdata.NewPriceRefresher(store, provider), time.Minute)
 
 		result, err := handler.HandleRefreshPrices(ctx, request(nil))
 

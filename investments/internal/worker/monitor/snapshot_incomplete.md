@@ -1,6 +1,6 @@
 # Constants
 
-snapshotIncompleteAt = 07:00 in the market timezone, an hour after the last daily run of the day.
+snapshotIncompleteAt = 07:00 in the market timezone, an hour after the last price refresh run of the day.
 
 # Types
 

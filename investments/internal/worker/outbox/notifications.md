@@ -25,7 +25,7 @@ The notifications worker: drains the outbox. It holds no state beyond its depend
 
 1. Handlers(ctx Context) (Handlers, error)
 
-The handlers registered for each event type, read fresh on every pass so configuration changes apply without a restart. Defined here, implemented by the notification package. An error means the handlers are unavailable.
+The handlers registered for each event type, read fresh on every pass so configuration changes apply without a restart. Defined here, implemented by the notification package under worker. An error means the handlers are unavailable.
 
 ## Handlers = func(eventType string) []domain.EventHandler
 

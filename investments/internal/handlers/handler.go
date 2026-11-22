@@ -13,7 +13,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/marketdata"
+	"github.com/rthomazel/mcp/investments/internal/worker/marketdata"
 )
 
 const (
@@ -30,12 +30,12 @@ const (
 // Handler is the MCP tool layer. It holds no state beyond its dependencies.
 type Handler struct {
 	store        domain.Store
-	refresher    *marketdata.Refresher
+	refresher    *marketdata.PriceRefresher
 	queryTimeout time.Duration
 }
 
 // New builds a Handler.
-func New(store domain.Store, refresher *marketdata.Refresher, queryTimeout time.Duration) *Handler {
+func New(store domain.Store, refresher *marketdata.PriceRefresher, queryTimeout time.Duration) *Handler {
 	return &Handler{store: store, refresher: refresher, queryTimeout: queryTimeout}
 }
 
@@ -169,7 +169,7 @@ func (h *Handler) Register(s *server.MCPServer) {
 	), h.HandleGetCash)
 
 	s.AddTool(mcp.NewTool("get_status",
-		mcp.WithDescription("Check whether the portfolio data is healthy, as of today in the New York market timezone. Returns one verdict, healthy or needs attention, with a reason for each problem, and the facts behind it: for every held instrument its latest stored price date and whether that price is missing or stale, the latest price date overall, the latest price date covered by a completed snapshot, whether the latest price date still has no completed snapshot, and the failed or incomplete runs that no later run has resolved, the notification events given up on after repeated failures (each with the id remove_event takes), and, apart from the verdict, the expired events that were never handled. A snapshot missing for a price date just fetched is expected until the next daily run or a rebuild_snapshots. Sold instruments are not checked. Use refresh_prices for missing or stale prices and rebuild_snapshots for missing snapshots; use list_updates for the raw run log."),
+		mcp.WithDescription("Check whether the portfolio data is healthy, as of today in the New York market timezone. Returns one verdict, healthy or needs attention, with a reason for each problem, and the facts behind it: for every held instrument its latest stored price date and whether that price is missing or stale, the latest price date overall, the latest price date covered by a completed snapshot, whether the latest price date still has no completed snapshot, and the failed or incomplete runs that no later run has resolved, the notification events given up on after repeated failures (each with the id remove_event takes), and, apart from the verdict, the expired events that were never handled. A snapshot missing for a price date just fetched is expected until the next price refresh run or a rebuild_snapshots. Sold instruments are not checked. Use refresh_prices for missing or stale prices and rebuild_snapshots for missing snapshots; use list_updates for the raw run log."),
 		mcp.WithReadOnlyHintAnnotation(true),
 	), h.HandleGetStatus)
 

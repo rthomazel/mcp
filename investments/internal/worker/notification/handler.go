@@ -8,7 +8,7 @@ import (
 	"slices"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
-	"github.com/rthomazel/mcp/investments/internal/worker"
+	"github.com/rthomazel/mcp/investments/internal/worker/outbox"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 )
 
 // Source is the one notification handler, expanded for the current
-// configuration. It implements worker.HandlerSource.
+// configuration. It implements outbox.HandlerSource.
 type Source struct {
 	loader        *Loader
 	store         domain.Store
@@ -43,7 +43,7 @@ type noChannelHandler struct {
 
 // Handlers returns the handlers of each notifying event type. A type without
 // channels is handled with a warning, never an error.
-func (s *Source) Handlers(_ context.Context) (worker.Handlers, error) {
+func (s *Source) Handlers(_ context.Context) (outbox.Handlers, error) {
 	cfg, err := s.loader.Current()
 	if err != nil {
 		return nil, err
