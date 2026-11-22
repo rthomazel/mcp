@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-const (
-	defaultQueryTimeout   = 30 * time.Second
-	defaultStalePriceDays = 5
-)
-
 // Config is the server configuration. Every tunable has a default, so only the
 // required values need to be provided.
 type Config struct {
@@ -55,8 +50,8 @@ type Config struct {
 // Defaults returns the configuration with every default and no required value.
 func Defaults() Config {
 	return Config{
-		QueryTimeout:         defaultQueryTimeout,
-		StalePriceDays:       defaultStalePriceDays,
+		QueryTimeout:         30 * time.Second,
+		StalePriceDays:       5,
 		MarketTimezone:       "America/New_York",
 		MaxHistoryPoints:     1000,
 		EventMaxFailures:     10,
