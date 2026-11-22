@@ -5,7 +5,12 @@ if [ "$KEYS_MCP_HTTP" = "true" ] || [ "$KEYS_MCP_TRANSPORT" = "mcpo" ]; then
     exec mcpo --port 8001 -- keys
 elif [ "$KEYS_MCP_TRANSPORT" = "mcp-proxy" ]; then
     echo "INFO: starting keys with mcp-proxy (native MCP/SSE)" >&2
-    exec mcp-proxy --pass-environment --host 0.0.0.0 --port 8001 -- keys
+    # mcp-proxy 0.15+ rejects Host headers it does not know (DNS rebinding protection), so
+    # the compose service name must be allowed or peers like LiteLLM get "Invalid Host header".
+    exec mcp-proxy --pass-environment --host 0.0.0.0 --port 8001 \
+        --allowed-host "${KEYS_MCP_ALLOWED_HOST:-mcpkeys}" \
+        --allowed-host "${KEYS_MCP_ALLOWED_HOST:-mcpkeys}:*" \
+        -- keys
 else
     echo "INFO: starting keys in stdio mode" >&2
     exec keys

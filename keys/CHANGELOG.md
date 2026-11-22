@@ -21,6 +21,10 @@
 
 ## Unreleased
 
+### fix
+
+- **(container)** pin `mcp-proxy` to 0.15.0 and allow the `mcpkeys` Host header (`KEYS_MCP_ALLOWED_HOST` to override); mcp-proxy 0.15 rejects unknown Host headers, so LiteLLM health checks failed with "Invalid Host header".
+
 ### build
 
 - **(container)** add OCI image labels (`org.opencontainers.image.title`, `source`, `version`, `revision`) to the runtime image. The release workflow passes `VERSION` and `REVISION` (commit SHA) as build args, so `docker image inspect` shows which release is running; local builds report `local` / `unknown`.
