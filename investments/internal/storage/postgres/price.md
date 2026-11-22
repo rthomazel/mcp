@@ -7,7 +7,7 @@ listPricesSQL = select the price columns of one instrument between the optional 
 
 # Functions
 
-## Store.UpsertPrices(ctx Context, instrumentID int, bars []domain.PriceBar) error
+## Prices.Upsert(ctx Context, instrumentID int, bars []domain.PriceBar) error
 
 1. if bars is empty, return nil.
 2. Validate every bar with PriceBar.Validate and check that no date repeats.
@@ -34,7 +34,7 @@ listPricesSQL = select the price columns of one instrument between the optional 
 One statement makes the write atomic without an explicit transaction. Passing decimals as JSON strings keeps their exact text, and a repeated date is rejected up front because ON CONFLICT DO UPDATE cannot touch the same row twice in one statement.
 A full history is a few thousand rows, small enough for one statement.
 
-## Store.LatestPriceDate(ctx Context, instrumentID int) (*domain.Date, error)
+## Prices.LatestDate(ctx Context, instrumentID int) (*domain.Date, error)
 
 1. Select via latestPriceDateSQL.
 2. Return the date, or nil when there is none.
@@ -45,7 +45,7 @@ A full history is a few thousand rows, small enough for one statement.
 
 An unknown instrument has no prices and returns nil, not an error.
 
-## Store.ListPrices(ctx Context, filter domain.PriceFilter) ([]domain.PriceBar, error)
+## Prices.List(ctx Context, filter domain.PriceFilter) ([]domain.PriceBar, error)
 
 1. Validate filter and resolve the limit.
 2. Select via listPricesSQL.
@@ -60,3 +60,7 @@ An unknown instrument has no prices and returns nil, not an error.
 - **2.** log the failure at error level and return the wrapped error.
 
 Decimals are selected as text so the exact stored figures reach the caller.
+
+## Prices.LatestSessionDate(ctx Context) (*domain.Date, error)
+
+Return Store.latestSessionDate, the latest price date across all instruments, so the narrow store offers what the price refresh job needs and the status view shares the query.

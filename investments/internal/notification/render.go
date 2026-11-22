@@ -16,16 +16,16 @@ type Renderer interface {
 
 // SnapshotIncompleteRenderer describes the incomplete snapshot run for the event's date.
 type SnapshotIncompleteRenderer struct {
-	store domain.Store
+	updates domain.UpdateStore
 }
 
 // NotificationFailedRenderer announces an event whose delivery was given up on.
 type NotificationFailedRenderer struct{}
 
 // NewRenderers returns the renderer of each notifying event type by format.
-func NewRenderers(store domain.Store) map[string]map[string]Renderer {
+func NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer {
 	return map[string]map[string]Renderer{
-		domain.Events.SnapshotIncomplete: {defaultFormat: &SnapshotIncompleteRenderer{store: store}},
+		domain.Events.SnapshotIncomplete: {defaultFormat: &SnapshotIncompleteRenderer{updates: updates}},
 		domain.Events.NotificationFailed: {defaultFormat: &NotificationFailedRenderer{}},
 	}
 }
@@ -37,7 +37,7 @@ func (r *SnapshotIncompleteRenderer) Render(ctx context.Context, event domain.Ev
 		return "", fmt.Errorf("decoding snapshot incomplete data: %w", err)
 	}
 
-	updates, err := r.store.ListUpdates(ctx, domain.UpdateFilter{
+	updates, err := r.updates.List(ctx, domain.UpdateFilter{
 		DataType: domain.UpdateDataSnapshots, Status: domain.UpdateStatusIncomplete,
 	})
 	if err != nil {

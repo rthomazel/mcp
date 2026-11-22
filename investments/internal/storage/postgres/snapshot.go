@@ -65,8 +65,8 @@ INSERT INTO updates (provider, data_type, started_at, completed_at, status, reco
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9::date, $10)`
 )
 
-// LatestSessionDate returns the latest price date across all instruments.
-func (s *Store) LatestSessionDate(ctx context.Context) (*domain.Date, error) {
+// latestSessionDate returns the latest price date across all instruments.
+func (s *Store) latestSessionDate(ctx context.Context) (*domain.Date, error) {
 	var latest sql.NullTime
 
 	if err := s.db.GetContext(ctx, &latest, latestSessionDateSQL); err != nil {
@@ -82,8 +82,8 @@ func (s *Store) LatestSessionDate(ctx context.Context) (*domain.Date, error) {
 	return &latest.Time, nil
 }
 
-// RecordUpdate appends one row to the updates log.
-func (s *Store) RecordUpdate(ctx context.Context, update domain.Update) error {
+// Record appends one row to the updates log.
+func (s *Updates) Record(ctx context.Context, update domain.Update) error {
 	if err := update.Validate(); err != nil {
 		return err
 	}
@@ -114,9 +114,9 @@ func nullIfEmpty(value string) *string {
 	return &value
 }
 
-// WriteSnapshot writes the snapshot rows for one date and logs the outcome in
+// Write writes the snapshot rows for one date and logs the outcome in
 // one transaction, so the idempotency marker never disagrees with the rows.
-func (s *Store) WriteSnapshot(ctx context.Context, date domain.Date) (domain.SnapshotResult, error) {
+func (s *Snapshots) Write(ctx context.Context, date domain.Date) (domain.SnapshotResult, error) {
 	if err := s.checkNotFuture(date); err != nil {
 		return domain.SnapshotResult{}, err
 	}
@@ -202,9 +202,9 @@ func (s *Store) WriteSnapshot(ctx context.Context, date domain.Date) (domain.Sna
 	return result, nil
 }
 
-// RebuildSnapshots replaces the snapshots for every price date in the range,
+// Rebuild replaces the snapshots for every price date in the range,
 // all or nothing.
-func (s *Store) RebuildSnapshots(ctx context.Context, from, to domain.Date, reason string) (domain.RebuildResult, error) {
+func (s *Snapshots) Rebuild(ctx context.Context, from, to domain.Date, reason string) (domain.RebuildResult, error) {
 	reason = strings.TrimSpace(reason)
 
 	switch {
@@ -305,7 +305,7 @@ func (s *Store) RebuildSnapshots(ctx context.Context, from, to domain.Date, reas
 
 // recordFailedRebuild logs the failed rebuild after its transaction rolled
 // back. A failure to log is itself logged and not returned.
-func (s *Store) recordFailedRebuild(ctx context.Context, started time.Time, from, to domain.Date, reason string, cause error) {
+func (s *Snapshots) recordFailedRebuild(ctx context.Context, started time.Time, from, to domain.Date, reason string, cause error) {
 	err := insertUpdate(ctx, s.db, domain.Update{
 		DataType: domain.UpdateDataSnapshotRebuild, StartedAt: started, CompletedAt: time.Now(),
 		Status: domain.UpdateStatusFailed, ErrorMessage: cause.Error(),
@@ -316,7 +316,7 @@ func (s *Store) recordFailedRebuild(ctx context.Context, started time.Time, from
 	}
 }
 
-func (s *Store) checkNotFuture(date domain.Date) error {
+func (s *Snapshots) checkNotFuture(date domain.Date) error {
 	if date.After(s.referenceDate(nil)) {
 		return fmt.Errorf("%w: %s is in the future", domain.ErrInvalidInput, date.Format(time.DateOnly))
 	}
@@ -387,8 +387,8 @@ func insertCashSnapshot(ctx context.Context, tx *sqlx.Tx, date domain.Date) (boo
 	return true, nil
 }
 
-// ListSnapshots returns snapshot rows, newest date first, each with its date's total.
-func (s *Store) ListSnapshots(ctx context.Context, filter domain.SnapshotFilter) ([]domain.SnapshotRow, error) {
+// List returns snapshot rows, newest date first, each with its date's total.
+func (s *Snapshots) List(ctx context.Context, filter domain.SnapshotFilter) ([]domain.SnapshotRow, error) {
 	if err := filter.Validate(); err != nil {
 		return nil, err
 	}
@@ -426,8 +426,8 @@ func (s *Store) ListSnapshots(ctx context.Context, filter domain.SnapshotFilter)
 	return snapshots, nil
 }
 
-// ListUpdates returns updates log rows, newest first.
-func (s *Store) ListUpdates(ctx context.Context, filter domain.UpdateFilter) ([]domain.Update, error) {
+// List returns updates log rows, newest first.
+func (s *Updates) List(ctx context.Context, filter domain.UpdateFilter) ([]domain.Update, error) {
 	if err := filter.Validate(); err != nil {
 		return nil, err
 	}

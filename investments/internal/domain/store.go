@@ -2,8 +2,10 @@ package domain
 
 import "context"
 
-// Store is the central persistence interface. Each method is a self-contained
-// unit of work in its own transaction. Implemented by internal/storage/postgres.
+// Store is the generic persistence interface: instruments, the ledger and the
+// read-only reports. Related methods live in the narrower stores below. Each
+// method of every store is a self-contained unit of work in its own
+// transaction. All are implemented by internal/storage/postgres.
 type Store interface {
 	// RegisterInstrument normalizes, validates and inserts draft. Returns
 	// ErrInvalidInput, or ErrInstrumentExists when the symbol and exchange are taken.
@@ -16,15 +18,6 @@ type Store interface {
 	RecordTransaction(ctx context.Context, draft DraftTransaction) (RecordResult, error)
 	// ListTransactions returns ledger entries matching filter, newest first by ledger order.
 	ListTransactions(ctx context.Context, filter TransactionFilter) ([]Transaction, error)
-	// RecordCashTransaction validates draft and inserts it. Returns
-	// ErrInvalidInput, including for a second opening balance. A balance that
-	// goes negative is not rejected. RebuildFrom reports stale cash snapshots.
-	RecordCashTransaction(ctx context.Context, draft CashTransaction) (CashRecordResult, error)
-	// ListCashTransactions returns cash transactions matching filter, newest first.
-	ListCashTransactions(ctx context.Context, filter CashTransactionFilter) ([]CashTransaction, error)
-	// GetCash returns the cash balance as of date, or today in the market
-	// timezone when nil; not initialized without an opening balance.
-	GetCash(ctx context.Context, date *Date) (CashBalance, error)
 	// GetStatus aggregates price freshness of held instruments, snapshot
 	// coverage and unresolved failed runs into a health view.
 	GetStatus(ctx context.Context) (Status, error)
@@ -37,50 +30,90 @@ type Store interface {
 	// GetPortfolio values active positions at real closes as of date, or today
 	// in the market timezone when nil, with average-cost P&L and cash.
 	GetPortfolio(ctx context.Context, date *Date) (Portfolio, error)
-	// UpsertPrices stores the bars for an instrument, replacing the record of
-	// any date already stored. All bars are stored or none. Returns
+}
+
+// CashStore holds cash transactions and the balance.
+type CashStore interface {
+	// Record validates draft and inserts it. Returns ErrInvalidInput,
+	// including for a second opening balance. A balance that goes negative is
+	// not rejected. RebuildFrom reports stale cash snapshots.
+	Record(ctx context.Context, draft CashTransaction) (CashRecordResult, error)
+	// List returns cash transactions matching filter, newest first.
+	List(ctx context.Context, filter CashTransactionFilter) ([]CashTransaction, error)
+	// Get returns the cash balance as of date, or today in the market
+	// timezone when nil; not initialized without an opening balance.
+	Get(ctx context.Context, date *Date) (CashBalance, error)
+}
+
+// PriceStore holds the stored daily prices.
+type PriceStore interface {
+	// Upsert stores the bars for an instrument, replacing the record of any
+	// date already stored. All bars are stored or none. Returns
 	// ErrInvalidInput or ErrInstrumentNotFound.
-	UpsertPrices(ctx context.Context, instrumentID int, bars []PriceBar) error
-	// LatestPriceDate returns the latest stored price date, nil when there is none.
-	LatestPriceDate(ctx context.Context, instrumentID int) (*Date, error)
+	Upsert(ctx context.Context, instrumentID int, bars []PriceBar) error
+	// LatestDate returns the latest stored price date, nil when there is none.
+	LatestDate(ctx context.Context, instrumentID int) (*Date, error)
 	// LatestSessionDate returns the latest price date across all instruments, nil when none.
 	LatestSessionDate(ctx context.Context) (*Date, error)
-	// WriteSnapshot writes the snapshot rows for one date and logs the outcome
-	// in one transaction. It does nothing for a completed date and writes no
-	// rows when an active instrument lacks a price dated on date. Returns
+	// List returns the stored price records of one instrument, newest first,
+	// limited. Returns ErrInvalidInput.
+	List(ctx context.Context, filter PriceFilter) ([]PriceBar, error)
+}
+
+// SnapshotStore holds the daily snapshots.
+type SnapshotStore interface {
+	// Write writes the snapshot rows for one date and logs the outcome in one
+	// transaction. It does nothing for a completed date and writes no rows
+	// when an active instrument lacks a price dated on date. Returns
 	// ErrInvalidInput or ErrSnapshotExists.
-	WriteSnapshot(ctx context.Context, date Date) (SnapshotResult, error)
-	// RebuildSnapshots replaces the snapshots for every price date in the
-	// range, all or nothing, and logs the rebuild. Returns ErrInvalidInput or
-	// an IncompleteSnapshotError.
-	RebuildSnapshots(ctx context.Context, from, to Date, reason string) (RebuildResult, error)
-	// RecordUpdate appends one row to the updates log. Returns ErrInvalidInput.
-	RecordUpdate(ctx context.Context, update Update) error
-	// ListPrices returns the stored price records of one instrument, newest
-	// first, limited. Returns ErrInvalidInput.
-	ListPrices(ctx context.Context, filter PriceFilter) ([]PriceBar, error)
-	// ListSnapshots returns snapshot rows, newest date first then by symbol and
+	Write(ctx context.Context, date Date) (SnapshotResult, error)
+	// Rebuild replaces the snapshots for every price date in the range, all or
+	// nothing, and logs the rebuild. Returns ErrInvalidInput or an
+	// IncompleteSnapshotError.
+	Rebuild(ctx context.Context, from, to Date, reason string) (RebuildResult, error)
+	// List returns snapshot rows, newest date first then by symbol and
 	// exchange, limited. Returns ErrInvalidInput.
-	ListSnapshots(ctx context.Context, filter SnapshotFilter) ([]SnapshotRow, error)
-	// ListUpdates returns updates log rows, newest first, limited. Returns ErrInvalidInput.
-	ListUpdates(ctx context.Context, filter UpdateFilter) ([]Update, error)
-	// RecordEvent validates draft and inserts it into the outbox. With a
-	// subject, an existing event of the same type and subject makes it a no-op
+	List(ctx context.Context, filter SnapshotFilter) ([]SnapshotRow, error)
+}
+
+// UpdateStore holds the updates log.
+type UpdateStore interface {
+	// Record appends one row to the updates log. Returns ErrInvalidInput.
+	Record(ctx context.Context, update Update) error
+	// List returns updates log rows, newest first, limited. Returns ErrInvalidInput.
+	List(ctx context.Context, filter UpdateFilter) ([]Update, error)
+}
+
+// EventStore holds the events outbox.
+type EventStore interface {
+	// Record validates draft and inserts it into the outbox. With a subject,
+	// an existing event of the same type and subject makes it a no-op
 	// reporting created false. Returns ErrInvalidInput.
-	RecordEvent(ctx context.Context, draft DraftEvent) (created bool, err error)
-	// ListDueEvents returns up to limit events Event.Eligible accepts now whose
-	// type starts with typePrefix (empty for any), oldest first. Returns
+	Record(ctx context.Context, draft DraftEvent) (created bool, err error)
+	// ListDue returns up to limit events Event.Eligible accepts now whose type
+	// starts with typePrefix (empty for any), oldest first. Returns
 	// ErrInvalidInput for a non-positive limit.
-	ListDueEvents(ctx context.Context, typePrefix string, limit int) ([]Event, error)
-	// SaveEventOutcome applies one handling pass in one transaction: merges
+	ListDue(ctx context.Context, typePrefix string, limit int) ([]Event, error)
+	// SaveOutcome applies one handling pass in one transaction: merges
 	// succeeded handler names, marks handled, or counts a failure with backoff
-	// and gives up at the configured maximum failures (error log, notification.failed event).
-	// Returns ErrInvalidInput or ErrEventNotFound.
-	SaveEventOutcome(ctx context.Context, id int64, outcome EventOutcome) error
-	// RemoveEvent deletes an event given up on or expired. Returns
+	// and gives up at the configured maximum failures (error log,
+	// notification.failed event). Returns ErrInvalidInput or ErrEventNotFound.
+	SaveOutcome(ctx context.Context, id int64, outcome EventOutcome) error
+	// Remove deletes an event given up on or expired. Returns
 	// ErrEventNotFound or ErrEventNotRemovable.
-	RemoveEvent(ctx context.Context, id int64) error
-	// PruneEvents deletes fully handled events older than the configured retention and
-	// returns how many.
-	PruneEvents(ctx context.Context) (int, error)
+	Remove(ctx context.Context, id int64) error
+	// Prune deletes fully handled events older than the configured retention
+	// and returns how many.
+	Prune(ctx context.Context) (int, error)
+}
+
+// Stores bundles every store for the consumers that need several, such as the
+// tool handlers. A consumer that needs one takes that one.
+type Stores struct {
+	Store     Store
+	Cash      CashStore
+	Prices    PriceStore
+	Snapshots SnapshotStore
+	Updates   UpdateStore
+	Events    EventStore
 }

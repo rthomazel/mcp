@@ -13,7 +13,7 @@ import (
 )
 
 type fakeStore struct {
-	domain.Store
+	domain.EventStore
 
 	due      []domain.Event
 	prefix   string
@@ -22,13 +22,13 @@ type fakeStore struct {
 	pruned   int
 }
 
-func (s *fakeStore) ListDueEvents(_ context.Context, prefix string, _ int) ([]domain.Event, error) {
+func (s *fakeStore) ListDue(_ context.Context, prefix string, _ int) ([]domain.Event, error) {
 	s.prefix = prefix
 
 	return s.due, s.listErr
 }
 
-func (s *fakeStore) SaveEventOutcome(_ context.Context, id int64, outcome domain.EventOutcome) error {
+func (s *fakeStore) SaveOutcome(_ context.Context, id int64, outcome domain.EventOutcome) error {
 	if s.outcomes == nil {
 		s.outcomes = map[int64]domain.EventOutcome{}
 	}
@@ -38,13 +38,13 @@ func (s *fakeStore) SaveEventOutcome(_ context.Context, id int64, outcome domain
 	return nil
 }
 
-func (s *fakeStore) PruneEvents(context.Context) (int, error) {
+func (s *fakeStore) Prune(context.Context) (int, error) {
 	s.pruned++
 
 	return 0, nil
 }
 
-func newWorker(store domain.Store, source domain.EventHandlerSource) *Worker {
+func newWorker(store domain.EventStore, source domain.EventHandlerSource) *Worker {
 	return NewWorker(store, source, Settings{TypePrefix: domain.NotificationPrefix,
 		PollInterval: time.Second, PruneInterval: time.Hour, BatchLimit: 100, HandlerTimeout: time.Second,
 	})

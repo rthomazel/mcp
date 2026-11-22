@@ -11,7 +11,7 @@ Description shown to the agent: Read the log of price refreshes, daily snapshot 
 - status string, optional, one of completed, incomplete, failed
 
 1. Parse the parameters.
-2. List through store.ListUpdates.
+2. List through store.Updates.List.
 3. Return the entries.
 
 #### Errors

@@ -39,7 +39,7 @@ func run() error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	store, cleanup, err := postgres.Open(cfg.DSN, postgres.Settings{
+	stores, cleanup, err := postgres.Open(cfg.DSN, postgres.Settings{
 		StalePriceDays: cfg.StalePriceDays, MarketTimezone: cfg.MarketTimezone, MaxHistoryPoints: cfg.MaxHistoryPoints,
 		Events: domain.EventPolicy{
 			MaxFailures: cfg.EventMaxFailures, BackoffBase: cfg.EventBackoffBase,
@@ -51,17 +51,17 @@ func run() error {
 	}
 	defer func() { _ = cleanup() }()
 
-	if err := migrate(store); err != nil {
+	if err := migrate(stores); err != nil {
 		return fmt.Errorf("migrating: %w", err)
 	}
 
 	provider := tiingo.NewClient(cfg.TiingoAPIKey, "")
-	refresher := marketdata.NewPriceRefresher(store, provider)
-	job := marketdata.NewJob(store, refresher, provider.Name())
+	refresher := marketdata.NewPriceRefresher(stores, stores.Prices, provider)
+	job := marketdata.NewJob(stores.Prices, stores.Snapshots, stores.Updates, refresher, provider.Name())
 
 	tasks := []domain.ScheduledTask{marketdata.RefreshTask(job)}
 
-	for _, m := range []monitor.Monitor{monitor.NewSnapshotIncomplete(store)} {
+	for _, m := range []monitor.Monitor{monitor.NewSnapshotIncomplete(stores, stores.Events)} {
 		tasks = append(tasks, monitor.Task(m, cfg.MonitorTimeout))
 	}
 
@@ -78,8 +78,8 @@ func run() error {
 
 	running.Go(func() { scheduler.Run(ctx) })
 
-	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), store, cfg.TelegramBotToken)
-	eventsWorker := events.NewWorker(store, source, events.Settings{
+	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), stores.Updates, cfg.TelegramBotToken)
+	eventsWorker := events.NewWorker(stores.Events, source, events.Settings{
 		TypePrefix:   domain.NotificationPrefix,
 		PollInterval: cfg.WorkerPollInterval, PruneInterval: cfg.WorkerPruneInterval,
 		BatchLimit: cfg.WorkerBatchLimit, HandlerTimeout: cfg.WorkerHandlerTimeout,
@@ -93,7 +93,7 @@ func run() error {
 	}()
 
 	mcpServer := server.NewMCPServer("investments-mcp", version)
-	handlers.New(store, refresher, cfg.QueryTimeout).Register(mcpServer)
+	handlers.New(stores.Domain(), refresher, cfg.QueryTimeout).Register(mcpServer)
 
 	return server.ServeStdio(mcpServer)
 }

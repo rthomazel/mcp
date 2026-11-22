@@ -6,13 +6,14 @@ snapshotIncompleteAt = 07:00 in the market timezone, an hour after the last pric
 
 ## SnapshotIncomplete
 
-1. store domain.Store
+1. store domain.Store, for the status
+2. events domain.EventStore, where the event is recorded
 
 The monitor for a latest price date without a completed snapshot.
 
 # Functions
 
-## NewSnapshotIncomplete(store domain.Store) *SnapshotIncomplete
+## NewSnapshotIncomplete(store domain.Store, events domain.EventStore) *SnapshotIncomplete
 
 Build the monitor.
 
@@ -28,7 +29,7 @@ Return snapshotIncompleteAt.
 
 1. Read the status through store.GetStatus.
 2. if no price date exists, or the latest price date has a completed snapshot, log at info level and return nil.
-3. Record a snapshot-incomplete event through store.RecordEvent, with the date as its subject, as YYYY-MM-DD, and as its payload.
+3. Record a snapshot-incomplete event through store.Events.Record, with the date as its subject, as YYYY-MM-DD, and as its payload.
 4. Log at info level whether it was recorded or the date was already announced.
 5. Return nil.
 

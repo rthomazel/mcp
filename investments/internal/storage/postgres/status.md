@@ -48,6 +48,6 @@ The given-up and expired event queries, givenUpEventsSQL and expiredEventsSQL, a
 
 Only held instruments are checked, matching the refresh, which stops refreshing a sold instrument; a sold instrument's old prices are not a fault.
 The five-day threshold already tolerates mutual funds, which publish a day later and so show a latest price a day behind.
-A null error message, reason, provider or date in the attention rows becomes the empty value or nil, as in ListUpdates.
+A null error message, reason, provider or date in the attention rows becomes the empty value or nil, as in Updates.List.
 Given-up events are told apart from expired ones by the event's ExpiredAt, not by when it was given up on; an event is given up on within hours of being recorded, so the two agree in practice. A given-up event therefore needs attention until its ExpiredAt and then moves, unchanged, to the expired list.
 All reads are independent selects on one handle; no transaction, since each is a point-in-time fact and a concurrent run changing between them only makes the next call correct.

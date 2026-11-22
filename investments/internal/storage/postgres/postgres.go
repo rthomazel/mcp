@@ -25,9 +25,17 @@ const (
 	postgresCheckViolation      = "23514"
 )
 
-var _ domain.Store = (*Store)(nil)
+var (
+	_ domain.Store         = (*Store)(nil)
+	_ domain.CashStore     = (*Cash)(nil)
+	_ domain.PriceStore    = (*Prices)(nil)
+	_ domain.SnapshotStore = (*Snapshots)(nil)
+	_ domain.UpdateStore   = (*Updates)(nil)
+	_ domain.EventStore    = (*Events)(nil)
+)
 
-// Store implements domain.Store; its methods are spread across files by concern.
+// Store implements domain.Store and holds what every store shares: the
+// connection and the settings. Its methods are spread across files by concern.
 type Store struct {
 	db               *sqlx.DB
 	stalePriceDays   int
@@ -35,6 +43,33 @@ type Store struct {
 	maxHistoryPoints int
 	events           domain.EventPolicy
 	clock            func() time.Time // replaceable in tests
+}
+
+// Cash, Prices, Snapshots, Updates and Events implement the narrower stores.
+// Each shares the Store's connection and settings.
+type (
+	Cash      struct{ *Store }
+	Prices    struct{ *Store }
+	Snapshots struct{ *Store }
+	Updates   struct{ *Store }
+	Events    struct{ *Store }
+)
+
+// Stores is every store over one connection. The embedded Store is the generic
+// one, so Stores itself also implements domain.Store.
+type Stores struct {
+	*Store
+
+	Cash      *Cash
+	Prices    *Prices
+	Snapshots *Snapshots
+	Updates   *Updates
+	Events    *Events
+}
+
+// Domain returns the stores as the domain bundle.
+func (s *Stores) Domain() domain.Stores {
+	return domain.Stores{Store: s.Store, Cash: s.Cash, Prices: s.Prices, Snapshots: s.Snapshots, Updates: s.Updates, Events: s.Events}
 }
 
 // Settings are the store's tunables, taken from the server configuration.
@@ -45,8 +80,8 @@ type Settings struct {
 	Events           domain.EventPolicy
 }
 
-// Open connects to the database and returns the store and a cleanup function.
-func Open(dsn string, settings Settings) (*Store, func() error, error) {
+// Open connects to the database and returns the stores and a cleanup function.
+func Open(dsn string, settings Settings) (*Stores, func() error, error) {
 	connConfig, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing dsn: %w", err)
@@ -81,7 +116,10 @@ func Open(dsn string, settings Settings) (*Store, func() error, error) {
 		maxHistoryPoints: settings.MaxHistoryPoints, events: settings.Events, clock: time.Now,
 	}
 
-	return store, handle.Close, nil
+	return &Stores{
+		Store: store, Cash: &Cash{store}, Prices: &Prices{store}, Snapshots: &Snapshots{store},
+		Updates: &Updates{store}, Events: &Events{store},
+	}, handle.Close, nil
 }
 
 // DB returns the underlying handle, used by the migration runner.

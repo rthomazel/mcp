@@ -10,7 +10,7 @@
 6. AdjustedClose Decimal, kept for future total-return analysis
 7. Volume int64, zero for mutual funds
 
-A provider-independent daily price record for one instrument. It carries no instrument identity; Store.UpsertPrices attaches it.
+A provider-independent daily price record for one instrument. It carries no instrument identity; Prices.Upsert attaches it.
 
 ## PriceFilter
 

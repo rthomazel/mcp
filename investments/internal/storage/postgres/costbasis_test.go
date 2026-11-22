@@ -11,7 +11,7 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
-func recordFee(t *testing.T, store *Store, instrumentID int, event domain.EventType, quantity, cash, fee string, effective domain.Date) error {
+func recordFee(t *testing.T, store *Stores, instrumentID int, event domain.EventType, quantity, cash, fee string, effective domain.Date) error {
 	t.Helper()
 
 	_, err := store.RecordTransaction(context.Background(), domain.DraftTransaction{
@@ -23,7 +23,7 @@ func recordFee(t *testing.T, store *Store, instrumentID int, event domain.EventT
 	return err
 }
 
-func mustRecord(t *testing.T, store *Store, instrumentID int, event domain.EventType, quantity, cash string, effective domain.Date) {
+func mustRecord(t *testing.T, store *Stores, instrumentID int, event domain.EventType, quantity, cash string, effective domain.Date) {
 	t.Helper()
 
 	_, err := record(t, store, instrumentID, event, quantity, cash, effective)

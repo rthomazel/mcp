@@ -37,7 +37,7 @@ func TestMigrateAppliesSchemaAndIsRepeatable(t *testing.T) {
 
 	u.Path = "/" + name
 
-	store, cleanup, err := postgres.Open(u.String(), postgres.Settings{StalePriceDays: 5, MarketTimezone: defaults.MarketTimezone, MaxHistoryPoints: defaults.MaxHistoryPoints})
+	stores, cleanup, err := postgres.Open(u.String(), postgres.Settings{StalePriceDays: 5, MarketTimezone: defaults.MarketTimezone, MaxHistoryPoints: defaults.MaxHistoryPoints})
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -46,11 +46,11 @@ func TestMigrateAppliesSchemaAndIsRepeatable(t *testing.T) {
 		_ = admin.Close(ctx)
 	})
 
-	require.NoError(t, migrate(store))
-	require.NoError(t, migrate(store), "a second run is a no-op")
+	require.NoError(t, migrate(stores))
+	require.NoError(t, migrate(stores), "a second run is a no-op")
 
 	var tables int
-	require.NoError(t, store.DB().QueryRow(
+	require.NoError(t, stores.DB().QueryRow(
 		`SELECT count(*) FROM information_schema.tables
 		 WHERE table_schema = 'public'
 		   AND table_name IN ('instruments', 'transactions', 'prices', 'snapshots', 'updates')`).Scan(&tables))

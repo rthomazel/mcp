@@ -12,7 +12,7 @@ import (
 
 // seedSeries stores one snapshot row per day with the given market value,
 // starting on start. A zero value skips the day.
-func seedSeries(t *testing.T, store *Store, instrumentID int, start domain.Date, values ...int) {
+func seedSeries(t *testing.T, store *Stores, instrumentID int, start domain.Date, values ...int) {
 	t.Helper()
 
 	for offset, value := range values {
@@ -27,7 +27,7 @@ func seedSeries(t *testing.T, store *Store, instrumentID int, start domain.Date,
 	}
 }
 
-func seedCashSnapshot(t *testing.T, store *Store, on domain.Date, balance string) {
+func seedCashSnapshot(t *testing.T, store *Stores, on domain.Date, balance string) {
 	t.Helper()
 
 	_, err := store.DB().Exec(`INSERT INTO cash_snapshots (date, balance_usd) VALUES ($1, $2::numeric)`, on, balance)

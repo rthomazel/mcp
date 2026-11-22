@@ -9,7 +9,7 @@ Description shown to the agent: Remove an event from the notification outbox onc
 - id int, required, the event id from get_status
 
 1. Parse the id.
-2. Remove through store.RemoveEvent.
+2. Remove through store.Events.Remove.
 3. Return the removed id.
 
 #### Errors

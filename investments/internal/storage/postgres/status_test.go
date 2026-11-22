@@ -11,7 +11,7 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
-func insertRun(t *testing.T, store *Store, dataType, status string, started time.Time, from, to *domain.Date) {
+func insertRun(t *testing.T, store *Stores, dataType, status string, started time.Time, from, to *domain.Date) {
 	t.Helper()
 
 	_, err := store.DB().Exec(

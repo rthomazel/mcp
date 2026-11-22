@@ -12,7 +12,7 @@ import (
 )
 
 // seedHolding registers a symbol bought on the given day and priced on the days.
-func seedHolding(t *testing.T, store *Store, symbol, quantity string, bought domain.Date, priced ...domain.Date) domain.Instrument {
+func seedHolding(t *testing.T, store *Stores, symbol, quantity string, bought domain.Date, priced ...domain.Date) domain.Instrument {
 	t.Helper()
 
 	instrument := registerETF(t, store, symbol)
@@ -26,7 +26,7 @@ func seedHolding(t *testing.T, store *Store, symbol, quantity string, bought dom
 	return instrument
 }
 
-func snapshotCount(t *testing.T, store *Store, on domain.Date) int {
+func snapshotCount(t *testing.T, store *Stores, on domain.Date) int {
 	t.Helper()
 
 	var count int
@@ -36,7 +36,7 @@ func snapshotCount(t *testing.T, store *Store, on domain.Date) int {
 	return count
 }
 
-func updateStatuses(t *testing.T, store *Store, dataType string) []string {
+func updateStatuses(t *testing.T, store *Stores, dataType string) []string {
 	t.Helper()
 
 	statuses := []string{}
@@ -61,7 +61,7 @@ func TestWriteSnapshotComplete(t *testing.T) {
 	seedHolding(t, store, "VTI", "3", date(2026, 11, 2), date(2026, 11, 2))
 	seedHolding(t, store, "BND", "2", date(2026, 11, 2), date(2026, 11, 2))
 
-	result, err := store.WriteSnapshot(ctx, date(2026, 11, 2))
+	result, err := store.Snapshots.Write(ctx, date(2026, 11, 2))
 
 	require.NoError(t, err)
 	assert.True(t, result.Complete)
@@ -81,10 +81,10 @@ func TestWriteSnapshotIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	seedHolding(t, store, "VTI", "3", date(2026, 11, 2), date(2026, 11, 2))
 
-	_, err := store.WriteSnapshot(ctx, date(2026, 11, 2))
+	_, err := store.Snapshots.Write(ctx, date(2026, 11, 2))
 	require.NoError(t, err)
 
-	result, err := store.WriteSnapshot(ctx, date(2026, 11, 2))
+	result, err := store.Snapshots.Write(ctx, date(2026, 11, 2))
 
 	require.NoError(t, err)
 	assert.True(t, result.Skipped)
@@ -98,13 +98,13 @@ func TestWriteSnapshotNoPositionsIsCompleteAndMarked(t *testing.T) {
 	other := registerETF(t, store, "VTI")
 	insertPrice(t, store, other.ID, date(2026, 11, 2), "10")
 
-	result, err := store.WriteSnapshot(ctx, date(2026, 11, 2))
+	result, err := store.Snapshots.Write(ctx, date(2026, 11, 2))
 
 	require.NoError(t, err)
 	assert.True(t, result.Complete)
 	assert.Zero(t, result.Rows)
 
-	again, err := store.WriteSnapshot(ctx, date(2026, 11, 2))
+	again, err := store.Snapshots.Write(ctx, date(2026, 11, 2))
 	require.NoError(t, err)
 	assert.True(t, again.Skipped, "the updates row marks a date with no positions")
 }
@@ -115,7 +115,7 @@ func TestWriteSnapshotMissingPriceWritesNothing(t *testing.T) {
 	seedHolding(t, store, "VTI", "3", date(2026, 11, 2), date(2026, 11, 2))
 	seedHolding(t, store, "BND", "2", date(2026, 11, 2))
 
-	result, err := store.WriteSnapshot(ctx, date(2026, 11, 2))
+	result, err := store.Snapshots.Write(ctx, date(2026, 11, 2))
 
 	require.NoError(t, err)
 	assert.False(t, result.Complete)
@@ -128,7 +128,7 @@ func TestWriteSnapshotMissingPriceWritesNothing(t *testing.T) {
 	// Completing the price and retrying succeeds: incomplete is not a marker.
 	insertPrice(t, store, result.Issues[0].InstrumentID, date(2026, 11, 2), "10")
 
-	retry, err := store.WriteSnapshot(ctx, date(2026, 11, 2))
+	retry, err := store.Snapshots.Write(ctx, date(2026, 11, 2))
 	require.NoError(t, err)
 	assert.True(t, retry.Complete)
 	assert.Equal(t, 2, retry.Rows)
@@ -143,7 +143,7 @@ func TestWriteSnapshotOlderPriceIsStaleNotUsed(t *testing.T) {
 	require.NoError(t, err)
 	insertPrice(t, store, other.ID, date(2026, 10, 30), "10")
 
-	result, err := store.WriteSnapshot(context.Background(), date(2026, 11, 2))
+	result, err := store.Snapshots.Write(context.Background(), date(2026, 11, 2))
 
 	require.NoError(t, err)
 	assert.False(t, result.Complete)
@@ -157,7 +157,7 @@ func TestWriteSnapshotExistingRowsAreNeverOverwritten(t *testing.T) {
 	instrument := seedHolding(t, store, "VTI", "3", date(2026, 11, 2), date(2026, 11, 2))
 	insertSnapshot(t, store, instrument.ID, date(2026, 11, 2))
 
-	_, err := store.WriteSnapshot(context.Background(), date(2026, 11, 2))
+	_, err := store.Snapshots.Write(context.Background(), date(2026, 11, 2))
 
 	assert.ErrorIs(t, err, domain.ErrSnapshotExists)
 	assert.Empty(t, updateStatuses(t, store, "snapshots"))
@@ -166,7 +166,7 @@ func TestWriteSnapshotExistingRowsAreNeverOverwritten(t *testing.T) {
 func TestWriteSnapshotRejectsFutureDate(t *testing.T) {
 	store := newTestStore(t)
 
-	_, err := store.WriteSnapshot(context.Background(), time.Now().AddDate(0, 0, 3).UTC().Truncate(24*time.Hour))
+	_, err := store.Snapshots.Write(context.Background(), time.Now().AddDate(0, 0, 3).UTC().Truncate(24*time.Hour))
 
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
@@ -177,7 +177,7 @@ func TestWriteSnapshotUsesHistoricalPositions(t *testing.T) {
 	_, err := record(t, store, instrument.ID, domain.EventSell, "-1", "10", date(2026, 11, 3))
 	require.NoError(t, err)
 
-	_, err = store.WriteSnapshot(context.Background(), date(2026, 11, 2))
+	_, err = store.Snapshots.Write(context.Background(), date(2026, 11, 2))
 	require.NoError(t, err)
 
 	var quantity string
@@ -195,7 +195,7 @@ func TestRebuildReplacesRangeAndIsLogged(t *testing.T) {
 	_, err := record(t, store, instrument.ID, domain.EventBuy, "1", "-10", date(2026, 11, 3))
 	require.NoError(t, err)
 
-	result, err := store.RebuildSnapshots(ctx, date(2026, 11, 3), date(2026, 11, 4), " backdated buy ")
+	result, err := store.Snapshots.Rebuild(ctx, date(2026, 11, 3), date(2026, 11, 4), " backdated buy ")
 
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.Dates)
@@ -210,7 +210,7 @@ func TestRebuildReplacesRangeAndIsLogged(t *testing.T) {
 	assert.Equal(t, "backdated buy", reason)
 
 	// A rebuilt date counts as completed for the price refresh job.
-	again, err := store.WriteSnapshot(ctx, date(2026, 11, 4))
+	again, err := store.Snapshots.Write(ctx, date(2026, 11, 4))
 	require.NoError(t, err)
 	assert.True(t, again.Skipped)
 }
@@ -222,7 +222,7 @@ func TestRebuildIsAllOrNothing(t *testing.T) {
 	seedHolding(t, store, "BND", "2", date(2026, 11, 2), date(2026, 11, 2))
 	insertSnapshot(t, store, vti.ID, date(2026, 11, 2))
 
-	_, err := store.RebuildSnapshots(ctx, date(2026, 11, 2), date(2026, 11, 3), "fix")
+	_, err := store.Snapshots.Rebuild(ctx, date(2026, 11, 2), date(2026, 11, 3), "fix")
 
 	var incomplete *domain.IncompleteSnapshotError
 
@@ -237,13 +237,13 @@ func TestRebuildValidation(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	_, err := store.RebuildSnapshots(ctx, date(2026, 11, 2), date(2026, 11, 3), "  ")
+	_, err := store.Snapshots.Rebuild(ctx, date(2026, 11, 2), date(2026, 11, 3), "  ")
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 
-	_, err = store.RebuildSnapshots(ctx, date(2026, 11, 3), date(2026, 11, 2), "fix")
+	_, err = store.Snapshots.Rebuild(ctx, date(2026, 11, 3), date(2026, 11, 2), "fix")
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 
-	_, err = store.RebuildSnapshots(ctx, date(2026, 11, 2), time.Now().AddDate(0, 0, 3).UTC().Truncate(24*time.Hour), "fix")
+	_, err = store.Snapshots.Rebuild(ctx, date(2026, 11, 2), time.Now().AddDate(0, 0, 3).UTC().Truncate(24*time.Hour), "fix")
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
@@ -251,7 +251,7 @@ func TestLatestSessionDate(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	latest, err := store.LatestSessionDate(ctx)
+	latest, err := store.Prices.LatestSessionDate(ctx)
 	require.NoError(t, err)
 	assert.Nil(t, latest)
 
@@ -259,7 +259,7 @@ func TestLatestSessionDate(t *testing.T) {
 	insertPrice(t, store, a.ID, date(2026, 11, 2), "1")
 	insertPrice(t, store, b.ID, date(2026, 11, 4), "1")
 
-	latest, err = store.LatestSessionDate(ctx)
+	latest, err = store.Prices.LatestSessionDate(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, date(2026, 11, 4), *latest)
 }
@@ -272,19 +272,19 @@ func TestNoSnapshotForAWeekend(t *testing.T) {
 	seedHolding(t, store, "VTI", "3", date(2026, 11, 2), friday, monday)
 
 	// The price refresh job snapshots the latest price date, which is never a weekend day.
-	latest, err := store.LatestSessionDate(ctx)
+	latest, err := store.Prices.LatestSessionDate(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, monday, *latest)
 
 	// Asking for the weekend directly writes nothing and is recorded incomplete.
-	result, err := store.WriteSnapshot(ctx, saturday)
+	result, err := store.Snapshots.Write(ctx, saturday)
 	require.NoError(t, err)
 	assert.False(t, result.Complete)
 	assert.Zero(t, snapshotCount(t, store, saturday))
 	assert.Equal(t, []string{"incomplete"}, updateStatuses(t, store, "snapshots"))
 
 	// A rebuild over the weekend writes the two session dates only.
-	rebuilt, err := store.RebuildSnapshots(ctx, friday, monday, "weekend check")
+	rebuilt, err := store.Snapshots.Rebuild(ctx, friday, monday, "weekend check")
 	require.NoError(t, err)
 	assert.Equal(t, 2, rebuilt.Dates)
 	assert.Zero(t, snapshotCount(t, store, saturday))
@@ -297,13 +297,13 @@ func TestRecordUpdate(t *testing.T) {
 	provider := "tiingo"
 	now := time.Now()
 
-	require.NoError(t, store.RecordUpdate(ctx, domain.Update{
+	require.NoError(t, store.Updates.Record(ctx, domain.Update{
 		Provider: &provider, DataType: domain.UpdateDataPrices, StartedAt: now, CompletedAt: now,
 		Status: domain.UpdateStatusIncomplete, RecordsUpdated: 4, ErrorMessage: "not refreshed: VTI",
 	}))
 	assert.Equal(t, []string{"incomplete"}, updateStatuses(t, store, "prices"))
 
-	err := store.RecordUpdate(ctx, domain.Update{DataType: "bogus", Status: domain.UpdateStatusCompleted})
+	err := store.Updates.Record(ctx, domain.Update{DataType: "bogus", Status: domain.UpdateStatusCompleted})
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
@@ -317,14 +317,14 @@ func TestSnapshotIgnoresSessionTimezone(t *testing.T) {
 
 	seedHolding(t, store, "VTI", "3", date(2026, 11, 2), date(2026, 11, 2))
 
-	result, err := store.WriteSnapshot(context.Background(), date(2026, 11, 2))
+	result, err := store.Snapshots.Write(context.Background(), date(2026, 11, 2))
 
 	require.NoError(t, err)
 	assert.True(t, result.Complete)
 	assert.Equal(t, 1, snapshotCount(t, store, date(2026, 11, 2)))
 }
 
-func currentDatabase(t *testing.T, store *Store) string {
+func currentDatabase(t *testing.T, store *Stores) string {
 	t.Helper()
 
 	var name string
@@ -343,22 +343,22 @@ func TestListPrices(t *testing.T) {
 		insertPrice(t, store, instrument.ID, date(2026, 11, day), "10.50")
 	}
 
-	bars, err := store.ListPrices(ctx, domain.PriceFilter{InstrumentID: instrument.ID, From: dp(date(2026, 11, 3)), To: dp(date(2026, 11, 4))})
+	bars, err := store.Prices.List(ctx, domain.PriceFilter{InstrumentID: instrument.ID, From: dp(date(2026, 11, 3)), To: dp(date(2026, 11, 4))})
 
 	require.NoError(t, err)
 	require.Len(t, bars, 2)
 	assert.Equal(t, date(2026, 11, 4), bars[0].Date, "newest first")
 	assert.Equal(t, domain.Decimal("10.50"), bars[0].Close, "exact decimal text")
 
-	limited, err := store.ListPrices(ctx, domain.PriceFilter{InstrumentID: instrument.ID, Limit: 1})
+	limited, err := store.Prices.List(ctx, domain.PriceFilter{InstrumentID: instrument.ID, Limit: 1})
 	require.NoError(t, err)
 	assert.Len(t, limited, 1)
 
-	none, err := store.ListPrices(ctx, domain.PriceFilter{InstrumentID: 999})
+	none, err := store.Prices.List(ctx, domain.PriceFilter{InstrumentID: 999})
 	require.NoError(t, err)
 	assert.Empty(t, none, "an unknown instrument has no prices")
 
-	_, err = store.ListPrices(ctx, domain.PriceFilter{})
+	_, err = store.Prices.List(ctx, domain.PriceFilter{})
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
@@ -369,11 +369,11 @@ func TestListSnapshotsCarriesTheDateTotalAndAllocation(t *testing.T) {
 	seedHolding(t, store, "BND", "2", date(2026, 11, 2), date(2026, 11, 2), date(2026, 11, 3))
 
 	for _, day := range []int{2, 3} {
-		_, err := store.WriteSnapshot(ctx, date(2026, 11, day))
+		_, err := store.Snapshots.Write(ctx, date(2026, 11, day))
 		require.NoError(t, err)
 	}
 
-	rows, err := store.ListSnapshots(ctx, domain.SnapshotFilter{})
+	rows, err := store.Snapshots.List(ctx, domain.SnapshotFilter{})
 	require.NoError(t, err)
 	require.Len(t, rows, 4)
 	assert.Equal(t, date(2026, 11, 3), rows[0].Date, "newest date first")
@@ -382,20 +382,20 @@ func TestListSnapshotsCarriesTheDateTotalAndAllocation(t *testing.T) {
 	assert.Equal(t, domain.Decimal("20"), rows[0].MarketValueUSD)
 	assert.Equal(t, "0.4000000000000000", string(rows[0].Allocation)[:18])
 
-	filtered, err := store.ListSnapshots(ctx, domain.SnapshotFilter{InstrumentID: &vti.ID})
+	filtered, err := store.Snapshots.List(ctx, domain.SnapshotFilter{InstrumentID: &vti.ID})
 	require.NoError(t, err)
 	require.Len(t, filtered, 2)
 	assert.Equal(t, domain.Decimal("50"), filtered[0].DateTotalUSD, "the total ignores the instrument filter")
 
-	ranged, err := store.ListSnapshots(ctx, domain.SnapshotFilter{From: dp(date(2026, 11, 3))})
+	ranged, err := store.Snapshots.List(ctx, domain.SnapshotFilter{From: dp(date(2026, 11, 3))})
 	require.NoError(t, err)
 	assert.Len(t, ranged, 2)
 
-	limited, err := store.ListSnapshots(ctx, domain.SnapshotFilter{Limit: 3})
+	limited, err := store.Snapshots.List(ctx, domain.SnapshotFilter{Limit: 3})
 	require.NoError(t, err)
 	assert.Len(t, limited, 3)
 
-	_, err = store.ListSnapshots(ctx, domain.SnapshotFilter{Limit: -1})
+	_, err = store.Snapshots.List(ctx, domain.SnapshotFilter{Limit: -1})
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
@@ -413,10 +413,10 @@ func TestListUpdatesNewestFirstWithFilters(t *testing.T) {
 		update.StartedAt = base.Add(time.Duration(index) * time.Hour)
 		update.CompletedAt = update.StartedAt.Add(time.Minute)
 
-		require.NoError(t, store.RecordUpdate(ctx, update))
+		require.NoError(t, store.Updates.Record(ctx, update))
 	}
 
-	all, err := store.ListUpdates(ctx, domain.UpdateFilter{})
+	all, err := store.Updates.List(ctx, domain.UpdateFilter{})
 	require.NoError(t, err)
 	require.Len(t, all, 3)
 	assert.Equal(t, domain.UpdateDataSnapshotRebuild, all[0].DataType, "newest first")
@@ -426,15 +426,15 @@ func TestListUpdatesNewestFirstWithFilters(t *testing.T) {
 	assert.Equal(t, "tiingo", *all[2].Provider)
 	assert.NotZero(t, all[0].ID)
 
-	incomplete, err := store.ListUpdates(ctx, domain.UpdateFilter{Status: domain.UpdateStatusIncomplete})
+	incomplete, err := store.Updates.List(ctx, domain.UpdateFilter{Status: domain.UpdateStatusIncomplete})
 	require.NoError(t, err)
 	require.Len(t, incomplete, 1)
 	assert.Equal(t, "VTI missing", incomplete[0].ErrorMessage)
 
-	prices, err := store.ListUpdates(ctx, domain.UpdateFilter{DataType: domain.UpdateDataPrices, Limit: 1})
+	prices, err := store.Updates.List(ctx, domain.UpdateFilter{DataType: domain.UpdateDataPrices, Limit: 1})
 	require.NoError(t, err)
 	assert.Len(t, prices, 1)
 
-	_, err = store.ListUpdates(ctx, domain.UpdateFilter{DataType: "bogus"})
+	_, err = store.Updates.List(ctx, domain.UpdateFilter{DataType: "bogus"})
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }

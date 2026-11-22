@@ -14,12 +14,13 @@ var snapshotIncompleteAt = domain.ClockTime{Hour: 7}
 
 // SnapshotIncomplete watches for a latest price date without a completed snapshot.
 type SnapshotIncomplete struct {
-	store domain.Store
+	store  domain.Store
+	events domain.EventStore
 }
 
 // NewSnapshotIncomplete builds the monitor.
-func NewSnapshotIncomplete(store domain.Store) *SnapshotIncomplete {
-	return &SnapshotIncomplete{store: store}
+func NewSnapshotIncomplete(store domain.Store, events domain.EventStore) *SnapshotIncomplete {
+	return &SnapshotIncomplete{store: store, events: events}
 }
 
 // Name is the event type the monitor records.
@@ -49,7 +50,7 @@ func (m *SnapshotIncomplete) Run(ctx context.Context) error {
 		return fmt.Errorf("encoding event data: %w", err)
 	}
 
-	created, err := m.store.RecordEvent(ctx, domain.DraftEvent{Type: domain.Events.SnapshotIncomplete, Subject: &subject, Data: data})
+	created, err := m.events.Record(ctx, domain.DraftEvent{Type: domain.Events.SnapshotIncomplete, Subject: &subject, Data: data})
 	if err != nil {
 		return fmt.Errorf("recording event: %w", err)
 	}

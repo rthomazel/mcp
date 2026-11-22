@@ -2,7 +2,7 @@
 
 ## Handler.HandleAddCashTransaction(ctx Context, req CallToolRequest) (*CallToolResult, error)
 
-Tool add_cash_transaction. Appends one account-level cash entry through store.RecordCashTransaction. There is no tool to change or delete one.
+Tool add_cash_transaction. Appends one account-level cash entry through store.Cash.Record. There is no tool to change or delete one.
 
 Description shown to the agent: Append one cash entry that belongs to no instrument: the opening balance, a deposit, a withdrawal, interest or an account fee. Signs are enforced per kind: OPENING_BALANCE any sign, DEPOSIT and INTEREST positive, WITHDRAWAL and FEE negative. Only one opening balance can exist, and cash is reported only from its effective date onward, so record it first. Trades, dividends and taxes are not entered here; their cash impact is counted from add_transaction. Entries cannot be edited or deleted. A balance that goes negative is recorded and reported as an integrity error, never rejected. Returns the stored entry. When the entry changes a balance that cash snapshots already cover, the result includes rebuild_from, the date to pass to rebuild_snapshots; recording never rebuilds on its own.
 
@@ -13,7 +13,7 @@ Description shown to the agent: Append one cash entry that belongs to no instrum
 - notes string, optional
 
 1. Read and parse the parameters.
-2. Record the draft through store.RecordCashTransaction.
+2. Record the draft through store.Cash.Record.
 3. Return the entry and, when set, rebuild_from with a note that cash snapshots from that date are stale until rebuild_snapshots runs.
 
 #### Errors
@@ -38,7 +38,7 @@ Description shown to the agent: List cash entries, not trades, dividends or taxe
 - to string, optional YYYY-MM-DD, inclusive effective date
 
 1. Parse the parameters.
-2. List through store.ListCashTransactions.
+2. List through store.Cash.List.
 3. Return the entries.
 
 #### Errors
@@ -58,7 +58,7 @@ Description shown to the agent: Report the cash balance and buying power as of a
 - date string, optional YYYY-MM-DD; today in the market timezone when absent
 
 1. Parse date.
-2. Read through store.GetCash.
+2. Read through store.Cash.Get.
 3. Return the balance, with a hint to record an opening balance when it is not initialized.
 
 #### Errors

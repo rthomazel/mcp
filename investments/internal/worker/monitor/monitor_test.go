@@ -13,8 +13,10 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
+func newMonitor(store *fakeStore) *SnapshotIncomplete { return NewSnapshotIncomplete(store, store) }
+
 func TestTaskRunsTheMonitorAtItsTime(t *testing.T) {
-	monitor := NewSnapshotIncomplete(&fakeStore{})
+	monitor := newMonitor(&fakeStore{})
 	task := Task(monitor, time.Minute)
 
 	assert.Equal(t, []domain.ClockTime{{Hour: 7}}, task.At)
@@ -25,6 +27,7 @@ func TestTaskRunsTheMonitorAtItsTime(t *testing.T) {
 
 type fakeStore struct {
 	domain.Store
+	domain.EventStore
 
 	status    domain.Status
 	statusErr error
@@ -34,7 +37,7 @@ type fakeStore struct {
 
 func (s *fakeStore) GetStatus(context.Context) (domain.Status, error) { return s.status, s.statusErr }
 
-func (s *fakeStore) RecordEvent(_ context.Context, draft domain.DraftEvent) (bool, error) {
+func (s *fakeStore) Record(_ context.Context, draft domain.DraftEvent) (bool, error) {
 	s.recorded = append(s.recorded, draft)
 
 	return s.created, nil
@@ -43,7 +46,7 @@ func (s *fakeStore) RecordEvent(_ context.Context, draft domain.DraftEvent) (boo
 func TestSnapshotIncompleteRecordsTheDateOnce(t *testing.T) {
 	date := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
 	store := &fakeStore{status: domain.Status{LatestPriceDate: &date, SnapshotMissing: true}, created: true}
-	monitor := NewSnapshotIncomplete(store)
+	monitor := newMonitor(store)
 
 	require.NoError(t, monitor.Run(context.Background()))
 	require.Len(t, store.recorded, 1)
@@ -66,7 +69,7 @@ func TestSnapshotIncompleteRecordsNothingWhenResolved(t *testing.T) {
 		"has a snapshot": {LatestPriceDate: &date},
 	} {
 		store := &fakeStore{status: status}
-		require.NoError(t, NewSnapshotIncomplete(store).Run(context.Background()), name)
+		require.NoError(t, newMonitor(store).Run(context.Background()), name)
 		assert.Empty(t, store.recorded, name)
 	}
 }
@@ -74,5 +77,5 @@ func TestSnapshotIncompleteRecordsNothingWhenResolved(t *testing.T) {
 func TestSnapshotIncompleteReturnsStatusErrors(t *testing.T) {
 	store := &fakeStore{statusErr: errors.New("db down")}
 
-	assert.Error(t, NewSnapshotIncomplete(store).Run(context.Background()))
+	assert.Error(t, newMonitor(store).Run(context.Background()))
 }

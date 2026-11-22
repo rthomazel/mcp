@@ -13,7 +13,7 @@ Description shown to the agent: Read stored daily valuation snapshots, newest da
 - to string, optional YYYY-MM-DD, inclusive
 
 1. Parse the parameters and resolve the optional instrument.
-2. Read through store.ListSnapshots.
+2. Read through store.Snapshots.List.
 3. Return the rows grouped by date, each date with its securities total and, per row, quantity, close price, price date, market value and allocation.
 
 #### Errors
@@ -38,7 +38,7 @@ Description shown to the agent: Replace the stored snapshots for every price dat
 
 1. Parse the parameters.
 2. Derive a long-timeout context.
-3. Rebuild through store.RebuildSnapshots.
+3. Rebuild through store.Snapshots.Rebuild.
 4. Return the range, the number of dates rebuilt, the number of rows written and the number of cash snapshot dates.
 
 #### Errors

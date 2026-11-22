@@ -37,7 +37,7 @@ func (h *Handler) HandleAddCashTransaction(ctx context.Context, req mcp.CallTool
 	ctx, cancel := h.withTimeout(ctx, false)
 	defer cancel()
 
-	result, err := h.store.RecordCashTransaction(ctx, draft)
+	result, err := h.stores.Cash.Record(ctx, draft)
 	if err != nil {
 		return h.failure(ctx, tool, err), nil
 	}
@@ -106,7 +106,7 @@ func (h *Handler) HandleListCashTransactions(ctx context.Context, req mcp.CallTo
 	ctx, cancel := h.withTimeout(ctx, false)
 	defer cancel()
 
-	entries, err := h.store.ListCashTransactions(ctx, domain.CashTransactionFilter{
+	entries, err := h.stores.Cash.List(ctx, domain.CashTransactionFilter{
 		Kind: domain.CashKind(strings.ToUpper(strings.TrimSpace(req.GetString("kind", "")))),
 		From: from, To: to, Limit: req.GetInt("limit", 0),
 	})
@@ -134,7 +134,7 @@ func (h *Handler) HandleGetCash(ctx context.Context, req mcp.CallToolRequest) (*
 	ctx, cancel := h.withTimeout(ctx, false)
 	defer cancel()
 
-	balance, err := h.store.GetCash(ctx, date)
+	balance, err := h.stores.Cash.Get(ctx, date)
 	if err != nil {
 		return h.failure(ctx, tool, err), nil
 	}

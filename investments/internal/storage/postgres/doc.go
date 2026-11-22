@@ -1,2 +1,2 @@
-// Package postgres implements domain.Store on PostgreSQL.
+// Package postgres implements the domain store interfaces on PostgreSQL.
 package postgres

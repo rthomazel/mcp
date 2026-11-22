@@ -21,7 +21,7 @@ func (h *Handler) HandleRemoveEvent(ctx context.Context, req mcp.CallToolRequest
 	ctx, cancel := h.withTimeout(ctx, false)
 	defer cancel()
 
-	if err := h.store.RemoveEvent(ctx, int64(id)); err != nil {
+	if err := h.stores.Events.Remove(ctx, int64(id)); err != nil {
 		return h.failure(ctx, tool, err), nil
 	}
 

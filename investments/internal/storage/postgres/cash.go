@@ -61,9 +61,9 @@ ORDER BY effective_date DESC, executed_at DESC, id DESC
 LIMIT $4`
 )
 
-// RecordCashTransaction validates draft and inserts it. A negative resulting
+// Record validates draft and inserts it. A negative resulting
 // balance is not rejected; RebuildFrom tells the caller which cash snapshots are stale.
-func (s *Store) RecordCashTransaction(ctx context.Context, draft domain.CashTransaction) (domain.CashRecordResult, error) {
+func (s *Cash) Record(ctx context.Context, draft domain.CashTransaction) (domain.CashRecordResult, error) {
 	if err := draft.Validate(); err != nil {
 		return domain.CashRecordResult{}, err
 	}
@@ -138,8 +138,8 @@ func staleCashFrom(ctx context.Context, tx *sqlx.Tx, effective domain.Date, isOp
 	return &effective, nil
 }
 
-// ListCashTransactions returns cash transactions matching filter, newest first.
-func (s *Store) ListCashTransactions(ctx context.Context, filter domain.CashTransactionFilter) ([]domain.CashTransaction, error) {
+// List returns cash transactions matching filter, newest first.
+func (s *Cash) List(ctx context.Context, filter domain.CashTransactionFilter) ([]domain.CashTransaction, error) {
 	filter, err := filter.Normalize()
 	if err != nil {
 		return nil, err
@@ -169,8 +169,8 @@ func (s *Store) ListCashTransactions(ctx context.Context, filter domain.CashTran
 	return entries, nil
 }
 
-// GetCash returns the cash balance as of date, or today in the market timezone when nil.
-func (s *Store) GetCash(ctx context.Context, date *domain.Date) (domain.CashBalance, error) {
+// Get returns the cash balance as of date, or today in the market timezone when nil.
+func (s *Cash) Get(ctx context.Context, date *domain.Date) (domain.CashBalance, error) {
 	return cashBalance(ctx, s.db, s.referenceDate(date))
 }
 

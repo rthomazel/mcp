@@ -23,13 +23,13 @@ type Settings struct {
 // Worker drains the events table, handling the events whose type starts with
 // the configured prefix. Every retry fact lives on the event.
 type Worker struct {
-	store    domain.Store
+	store    domain.EventStore
 	source   domain.EventHandlerSource
 	settings Settings
 }
 
 // NewWorker builds the events worker.
-func NewWorker(store domain.Store, source domain.EventHandlerSource, settings Settings) *Worker {
+func NewWorker(store domain.EventStore, source domain.EventHandlerSource, settings Settings) *Worker {
 	return &Worker{store: store, source: source, settings: settings}
 }
 
@@ -65,7 +65,7 @@ func (w *Worker) RunOnce(ctx context.Context) {
 		slog.ErrorContext(ctx, "reading event handlers", "err", handlersErr)
 	}
 
-	events, err := w.store.ListDueEvents(ctx, w.settings.TypePrefix, w.settings.BatchLimit)
+	events, err := w.store.ListDue(ctx, w.settings.TypePrefix, w.settings.BatchLimit)
 	if err != nil {
 		slog.ErrorContext(ctx, "listing due events", "err", err)
 
@@ -123,7 +123,7 @@ func (w *Worker) run(ctx context.Context, handler domain.EventHandler, event dom
 }
 
 func (w *Worker) save(ctx context.Context, event domain.Event, outcome domain.EventOutcome) {
-	if err := w.store.SaveEventOutcome(ctx, event.ID, outcome); err != nil {
+	if err := w.store.SaveOutcome(ctx, event.ID, outcome); err != nil {
 		if errors.Is(err, domain.ErrEventNotFound) {
 			slog.WarnContext(ctx, "event removed while handling", "id", event.ID)
 
@@ -135,7 +135,7 @@ func (w *Worker) save(ctx context.Context, event domain.Event, outcome domain.Ev
 }
 
 func (w *Worker) prune(ctx context.Context) {
-	count, err := w.store.PruneEvents(ctx)
+	count, err := w.store.Prune(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "pruning events", "err", err)
 

@@ -14,7 +14,7 @@ func (h *Handler) HandleListUpdates(ctx context.Context, req mcp.CallToolRequest
 	ctx, cancel := h.withTimeout(ctx, false)
 	defer cancel()
 
-	updates, err := h.store.ListUpdates(ctx, domain.UpdateFilter{
+	updates, err := h.stores.Updates.List(ctx, domain.UpdateFilter{
 		DataType: strings.TrimSpace(req.GetString("data_type", "")),
 		Status:   strings.TrimSpace(req.GetString("status", "")),
 		Limit:    req.GetInt("limit", 0),

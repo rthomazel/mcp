@@ -11,7 +11,7 @@ expiredEventsSQL = select the full rows with processed_at null and expired_at no
 
 # Functions
 
-## Store.RecordEvent(ctx Context, draft domain.DraftEvent) (bool, error)
+## Events.Record(ctx Context, draft domain.DraftEvent) (bool, error)
 
 1. Validate draft.
 2. Run insertEvent in its own transaction.
@@ -25,14 +25,14 @@ expiredEventsSQL = select the full rows with processed_at null and expired_at no
 
 - **2.** if the insert fails, return the wrapped error.
 
-## Store.insertEvent(ctx Context, tx *sqlx.Tx, draft domain.DraftEvent) (bool, error)
+## Events.insertEvent(ctx Context, tx *sqlx.Tx, draft domain.DraftEvent) (bool, error)
 
 1. Insert through insertEventSQL, with an empty Data stored as an empty JSON object.
 2. Return true when an id came back, false when the conflict clause skipped it.
 
-The one way an event is written. A change that must record an event in its own unit of work calls it with its transaction, so the event exists if and only if the change committed; RecordEvent and the give-up path in SaveEventOutcome are the callers today.
+The one way an event is written. A change that must record an event in its own unit of work calls it with its transaction, so the event exists if and only if the change committed; Events.Record and the give-up path in Events.SaveOutcome are the callers today.
 
-## Store.ListDueEvents(ctx Context, typePrefix string, limit int) ([]domain.Event, error)
+## Events.ListDue(ctx Context, typePrefix string, limit int) ([]domain.Event, error)
 
 1. Return domain.ErrInvalidInput when limit is not positive.
 2. Select through dueEventsSQL with the store's clock as now and typePrefix.
@@ -44,7 +44,7 @@ The one way an event is written. A change that must record an event in its own u
 
 An expired or given-up event is never selected, so it cannot block, slow or crowd out newer events, and nothing is logged for skipping it.
 
-## Store.SaveEventOutcome(ctx Context, id int64, outcome domain.EventOutcome) error
+## Events.SaveOutcome(ctx Context, id int64, outcome domain.EventOutcome) error
 
 1. Validate the outcome.
 2. Run inside withTx:
@@ -77,7 +77,7 @@ An expired or given-up event is never selected, so it cannot block, slow or crow
 
 A notification-failed event that is itself given up on only logs and is shown by status, so a failing channel cannot cascade. The log line is the dependable record, since the announcement needs the channel that may be failing. The payload is never logged. Reading the clock once per call keeps the timestamps of one outcome equal.
 
-## Store.RemoveEvent(ctx Context, id int64) error
+## Events.Remove(ctx Context, id int64) error
 
 1. Delete through removeEventSQL with the store's clock as now.
 2. if a row was deleted, return nil.
@@ -95,8 +95,8 @@ A notification-failed event that is itself given up on only logs and is shown by
 
 The conditions are in the delete itself, so removal and the eligibility check cannot disagree under a concurrent worker pass.
 
-## Store.PruneEvents(ctx Context) (int, error)
+## Events.Prune(ctx Context) (int, error)
 
 Delete through pruneEventsSQL with the store's clock as now and return the number of rows removed, or the wrapped error.
 
-The events table is created by a migration, reviewed as SQL and not modelled here. It has one row per event with the fields of domain.Event; a check that the type is dot-separated lowercase words and that failures are not negative; a partial index over pending events, those neither processed nor given up on, ordered by creation time, which backs ListDueEvents; and a partial unique index over type and subject where the subject is set, which makes RecordEvent atomic and gives monitors their one event per subject.
+The events table is created by a migration, reviewed as SQL and not modelled here. It has one row per event with the fields of domain.Event; a check that the type is dot-separated lowercase words and that failures are not negative; a partial index over pending events, those neither processed nor given up on, ordered by creation time, which backs Events.ListDue; and a partial unique index over type and subject where the subject is set, which makes Events.Record atomic and gives monitors their one event per subject.
