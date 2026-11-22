@@ -3,7 +3,7 @@ template: testify
 packages:
   github.com/rthomazel/mcp/investments/internal/domain:
     interfaces:
-      Store:
+      GenericStore:
         config:
           dir: internal/domain
           filename: mock_store.go

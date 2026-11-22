@@ -26,7 +26,7 @@ func (p *jobProvider) FetchPrices(_ context.Context, symbol string, _ *domain.Da
 }
 
 type jobStore struct {
-	domain.Store
+	domain.GenericStore
 
 	instruments []domain.Instrument
 	listErr     error

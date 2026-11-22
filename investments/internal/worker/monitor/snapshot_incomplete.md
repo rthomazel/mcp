@@ -6,14 +6,14 @@ snapshotIncompleteAt = 07:00 in the market timezone, an hour after the last pric
 
 ## SnapshotIncomplete
 
-1. store domain.Store, for the status
+1. store domain.GenericStore, for the status
 2. events domain.EventStore, where the event is recorded
 
 The monitor for a latest price date without a completed snapshot.
 
 # Functions
 
-## NewSnapshotIncomplete(store domain.Store, events domain.EventStore) *SnapshotIncomplete
+## NewSnapshotIncomplete(store domain.GenericStore, events domain.EventStore) *SnapshotIncomplete
 
 Build the monitor.
 

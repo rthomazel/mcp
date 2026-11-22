@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	_ domain.Store         = (*Store)(nil)
+	_ domain.GenericStore  = (*Store)(nil)
 	_ domain.CashStore     = (*Cash)(nil)
 	_ domain.PriceStore    = (*Prices)(nil)
 	_ domain.SnapshotStore = (*Snapshots)(nil)
@@ -34,7 +34,7 @@ var (
 	_ domain.EventStore    = (*Events)(nil)
 )
 
-// Store implements domain.Store and holds what every store shares: the
+// Store implements domain.GenericStore and holds what every store shares: the
 // connection and the settings. Its methods are spread across files by concern.
 type Store struct {
 	db               *sqlx.DB
@@ -56,7 +56,7 @@ type (
 )
 
 // Stores is every store over one connection. The embedded Store is the generic
-// one, so Stores itself also implements domain.Store.
+// one, so Stores itself also implements domain.GenericStore.
 type Stores struct {
 	*Store
 
@@ -69,7 +69,7 @@ type Stores struct {
 
 // Domain returns the stores as the domain bundle.
 func (s *Stores) Domain() domain.Stores {
-	return domain.Stores{Store: s.Store, Cash: s.Cash, Prices: s.Prices, Snapshots: s.Snapshots, Updates: s.Updates, Events: s.Events}
+	return domain.Stores{Generic: s.Store, Cash: s.Cash, Prices: s.Prices, Snapshots: s.Snapshots, Updates: s.Updates, Events: s.Events}
 }
 
 // Settings are the store's tunables, taken from the server configuration.

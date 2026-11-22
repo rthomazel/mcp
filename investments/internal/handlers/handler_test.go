@@ -20,7 +20,7 @@ func day(d int) domain.Date { return time.Date(2026, 11, d, 0, 0, 0, 0, time.UTC
 
 // fakeStore serves canned data and records the arguments of the calls under test.
 type fakeStore struct {
-	domain.Store
+	domain.GenericStore
 
 	instruments  []domain.Instrument
 	positions    domain.PositionsResult
@@ -143,9 +143,9 @@ type (
 )
 
 // bundle returns the stores a handler takes, with store as the generic one.
-func (s *fakeStore) bundle(store domain.Store) domain.Stores {
+func (s *fakeStore) bundle(store domain.GenericStore) domain.Stores {
 	return domain.Stores{
-		Store: store, Prices: fakePrices{fakeStore: s}, Snapshots: fakeSnapshots{fakeStore: s}, Updates: fakeUpdates{fakeStore: s},
+		Generic: store, Prices: fakePrices{fakeStore: s}, Snapshots: fakeSnapshots{fakeStore: s}, Updates: fakeUpdates{fakeStore: s},
 	}
 }
 

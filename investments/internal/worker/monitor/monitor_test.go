@@ -26,7 +26,7 @@ func TestTaskRunsTheMonitorAtItsTime(t *testing.T) {
 }
 
 type fakeStore struct {
-	domain.Store
+	domain.GenericStore
 	domain.EventStore
 
 	status    domain.Status

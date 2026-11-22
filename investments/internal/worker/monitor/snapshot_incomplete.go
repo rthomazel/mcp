@@ -14,12 +14,12 @@ var snapshotIncompleteAt = domain.ClockTime{Hour: 7}
 
 // SnapshotIncomplete watches for a latest price date without a completed snapshot.
 type SnapshotIncomplete struct {
-	store  domain.Store
+	store  domain.GenericStore
 	events domain.EventStore
 }
 
 // NewSnapshotIncomplete builds the monitor.
-func NewSnapshotIncomplete(store domain.Store, events domain.EventStore) *SnapshotIncomplete {
+func NewSnapshotIncomplete(store domain.GenericStore, events domain.EventStore) *SnapshotIncomplete {
 	return &SnapshotIncomplete{store: store, events: events}
 }
 

@@ -29,7 +29,7 @@ const (
 
 // Handler is the MCP tool layer. It holds no state beyond its dependencies.
 type Handler struct {
-	store        domain.Store // the generic store; the others are in stores
+	store        domain.GenericStore // the generic store; the others are in stores
 	stores       domain.Stores
 	refresher    *marketdata.PriceRefresher
 	queryTimeout time.Duration
@@ -37,7 +37,7 @@ type Handler struct {
 
 // New builds a Handler.
 func New(stores domain.Stores, refresher *marketdata.PriceRefresher, queryTimeout time.Duration) *Handler {
-	return &Handler{store: stores.Store, stores: stores, refresher: refresher, queryTimeout: queryTimeout}
+	return &Handler{store: stores.Generic, stores: stores, refresher: refresher, queryTimeout: queryTimeout}
 }
 
 // Register adds the tools to the server.

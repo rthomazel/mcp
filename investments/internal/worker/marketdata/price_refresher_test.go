@@ -57,7 +57,7 @@ func (p *fakeProvider) FetchPrices(_ context.Context, symbol string, from *domai
 
 // fakeStore implements the Store and PriceStore methods the refresher uses.
 type fakeStore struct {
-	domain.Store
+	domain.GenericStore
 
 	instruments []domain.Instrument
 	prices      map[int]map[time.Time]domain.PriceBar

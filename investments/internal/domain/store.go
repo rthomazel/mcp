@@ -2,11 +2,11 @@ package domain
 
 import "context"
 
-// Store is the generic persistence interface: instruments, the ledger and the
+// GenericStore is the generic persistence interface: instruments, the ledger and the
 // read-only reports. Related methods live in the narrower stores below. Each
 // method of every store is a self-contained unit of work in its own
 // transaction. All are implemented by internal/storage/postgres.
-type Store interface {
+type GenericStore interface {
 	// RegisterInstrument normalizes, validates and inserts draft. Returns
 	// ErrInvalidInput, or ErrInstrumentExists when the symbol and exchange are taken.
 	RegisterInstrument(ctx context.Context, draft Instrument) (Instrument, error)
@@ -110,7 +110,7 @@ type EventStore interface {
 // Stores bundles every store for the consumers that need several, such as the
 // tool handlers. A consumer that needs one takes that one.
 type Stores struct {
-	Store     Store
+	Generic   GenericStore
 	Cash      CashStore
 	Prices    PriceStore
 	Snapshots SnapshotStore

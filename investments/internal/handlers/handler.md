@@ -7,7 +7,7 @@ internalErrorText = "internal error, see the server logs".
 
 ## Handler
 
-1. store domain.Store, the generic store, taken from stores
+1. store domain.GenericStore, the generic store, taken from stores
 2. stores domain.Stores
 3. refresher *marketdata.PriceRefresher
 4. queryTimeout Duration, from the configuration, the deadline for every other tool

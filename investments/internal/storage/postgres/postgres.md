@@ -26,7 +26,7 @@ The store's tunables, all from the server configuration; the store holds no defa
 5. events domain.EventPolicy
 6. clock func() Time, the time source for the event queries and status; the real clock, which tests replace
 
-The generic store, implementing domain.Store, and the core every other store shares: the connection and the settings. Its methods are spread across instrument.go, transaction.go, positions.go, valuation.go, history.go and status.go by concern.
+The generic store, implementing domain.GenericStore, and the core every other store shares: the connection and the settings. Its methods are spread across instrument.go, transaction.go, positions.go, valuation.go, history.go and status.go by concern.
 
 ## Cash, Prices, Snapshots, Updates, Events
 
@@ -36,7 +36,7 @@ One small type per narrower store, each implementing the domain interface of the
 
 ## Stores
 
-1. Store *Store, embedded, so Stores itself implements domain.Store and exposes DB
+1. Store *Store, embedded, so Stores itself implements domain.GenericStore and exposes DB
 2. Cash *Cash
 3. Prices *Prices
 4. Snapshots *Snapshots

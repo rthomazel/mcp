@@ -7,7 +7,7 @@ runTimeout = 30 minutes, the deadline for one price refresh run.
 
 ## PriceRefresher
 
-1. store domain.Store, for registering instruments and reading positions
+1. store domain.GenericStore, for registering instruments and reading positions
 2. prices domain.PriceStore
 3. provider domain.PriceProvider
 
@@ -22,7 +22,7 @@ Orchestrates the provider and the store. It holds no state of its own.
 
 # Functions
 
-## NewPriceRefresher(store domain.Store, prices domain.PriceStore, provider domain.PriceProvider) *PriceRefresher
+## NewPriceRefresher(store domain.GenericStore, prices domain.PriceStore, provider domain.PriceProvider) *PriceRefresher
 
 Build a PriceRefresher over the stores and the provider.
 

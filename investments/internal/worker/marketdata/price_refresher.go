@@ -13,7 +13,7 @@ import (
 
 // PriceRefresher orchestrates the provider and the store. It holds no state of its own.
 type PriceRefresher struct {
-	store    domain.Store
+	store    domain.GenericStore
 	prices   domain.PriceStore
 	provider domain.PriceProvider
 }
@@ -27,7 +27,7 @@ type RefreshResult struct {
 }
 
 // NewPriceRefresher builds a PriceRefresher over the store and the provider.
-func NewPriceRefresher(store domain.Store, prices domain.PriceStore, provider domain.PriceProvider) *PriceRefresher {
+func NewPriceRefresher(store domain.GenericStore, prices domain.PriceStore, provider domain.PriceProvider) *PriceRefresher {
 	return &PriceRefresher{store: store, prices: prices, provider: provider}
 }
 

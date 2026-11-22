@@ -1,6 +1,6 @@
 # Interfaces
 
-## Store
+## GenericStore
 
 1. RegisterInstrument(ctx Context, draft Instrument) (Instrument, error)
 2. ListInstruments(ctx Context) ([]Instrument, error)
@@ -11,7 +11,7 @@
 7. GetStatus(ctx Context) (Status, error)
 8. GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
 
-The generic store: instruments, the ledger and the read-only reports. Groups of related methods have their own stores below. Tests mock each store with mockery. Implemented by internal/storage/postgres.
+The generic store, for everything that has no narrower store: instruments, the ledger and the read-only reports. Groups of related methods have their own stores below. Tests mock each store with mockery. Implemented by internal/storage/postgres.
 Each method of every store is a self-contained unit of work in its own transaction; composing several store calls into one transaction is not supported.
 
 ### RegisterInstrument(ctx Context, draft Instrument) (Instrument, error)
@@ -160,7 +160,7 @@ Deletes fully handled events whose handling finished the policy's retention or l
 
 ## Stores
 
-1. Store Store
+1. Generic GenericStore
 2. Cash CashStore
 3. Prices PriceStore
 4. Snapshots SnapshotStore
