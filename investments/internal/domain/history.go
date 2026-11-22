@@ -49,6 +49,23 @@ type SeriesSummary struct {
 	MaxDrawdown     Drawdown
 }
 
+// DrawdownLevel is a level the drawdown is at or below.
+type DrawdownLevel struct {
+	Level     Decimal // negative percent, a multiple of the increment
+	CrossedOn Date    // first date of the current stay at or below the level
+}
+
+// DrawdownState is the drawdown of the latest securities value from the
+// all-time high, over the series SeriesSummary reads.
+type DrawdownState struct {
+	Date            Date
+	ValueUSD        Decimal
+	DrawdownPercent Decimal // zero or negative
+	HighDate        Date
+	HighValueUSD    Decimal
+	Levels          []DrawdownLevel // shallowest first, capped by the store
+}
+
 // ValueHistory is the series and its summaries.
 type ValueHistory struct {
 	From                Date

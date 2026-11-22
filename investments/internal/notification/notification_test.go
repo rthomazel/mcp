@@ -45,7 +45,7 @@ func writeConfig(t *testing.T, content string) string {
 }
 
 func TestLoaderReadsAValidFile(t *testing.T) {
-	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
+	cfg, err := NewConfigLoader(writeConfig(t, validConfig)).Current()
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, cfg.Version)
@@ -55,7 +55,7 @@ func TestLoaderReadsAValidFile(t *testing.T) {
 }
 
 func TestChannelWrittenAsInlineSettingsHasOneDefaultCategory(t *testing.T) {
-	cfg, err := NewLoader(writeConfig(t, `
+	cfg, err := NewConfigLoader(writeConfig(t, `
 version: 1
 channels:
   telegram: {chat_id: 123}
@@ -75,7 +75,7 @@ notifications:
 
 func TestLoaderTreatsMissingFileAsUnconfigured(t *testing.T) {
 	for _, path := range []string{"", filepath.Join(t.TempDir(), "missing.yaml")} {
-		cfg, err := NewLoader(path).Current()
+		cfg, err := NewConfigLoader(path).Current()
 		require.NoError(t, err)
 		assert.Empty(t, cfg.Notifications)
 	}
@@ -83,7 +83,7 @@ func TestLoaderTreatsMissingFileAsUnconfigured(t *testing.T) {
 
 func TestLoaderKeepsTheLastValidConfiguration(t *testing.T) {
 	path := writeConfig(t, validConfig)
-	loader := NewLoader(path)
+	loader := NewConfigLoader(path)
 
 	_, err := loader.Current()
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestLoaderKeepsTheLastValidConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, cfg.Version)
 
-	fresh := NewLoader(path)
+	fresh := NewConfigLoader(path)
 	_, err = fresh.Current()
 	assert.Error(t, err)
 }
@@ -123,7 +123,7 @@ func TestConfigValidateRejects(t *testing.T) {
 	}
 
 	for name, content := range tests {
-		_, err := NewLoader(writeConfig(t, content)).Current()
+		_, err := NewConfigLoader(writeConfig(t, content)).Current()
 		assert.Error(t, err, name)
 	}
 }
@@ -140,7 +140,7 @@ func TestTelegramSendsPlainTextToTheCategoryChat(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
+	cfg, err := NewConfigLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
 	channel := NewTelegramChannel("telegram", cfg.Channels["telegram"], "secret")
@@ -156,7 +156,7 @@ func TestTelegramSendsPlainTextToTheCategoryChat(t *testing.T) {
 }
 
 func TestTelegramWithoutCredentialsWarnsAndSucceeds(t *testing.T) {
-	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
+	cfg, err := NewConfigLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
 	noToken := NewTelegramChannel("telegram", cfg.Channels["telegram"], "")
@@ -172,7 +172,7 @@ func TestTelegramFailuresDoNotLeakTheToken(t *testing.T) {
 		_, _ = w.Write([]byte(`{"description":"Too Many Requests"}`))
 	}))
 
-	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
+	cfg, err := NewConfigLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
 	channel := NewTelegramChannel("telegram", cfg.Channels["telegram"], "secret")
@@ -241,7 +241,7 @@ func TestRenderers(t *testing.T) {
 }
 
 func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
-	source := NewSource(NewLoader(writeConfig(t, validConfig)), &fakeUpdates{}, "")
+	source := NewSource(NewConfigLoader(writeConfig(t, validConfig)), &fakeUpdates{}, "")
 
 	handlers, err := source.Handlers(context.Background())
 	require.NoError(t, err)
@@ -258,7 +258,7 @@ func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
 	assert.Equal(t, []string{"notification.stub.default", "notification.telegram.portfolio"}, names(domain.Events.SnapshotIncomplete))
 	assert.Equal(t, []string{"notification.none"}, names(domain.Events.NotificationFailed))
 
-	unconfigured := NewSource(NewLoader(""), &fakeUpdates{}, "")
+	unconfigured := NewSource(NewConfigLoader(""), &fakeUpdates{}, "")
 	handlers, err = unconfigured.Handlers(context.Background())
 	require.NoError(t, err)
 	assert.NoError(t, handlers(domain.Events.SnapshotIncomplete)[0].Handle(context.Background(), domain.Event{}))
@@ -266,7 +266,7 @@ func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
 }
 
 func TestSourceFailsOnInvalidConfigurationWithoutAFallback(t *testing.T) {
-	source := NewSource(NewLoader(writeConfig(t, "version: 9")), &fakeUpdates{}, "")
+	source := NewSource(NewConfigLoader(writeConfig(t, "version: 9")), &fakeUpdates{}, "")
 
 	_, err := source.Handlers(context.Background())
 	assert.Error(t, err)
@@ -300,4 +300,26 @@ func TestChannelHandlerRendersThenSends(t *testing.T) {
 	channel.err = errors.New("down")
 	assert.Error(t, handler.Handle(context.Background(), domain.Event{Type: domain.Events.SnapshotIncomplete, Data: data}))
 	assert.Equal(t, "notification.x.y", handler.Name())
+}
+
+func TestPortfolioDrawdownRenderer(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	data, err := json.Marshal(domain.PortfolioDrawdownData{
+		Level: "-6", CrossedOn: day.AddDate(0, 0, -2), Date: day, DrawdownPercent: "-7.2",
+		ValueUSD: "92800", HighDate: day.AddDate(0, 0, -19), HighValueUSD: "100000",
+	})
+	require.NoError(t, err)
+
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioDrawdown][defaultFormat]
+
+	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "down 7.2%")
+	assert.Contains(t, text, "-6% level on 2026-11-18")
+	assert.Contains(t, text, "$92800")
+	assert.Contains(t, text, "2026-11-01: $100000")
+	assert.Contains(t, text, "not investment return")
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
 }

@@ -1,6 +1,13 @@
 # CHANGELOG
 
-## Unreleased
+## [0.4.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.4.0) feat: monitors configuration and portfolio drawdown monitor
+
+### feat
+
+- **(monitors)** a separate monitors YAML file (`INVESTMENTS_MCP_MONITORS_CONFIG_FILE`) turns each monitor on or off with `disabled` and carries its settings; a monitor with no entry does not run. **Upgrade note:** the snapshot-incomplete monitor is now `snapshot.incomplete` and stops announcing until the file has an entry for it. The notifications and monitors files are loaded by a shared file loader and validated independently.
+- **(monitors)** `portfolio.drawdown` announces, once per stay, each multiple of `increment_pct` the securities value falls below its all-time high, as `notification.portfolio.drawdown` with the peak and current values. Recovering above a level and falling back announces it again. Changes in value, not returns.
+
+## [0.3.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.3.0) feat: notification outbox, monitors and Telegram channel
 
 ### feat
 

@@ -40,6 +40,10 @@ for the date, which covers a price refresh job that did not run.
 The monitor does not depend on there being two price refresh runs: if the job times change,
 only the monitor's own time is retuned.
 
+The monitor is named snapshot.incomplete in the monitors configuration and takes no
+settings. It runs only when that file has an enabled entry for it, so a deployment with no
+monitors file does not announce anything until the entry is added.
+
 ## Acceptance criteria
 
 - At 7:00 AM Eastern, when the latest price date has no completed snapshot, one
@@ -51,9 +55,12 @@ only the monitor's own time is retuned.
 - Running the monitor again for the same unresolved date records no second event; after
   the operator removes that event, a still unresolved date is announced again.
 - A price refresh job that never ran is caught by the monitor.
+- With no enabled entry for snapshot.incomplete in the monitors configuration, the
+  monitor records nothing, whatever the state.
 
 ## Refs
 
 - Related: 2026-11-21-notifications, the outbox and monitor mechanism this uses.
+- Related: 2026-11-22-monitors-configuration, which turns the monitor on.
 - Related: 2026-11-15-status, whose definition of an unresolved snapshot date it shares.
 - Related: 2026-11-13-investments-mcp-plan, the daily schedule it follows.

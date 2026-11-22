@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
@@ -23,14 +26,25 @@ func NewSnapshotIncomplete(store domain.GenericStore, events domain.EventStore) 
 	return &SnapshotIncomplete{store: store, events: events}
 }
 
-// Name is the event type the monitor records.
-func (m *SnapshotIncomplete) Name() string { return domain.Events.SnapshotIncomplete }
+// Name is the event type the monitor records without its notification prefix.
+func (m *SnapshotIncomplete) Name() string {
+	return strings.TrimPrefix(domain.Events.SnapshotIncomplete, domain.NotificationPrefix)
+}
 
 // At is 07:00 market time.
 func (m *SnapshotIncomplete) At() domain.ClockTime { return snapshotIncompleteAt }
 
+// ValidateParams rejects any setting; the monitor takes none.
+func (m *SnapshotIncomplete) ValidateParams(params Params) error {
+	if len(params) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("unknown setting %q", slices.Sorted(maps.Keys(params))[0])
+}
+
 // Run records one event per unresolved date.
-func (m *SnapshotIncomplete) Run(ctx context.Context) error {
+func (m *SnapshotIncomplete) Run(ctx context.Context, _ Params) error {
 	status, err := m.store.GetStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("reading status: %w", err)

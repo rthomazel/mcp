@@ -3,14 +3,11 @@ package notification
 import (
 	"errors"
 	"fmt"
-	"io/fs"
-	"log/slog"
-	"os"
 	"strings"
-	"sync"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/rthomazel/mcp/investments/internal/config/fileloader"
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
@@ -187,61 +184,8 @@ func (c Config) resolveCategory(eventType, channelName, category string) (string
 	return category, nil
 }
 
-// Loader reads the configuration file and remembers the last valid result.
-type Loader struct {
-	path     string
-	mu       sync.Mutex
-	lastGood *Config
-}
-
-// NewLoader builds a Loader; an empty path means notifications are unconfigured.
-func NewLoader(path string) *Loader {
-	return &Loader{path: path}
-}
-
-// Current reads the file on every call. A missing file is an empty
-// configuration. An invalid file is logged on every call; the last valid
-// configuration is served when there is one, otherwise the error is returned.
-func (l *Loader) Current() (Config, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.path == "" {
-		l.lastGood = nil
-
-		return Config{}, nil
-	}
-
-	raw, err := os.ReadFile(l.path)
-	if errors.Is(err, fs.ErrNotExist) {
-		l.lastGood = nil
-
-		return Config{}, nil
-	}
-
-	var cfg Config
-
-	if err == nil {
-		if err = yaml.Unmarshal(raw, &cfg); err != nil {
-			err = fmt.Errorf("parsing %s: %w", l.path, err)
-		} else if err = cfg.Validate(); err != nil {
-			err = fmt.Errorf("invalid %s: %w", l.path, err)
-		}
-	} else {
-		err = fmt.Errorf("reading %s: %w", l.path, err)
-	}
-
-	if err != nil {
-		slog.Error("notifications configuration is invalid", "path", l.path, "err", err)
-
-		if l.lastGood != nil {
-			return *l.lastGood, nil
-		}
-
-		return Config{}, err
-	}
-
-	l.lastGood = &cfg
-
-	return cfg, nil
+// NewConfigLoader builds the loader of the notifications file; an empty path
+// means notifications are unconfigured.
+func NewConfigLoader(path string) *fileloader.Loader[Config] {
+	return fileloader.New(path, Config.Validate)
 }

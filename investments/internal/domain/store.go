@@ -25,6 +25,11 @@ type GenericStore interface {
 	// with summary measures. Returns ErrInvalidInput, including for a series
 	// over the configured maximum number of points.
 	GetValueHistory(ctx context.Context, filter HistoryFilter) (ValueHistory, error)
+	// GetDrawdownState returns the drawdown of the latest securities value from
+	// the all-time high and, for each multiple of increment it is at or below,
+	// when its current stay there began. Returns ErrInvalidInput for an
+	// increment that is not positive, and an empty state without snapshots.
+	GetDrawdownState(ctx context.Context, increment Decimal) (DrawdownState, error)
 	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
 	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
 	// GetPortfolio values active positions at real closes as of date, or today

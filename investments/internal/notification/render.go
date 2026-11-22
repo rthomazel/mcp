@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
@@ -19,6 +20,9 @@ type SnapshotIncompleteRenderer struct {
 	updates domain.UpdateStore
 }
 
+// PortfolioDrawdownRenderer announces a level of drawdown crossed.
+type PortfolioDrawdownRenderer struct{}
+
 // NotificationFailedRenderer announces an event whose delivery was given up on.
 type NotificationFailedRenderer struct{}
 
@@ -26,6 +30,7 @@ type NotificationFailedRenderer struct{}
 func NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer {
 	return map[string]map[string]Renderer{
 		domain.Events.SnapshotIncomplete: {defaultFormat: &SnapshotIncompleteRenderer{updates: updates}},
+		domain.Events.PortfolioDrawdown:  {defaultFormat: &PortfolioDrawdownRenderer{}},
 		domain.Events.NotificationFailed: {defaultFormat: &NotificationFailedRenderer{}},
 	}
 }
@@ -53,6 +58,20 @@ func (r *SnapshotIncompleteRenderer) Render(ctx context.Context, event domain.Ev
 	}
 
 	return fmt.Sprintf("Snapshot for %s is incomplete: no run was recorded for it.", date), nil
+}
+
+// Render names the level, the drawdown, the high, the current value and the crossing date.
+func (r *PortfolioDrawdownRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+	var data domain.PortfolioDrawdownData
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		return "", fmt.Errorf("decoding portfolio drawdown data: %w", err)
+	}
+
+	return fmt.Sprintf("Portfolio is down %s%% from its high, crossing the %s%% level on %s.\n"+
+		"Securities value on %s: $%s. High on %s: $%s.\n"+
+		"This is a change in value, not investment return: sales and withdrawals lower it too.",
+		strings.TrimPrefix(string(data.DrawdownPercent), "-"), data.Level, data.CrossedOn.Format(time.DateOnly),
+		data.Date.Format(time.DateOnly), data.ValueUSD, data.HighDate.Format(time.DateOnly), data.HighValueUSD), nil
 }
 
 // Render names the failed event's type, recorded time and attempts, never its payload.

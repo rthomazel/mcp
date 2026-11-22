@@ -22,12 +22,14 @@ type EventPolicy struct {
 type EventTypes struct {
 	SnapshotIncomplete string
 	NotificationFailed string
+	PortfolioDrawdown  string
 }
 
 // Events holds the event type names, dot-separated lowercase words.
 var Events = EventTypes{
 	SnapshotIncomplete: "notification.snapshot.incomplete",
 	NotificationFailed: "notification.failed",
+	PortfolioDrawdown:  "notification.portfolio.drawdown",
 }
 
 // NotificationPrefix starts the type of every event that produces a notification.
@@ -74,6 +76,18 @@ type EventOutcome struct {
 // SnapshotIncompleteData is the payload of Events.SnapshotIncomplete.
 type SnapshotIncompleteData struct {
 	Date Date `json:"date"`
+}
+
+// PortfolioDrawdownData is the payload of Events.PortfolioDrawdown. The subject
+// of the event is the level, an at sign and the crossing date.
+type PortfolioDrawdownData struct {
+	Level           Decimal `json:"level"`
+	CrossedOn       Date    `json:"crossed_on"`
+	Date            Date    `json:"date"`
+	DrawdownPercent Decimal `json:"drawdown_percent"`
+	ValueUSD        Decimal `json:"value_usd"`
+	HighDate        Date    `json:"high_date"`
+	HighValueUSD    Decimal `json:"high_value_usd"`
 }
 
 // NotificationFailedData is the payload of Events.NotificationFailed. It

@@ -18,6 +18,8 @@ type Config struct {
 
 	// NotificationsConfigFile is the path of the notifications YAML file; empty means unconfigured.
 	NotificationsConfigFile string
+	// MonitorsConfigFile is the path of the monitors YAML file; empty means no file, so no monitor runs.
+	MonitorsConfigFile string
 	// TelegramBotToken is a server-side secret, never logged or returned; empty means Telegram is unconfigured.
 	TelegramBotToken string
 
@@ -72,6 +74,7 @@ func Load() (*Config, error) {
 	cfg.DSN = os.Getenv("INVESTMENTS_MCP_DSN")
 	cfg.TiingoAPIKey = os.Getenv("INVESTMENTS_MCP_TIINGO_API_KEY")
 	cfg.NotificationsConfigFile = os.Getenv("INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE")
+	cfg.MonitorsConfigFile = os.Getenv("INVESTMENTS_MCP_MONITORS_CONFIG_FILE")
 	cfg.TelegramBotToken = os.Getenv("INVESTMENTS_MCP_TELEGRAM_BOT_TOKEN")
 
 	if cfg.DSN == "" {
