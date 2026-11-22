@@ -56,12 +56,12 @@ func run() error {
 	}
 
 	provider := tiingo.NewClient(cfg.TiingoAPIKey, "")
-	refresher := marketdata.NewPriceRefresher(stores, stores.Prices, provider)
+	refresher := marketdata.NewPriceRefresher(stores.Store, stores.Prices, provider)
 	job := marketdata.NewJob(stores.Prices, stores.Snapshots, stores.Updates, refresher, provider.Name())
 
 	tasks := []domain.ScheduledTask{marketdata.RefreshTask(job)}
 
-	for _, m := range []monitor.Monitor{monitor.NewSnapshotIncomplete(stores, stores.Events)} {
+	for _, m := range []monitor.Monitor{monitor.NewSnapshotIncomplete(stores.Store, stores.Events)} {
 		tasks = append(tasks, monitor.Task(m, cfg.MonitorTimeout))
 	}
 
