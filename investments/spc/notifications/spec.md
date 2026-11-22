@@ -136,13 +136,13 @@ silent. It does three things:
 1. It logs an error naming the event, its type and its failure count, never its payload.
    The log is the dependable record, because the notification below needs the channel
    implementation that may be the very thing failing.
-2. It records a delivery-failed event, which the configuration routes like any other
+2. It records a notification-failed event, which the configuration routes like any other
    event, intended to the system category, naming the type of the event that failed and
    when it was recorded.
 3. The event shows up in the status view, as described below.
 
-A delivery-failed event that is itself given up on only logs and shows in status. It
-never records another delivery-failed event, so a failing channel implementation cannot cause a
+A notification-failed event that is itself given up on only logs and shows in status. It
+never records another notification-failed event, so a failing channel implementation cannot cause a
 cascade.
 
 ### Age limit
@@ -318,7 +318,7 @@ configuration, not by the monitor.
 - Failures are counted per event, not per handler or target: per-handler counting needs
   a more elaborate column or table, and an event with several targets shares one count
   of ten. Revisit if a type gets several handlers or targets that diverge in practice.
-- Giving up logs an error and also records a delivery-failed event, which cannot
+- Giving up logs an error and also records a notification-failed event, which cannot
   cascade.
 - Given-up events need attention in status for a week and are then listed as expired,
   informationally; both are removed by an agent tool.
@@ -358,9 +358,9 @@ configuration, not by the monitor.
 - An event with no registered handler is logged as an error and retried like any
   failure.
 - After ten failures an event is not retried again, an error is logged, a
-  delivery-failed event is recorded, and the event is listed in status with a needs
+  notification-failed event is recorded, and the event is listed in status with a needs
   attention verdict.
-- A given-up delivery-failed event does not record another delivery-failed event.
+- A given-up notification-failed event does not record another notification-failed event.
 - An event older than one week that is not fully handled is not picked up again and
   is listed in status as expired, in an area that does not affect the verdict; it does
   not block or delay newer events.
@@ -376,7 +376,7 @@ configuration, not by the monitor.
   that chat are set; when they are not, nothing is sent, a warning is logged and the
   handler succeeds. An event type with no target configured logs a warning and is
   treated as delivered.
-- With the intended configuration, a delivery-failed event reaches the system category
+- With the intended configuration, a notification-failed event reaches the system category
   and a snapshot-incomplete event the portfolio category, and a category never falls
   back to the other. No event type, producer or monitor refers to a channel
   implementation or category.
