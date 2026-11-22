@@ -67,14 +67,14 @@ few messages about the system's own health.
 
 **Notification handler.** The generic handler for events that notification. It accepts the
 complete notifications configuration as one unit, and for each event it handles it
-renders the message text and sends it to every target the configuration routes that
+renders the message text and sends it to every channel the configuration routes that
 event type to. Event types, producers and monitors know nothing about how an event is
 handled.
 
 **Configuration.** One versioned YAML file declaring how notifications work: the channel
 implementations in use with their settings, the categories each offers, and for each
-notifying event type its message format and its targets, each target being a channel
-implementation and one of its categories. Routing lives only here.
+notifying event type its message format and its channels, each a channel
+implementation with one of its categories. Routing lives only here.
 
 **Monitor.** A job that runs on a schedule, judges a condition on the system's
 current state, and records an event when the condition holds. A monitor names the
@@ -179,28 +179,28 @@ models.
 ### Notification handling
 
 Notifying is generic. Each event type that notifies has one notification handler: the
-same handler, configured with a message format for the type and a list of targets. The
+same handler, configured with a message format for the type and its channels. The
 message format turns the event's data into plain, channel-neutral text, with no
 markup, and may look at current system state to do so, for example the updates log.
 The handler knows channel implementations and categories only by name and through
 the channel interface, never a particular service, so no handler is written for one service's
 formatting, and content cannot be rejected for formatting reasons.
 
-- A handler sends to every target it is configured with. Targets are independent: each
-  is delivered and retried on its own, so a target that already delivered is not sent
-  the message again because another failed, and one failing target does not stop
+- A handler sends to every channel it is configured with. Channels are independent: each
+  is delivered and retried on its own, so a channel that already delivered is not sent
+  the message again because another failed, and one failing channel does not stop
   delivery to the others.
-- A failure on any target is a failure of the handler for that event, counted toward
+- A failure on any channel is a failure of the handler for that event, counted toward
   the ten per event as described above.
-- Each target is tracked on the event under a stable name derived from the handler, the
+- Each channel delivery is tracked on the event under a stable name derived from the handler, the
   channel implementation and the category. Like handler names, these names are never reused for a
   different purpose and never removed while events that reference them may still be in
   flight.
-- An event type that notifies but has no target configured logs a warning and is
+- An event type that notifies but has no channel configured logs a warning and is
   treated as delivered, since there is nothing to send to.
-- Targets never fall back to one another: a message reaches only the targets its
+- Channels never fall back to one another: a message reaches only the channels its
   handler names.
-- Each target uses one channel implementation. Adding an implementation or a category
+- Each channel is one channel implementation. Adding an implementation or a category
   needs no change to any handler or producer, only the implementation, if new, and
   configuration.
 
@@ -230,7 +230,7 @@ evolve; a file with a version the server does not know is rejected.
 - Credentials are not in the file. They are server configuration, read from the
   environment, so the file can be versioned and reviewed without exposing the Telegram
   credential, which can still be rotated without a code change.
-- If no file exists, notifications are unconfigured: an event type has no target, which
+- If no file exists, notifications are unconfigured: an event type has no notification entry, which
   logs a warning and counts as delivered, as described above, so the system runs
   without Telegram.
 - If a file exists but is invalid, events are never treated as delivered because of it.
@@ -361,9 +361,9 @@ configuration, not by the monitor.
 - The worker runs in the server process, polls twice per minute, and gives up after
   ten failures, logging an error.
 - An unhandled event type is an error, not a silent skip.
-- Failures are counted per event, not per handler or target: per-handler counting needs
-  a more elaborate column or table, and an event with several targets shares one count
-  of ten. Revisit if a type gets several handlers or targets that diverge in practice.
+- Failures are counted per event, not per handler or channel: per-handler counting needs
+  a more elaborate column or table, and an event with several channels shares one count
+  of ten. Revisit if a type gets several handlers or channels that diverge in practice.
 - Giving up logs an error and also records a notification-failed event, which cannot
   cascade.
 - Given-up events need attention in status for a week and are then listed as expired,
@@ -372,7 +372,7 @@ configuration, not by the monitor.
 - Events are only considered for handling for a week after they were recorded, so a
   stuck event never blocks newer ones.
 - Notifying is generic: one notification handler per notifying event type, configured
-  with a message format and a list of targets, each a channel implementation and one of
+  with a message format and its channels, each a channel implementation with one of
   its categories. Handlers depend only on the channel interface. Telegram is the first
   channel implementation, with plain text, and the stub behavior applies when an
   implementation or category is unconfigured.
@@ -414,13 +414,13 @@ configuration, not by the monitor.
   longer lists it.
 - A notification handler uses only the channel interface; replacing a channel
   implementation changes no handler and no producer.
-- An event configured for two targets is delivered to both; if one fails, the one that
+- An event configured for two channels is delivered to both; if one fails, the one that
   delivered is not sent the message again on retry and the failing one is retried.
 - A channel implementation can have more than one category, set in the notifications configuration,
-  and a message reaches only the categories its targets name.
+  and a message reaches only the categories its channels name.
 - A message reaches the chat configured for its category when the credential and
   that chat are set; when they are not, nothing is sent, a warning is logged and the
-  handler succeeds. An event type with no target configured logs a warning and is
+  handler succeeds. An event type with no channel configured logs a warning and is
   treated as delivered.
 - With the intended configuration, a notification-failed event reaches the system category
   and a snapshot-incomplete event the portfolio category, and a category never falls

@@ -240,7 +240,7 @@ func TestRenderers(t *testing.T) {
 	assert.Contains(t, text, "10")
 }
 
-func TestSourceExpandsTargetsAndFallsBackToNoTarget(t *testing.T) {
+func TestSourceExpandsChannelsAndFallsBackToNoChannel(t *testing.T) {
 	source := NewSource(NewLoader(writeConfig(t, validConfig)), &fakeStore{}, "")
 
 	handlers, err := source.Handlers(context.Background())
@@ -283,12 +283,12 @@ func (c *recordingChannel) SendPlainText(_ context.Context, category, text strin
 	return c.err
 }
 
-func TestTargetHandlerRendersThenSends(t *testing.T) {
+func TestChannelHandlerRendersThenSends(t *testing.T) {
 	data, err := json.Marshal(domain.SnapshotIncompleteData{Date: time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)})
 	require.NoError(t, err)
 
 	channel := &recordingChannel{}
-	handler := &targetHandler{
+	handler := &channelHandler{
 		name: "notification.x.y", channel: channel, category: "y",
 		renderer: NewRenderers(&fakeStore{})[domain.Events.SnapshotIncomplete][defaultFormat],
 	}

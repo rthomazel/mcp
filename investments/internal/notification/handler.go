@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	handlerNamePrefix   = "notification"
-	noTargetHandlerName = handlerNamePrefix + ".none"
+	handlerNamePrefix    = "notification"
+	noChannelHandlerName = handlerNamePrefix + ".none"
 )
 
 // Source is the one notification handler, expanded for the current
@@ -29,19 +29,19 @@ func NewSource(loader *Loader, store domain.Store, telegramToken string) *Source
 	return &Source{loader: loader, store: store, renderers: NewRenderers(store), telegramToken: telegramToken}
 }
 
-type targetHandler struct {
+type channelHandler struct {
 	name     string
 	renderer Renderer
 	channel  Channel
 	category string
 }
 
-type noTargetHandler struct {
+type noChannelHandler struct {
 	eventType string
 }
 
 // Handlers returns the handlers of each notifying event type. A type without
-// targets is handled with a warning, never an error.
+// channels is handled with a warning, never an error.
 func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, error) {
 	cfg, err := s.loader.Current()
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, 
 	for _, eventType := range domain.NotifyingEvents {
 		notification, ok := cfg.Notifications[eventType]
 		if !ok {
-			handlers[eventType] = []domain.EventHandler{&noTargetHandler{eventType: eventType}}
+			handlers[eventType] = []domain.EventHandler{&noChannelHandler{eventType: eventType}}
 
 			continue
 		}
@@ -69,8 +69,8 @@ func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, 
 				return nil, err
 			}
 
-			handlers[eventType] = append(handlers[eventType], &targetHandler{
-				name:     targetHandlerName(channelName, category),
+			handlers[eventType] = append(handlers[eventType], &channelHandler{
+				name:     channelHandlerName(channelName, category),
 				renderer: s.renderers[eventType][notification.Format],
 				channel:  channels[channelName],
 				category: category,
@@ -89,14 +89,14 @@ func newChannel(name string, cfg ChannelConfig, telegramToken string) Channel {
 	return &StubChannel{name: name}
 }
 
-// targetHandlerName is stored on events, so it never changes meaning.
-func targetHandlerName(channel, category string) string {
+// channelHandlerName is stored on events, so it never changes meaning.
+func channelHandlerName(channel, category string) string {
 	return handlerNamePrefix + "." + channel + "." + category
 }
 
-func (h *targetHandler) Name() string { return h.name }
+func (h *channelHandler) Name() string { return h.name }
 
-func (h *targetHandler) Handle(ctx context.Context, event domain.Event) error {
+func (h *channelHandler) Handle(ctx context.Context, event domain.Event) error {
 	text, err := h.renderer.Render(ctx, event)
 	if err != nil {
 		return fmt.Errorf("rendering %s: %w", event.Type, err)
@@ -109,10 +109,10 @@ func (h *targetHandler) Handle(ctx context.Context, event domain.Event) error {
 	return nil
 }
 
-func (h *noTargetHandler) Name() string { return noTargetHandlerName }
+func (h *noChannelHandler) Name() string { return noChannelHandlerName }
 
-func (h *noTargetHandler) Handle(ctx context.Context, _ domain.Event) error {
-	slog.WarnContext(ctx, "notification not delivered: no target is configured for the event type", "type", h.eventType)
+func (h *noChannelHandler) Handle(ctx context.Context, _ domain.Event) error {
+	slog.WarnContext(ctx, "notification not delivered: no channel is configured for the event type", "type", h.eventType)
 
 	return nil
 }
