@@ -12,7 +12,7 @@ Turns an event into plain, channel-neutral text, with no markup, so no handler i
 
 1. store domain.Store
 
-## DeliveryFailedRenderer
+## NotificationFailedRenderer
 
 No fields.
 
@@ -40,9 +40,9 @@ Return the renderer for each event type of domain.NotifyingEvents under defaultF
 
 Only symbols, dates and counts reach the message. The no-run wording covers a daily job that never ran.
 
-## DeliveryFailedRenderer.Render(ctx Context, event domain.Event) (string, error)
+## NotificationFailedRenderer.Render(ctx Context, event domain.Event) (string, error)
 
-1. Decode the event data as DeliveryFailedData.
+1. Decode the event data as NotificationFailedData.
 2. Return a message naming the failed event's type, when it was recorded and the number of failed attempts, and saying that its delivery was given up on.
 
 #### Errors

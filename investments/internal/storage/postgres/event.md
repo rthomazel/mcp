@@ -52,7 +52,7 @@ An expired or given-up event is never selected, so it cannot block, slow or crow
    2. Merge outcome.Succeeded into the handled names.
    3. if outcome.Failed, add one failure and set backoff_until to now plus domain.EventBackoff of the new count.
    4. if the new count reached domain.MaxEventFailures, set given_up_at to now and log an error naming the id, type and failure count.
-   5. if given up and the type is not domain.Events.DeliveryFailed, record a delivery-failed event through insertEvent carrying the id, type, recorded time and failure count.
+   5. if given up and the type is not domain.Events.NotificationFailed, record a notification-failed event through insertEvent carrying the id, type, recorded time and failure count.
    6. if outcome.Handled, set processed_at to now.
    7. Save through saveEventSQL.
 3. Return nil.
@@ -75,7 +75,7 @@ An expired or given-up event is never selected, so it cannot block, slow or crow
 
 - **2.7.** if saving fails, return the wrapped error.
 
-A delivery-failed event that is itself given up on only logs and is shown by status, so a failing channel cannot cascade. The log line is the dependable record, since the announcement needs the channel that may be failing. The payload is never logged. Reading the clock once per call keeps the timestamps of one outcome equal.
+A notification-failed event that is itself given up on only logs and is shown by status, so a failing channel cannot cascade. The log line is the dependable record, since the announcement needs the channel that may be failing. The payload is never logged. Reading the clock once per call keeps the timestamps of one outcome equal.
 
 ## Store.RemoveEvent(ctx Context, id int64) error
 

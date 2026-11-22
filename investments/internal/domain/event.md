@@ -10,11 +10,11 @@ EventRetention = 1 year, how long after it was fully handled an event is kept.
 ## Events
 
 1. Events.SnapshotIncomplete = "snapshot.incomplete"
-2. Events.DeliveryFailed = "delivery.failed"
+2. Events.NotificationFailed = "notification.failed"
 
 Event types are dot-separated words, named here and nowhere else.
 
-## NotifyingEvents = Events.SnapshotIncomplete, Events.DeliveryFailed
+## NotifyingEvents = Events.SnapshotIncomplete, Events.NotificationFailed
 
 The types that notify, in a stable order. Every one of them has a notification handler; the notifications configuration routes them.
 
@@ -57,14 +57,14 @@ What one pass did with one event. Handled and Failed are never both true.
 
 Payload of Events.SnapshotIncomplete. The subject of the event is the date, formatted YYYY-MM-DD.
 
-## DeliveryFailedData
+## NotificationFailedData
 
 1. EventID int64
 2. EventType string
 3. RecordedAt Time, when the failed event was recorded
 4. Failures int
 
-Payload of Events.DeliveryFailed. It never carries the failed event's own payload.
+Payload of Events.NotificationFailed. It never carries the failed event's own payload.
 
 # Interfaces
 
