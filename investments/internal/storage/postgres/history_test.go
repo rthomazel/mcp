@@ -201,3 +201,161 @@ func TestValueHistoryFlatSeriesHasZeroDrawdown(t *testing.T) {
 	assert.True(t, drawdown.Recovered)
 	assert.Equal(t, drawdown.PeakDate, drawdown.TroughDate)
 }
+
+func drawdownState(t *testing.T, store *Stores, increment string) domain.DrawdownState {
+	t.Helper()
+
+	state, err := store.GetDrawdownState(context.Background(), domain.Decimal(increment))
+	require.NoError(t, err)
+
+	return state
+}
+
+func levelsOf(state domain.DrawdownState) map[string]domain.Date {
+	levels := map[string]domain.Date{}
+	for _, level := range state.Levels {
+		levels[string(level.Level)] = level.CrossedOn
+	}
+
+	return levels
+}
+
+func TestDrawdownStateWithoutSnapshotsIsEmpty(t *testing.T) {
+	store := newTestStore(t)
+
+	state := drawdownState(t, store, "3")
+
+	assert.Empty(t, state.Levels)
+	assert.True(t, state.Date.IsZero())
+}
+
+func TestDrawdownStateRejectsANonPositiveIncrement(t *testing.T) {
+	store := newTestStore(t)
+
+	for _, increment := range []string{"0", "-3", "0.0"} {
+		_, err := store.GetDrawdownState(context.Background(), domain.Decimal(increment))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, increment)
+	}
+}
+
+func TestDrawdownStateReportsLevelsShallowestFirstWithTheirCrossings(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	// Jan 1..5: 1000 990 960 930 928. The high is Jan 1; -1% on Jan 2, -4% on Jan 3, -7% on Jan 4, -7.2% on Jan 5.
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 1000, 990, 960, 930, 928)
+
+	state := drawdownState(t, store, "3")
+
+	assert.Equal(t, date(2026, 1, 5), state.Date)
+	assert.Equal(t, "928", string(state.ValueUSD))
+	assert.Equal(t, "-7.2", string(state.DrawdownPercent))
+	assert.Equal(t, date(2026, 1, 1), state.HighDate)
+	assert.Equal(t, "1000", string(state.HighValueUSD))
+	require.Len(t, state.Levels, 2)
+	assert.Equal(t, domain.DrawdownLevel{Level: "-3", CrossedOn: date(2026, 1, 3)}, state.Levels[0])
+	assert.Equal(t, domain.DrawdownLevel{Level: "-6", CrossedOn: date(2026, 1, 4)}, state.Levels[1])
+}
+
+func TestDrawdownStateIncludesAnExactLevel(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	// 291 is exactly 3% below 300, so it is at the -3 level, and 270 is exactly at -10.
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 300, 291)
+	assert.Equal(t, map[string]domain.Date{"-3": date(2026, 1, 2)}, levelsOf(drawdownState(t, store, "3")))
+
+	seedSeries(t, store, voo.ID, date(2026, 1, 3), 270)
+	assert.Equal(t, map[string]domain.Date{"-10": date(2026, 1, 3)}, levelsOf(drawdownState(t, store, "10")))
+}
+
+func TestDrawdownStateClearsALevelOnRecoveryAndCrossesAgain(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	// Jan 1..8: 1000 950 940 980 960 940 930 925. At -5% on Jan 2, back to -2% on Jan 4, below -5% again from Jan 6.
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 1000, 950, 940, 980, 960, 940, 930, 925)
+
+	state := drawdownState(t, store, "5")
+
+	assert.Equal(t, map[string]domain.Date{"-5": date(2026, 1, 6)}, levelsOf(state), "the stay began again on Jan 6")
+	assert.Equal(t, date(2026, 1, 1), state.HighDate)
+}
+
+func TestDrawdownStateStaysCrossedWhileTheValueStaysBelow(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 1000, 940, 930, 935, 920, 945)
+
+	// The value moves between -5.5% and -8% but never rises above -3% again, so the -3 crossing stays
+	// on Jan 2; the -6 level was passed on Jan 3 but the latest value is above it, so it is not reported.
+	assert.Equal(t, map[string]domain.Date{"-3": date(2026, 1, 2)}, levelsOf(drawdownState(t, store, "3")))
+}
+
+func TestDrawdownStateAtANewHighHasNoLevels(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 1000, 900, 1100)
+
+	state := drawdownState(t, store, "3")
+
+	assert.Empty(t, state.Levels)
+	assert.Equal(t, "0", string(state.DrawdownPercent))
+	assert.Equal(t, date(2026, 1, 3), state.HighDate)
+}
+
+func TestDrawdownStateTakesTheEarliestHighOnATie(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 1000, 1000, 900)
+
+	assert.Equal(t, date(2026, 1, 1), drawdownState(t, store, "3").HighDate)
+}
+
+func TestDrawdownStateAgreesWithTheValueHistory(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 100, 120, 150, 0, 100, 200, 140, 170)
+
+	history, err := store.GetValueHistory(context.Background(), domain.HistoryFilter{})
+	require.NoError(t, err)
+
+	state := drawdownState(t, store, "3")
+
+	assert.Equal(t, string(history.Securities.FromHighPercent), string(state.DrawdownPercent))
+	assert.Equal(t, history.Securities.AllTimeHigh.Date, state.HighDate)
+	assert.Equal(t, string(history.Securities.AllTimeHigh.ValueUSD), string(state.HighValueUSD))
+	assert.Equal(t, history.Securities.Latest.Date, state.Date)
+}
+
+func TestDrawdownStateCapsTheLevels(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 1000, 100)
+
+	// A fall of 90% in increments of 0.1 is 900 levels; only the shallowest hundred are reported.
+	state := drawdownState(t, store, "0.1")
+
+	require.Len(t, state.Levels, maxDrawdownLevels)
+	assert.Equal(t, domain.Decimal("-0.1"), state.Levels[0].Level)
+	assert.Equal(t, domain.Decimal("-10"), state.Levels[maxDrawdownLevels-1].Level)
+}
+
+func TestDrawdownStateAfterEverythingWasSold(t *testing.T) {
+	store := newTestStore(t)
+	voo := registerETF(t, store, "VOO")
+
+	// A cash-only date counts with securities value zero, as in the value history.
+	seedSeries(t, store, voo.ID, date(2026, 1, 1), 1000)
+	seedCashSnapshot(t, store, date(2026, 1, 2), "1000")
+
+	state := drawdownState(t, store, "50")
+
+	assert.Equal(t, "-100", string(state.DrawdownPercent))
+	assert.Equal(t, map[string]domain.Date{"-50": date(2026, 1, 2), "-100": date(2026, 1, 2)}, levelsOf(state))
+}

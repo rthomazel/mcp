@@ -61,8 +61,14 @@ func run() error {
 
 	tasks := []domain.ScheduledTask{marketdata.RefreshTask(job)}
 
-	for _, m := range []monitor.Monitor{monitor.NewSnapshotIncomplete(stores.Store, stores.Events)} {
-		tasks = append(tasks, monitor.Task(m, cfg.MonitorTimeout))
+	monitors := []monitor.Monitor{
+		monitor.NewSnapshotIncomplete(stores.Store, stores.Events),
+		monitor.NewPortfolioDrawdown(stores.Store, stores.Events),
+	}
+	monitorsConfig := monitor.NewConfigLoader(cfg.MonitorsConfigFile, monitors)
+
+	for _, m := range monitors {
+		tasks = append(tasks, monitor.Task(m, cfg.MonitorTimeout, monitorsConfig))
 	}
 
 	scheduler, err := domain.NewScheduler(tasks, cfg.MarketTimezone)
@@ -78,7 +84,7 @@ func run() error {
 
 	running.Go(func() { scheduler.Run(ctx) })
 
-	source := notification.NewSource(notification.NewLoader(cfg.NotificationsConfigFile), stores.Updates, cfg.TelegramBotToken)
+	source := notification.NewSource(notification.NewConfigLoader(cfg.NotificationsConfigFile), stores.Updates, cfg.TelegramBotToken)
 	eventsWorker := events.NewWorker(stores.Events, source, events.Settings{
 		TypePrefix:   domain.NotificationPrefix,
 		PollInterval: cfg.WorkerPollInterval, PruneInterval: cfg.WorkerPruneInterval,

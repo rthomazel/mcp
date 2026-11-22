@@ -9,6 +9,9 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
+// maxDrawdownLevels is the most levels one drawdown state reports.
+const maxDrawdownLevels = 100
+
 const (
 	historyBoundsSQL = `
 SELECT MIN(date), MAX(date) FROM (SELECT date FROM snapshots UNION SELECT date FROM cash_snapshots) dates`
@@ -80,6 +83,34 @@ SELECT latest.date, trim_scale(latest.value)::text,
        trim_scale(worst.fall)::text, trim_scale(worst.fall_percent)::text,
        worst.fall = 0 OR EXISTS (SELECT 1 FROM in_range i WHERE i.date > worst.trough_date AND i.value >= worst.peak_value)
 FROM latest, high, baseline, range_high, range_low, worst`
+
+	// drawdownStateSQL takes $1, the increment, and $2, the most levels. A row is shallower than a
+	// level when its drawdown is above it, compared by cross multiplication so no division rounds it.
+	// The crossing is the first date after the latest shallower one; a zero peak is shallower than every level.
+	drawdownStateSQL = `WITH ` + dailySeriesSQL + `, running AS (
+    SELECT date, securities AS value, MAX(securities) OVER (ORDER BY date) AS peak FROM daily
+), latest AS (
+    SELECT * FROM running ORDER BY date DESC LIMIT 1
+), high AS (
+    SELECT MIN(r.date) AS date FROM running r, latest WHERE r.value = latest.peak
+), depth AS (
+    SELECT latest.*,
+           CASE WHEN latest.peak > 0 THEN floor((latest.peak - latest.value) * 100 / (latest.peak * $1::numeric)) ELSE 0 END AS levels
+    FROM latest
+)
+SELECT depth.date, trim_scale(depth.value)::text,
+       trim_scale(COALESCE((depth.value - depth.peak) / NULLIF(depth.peak, 0) * 100, 0))::text,
+       high.date, trim_scale(depth.peak)::text,
+       lv.level, lv.crossed_on
+FROM depth CROSS JOIN high
+LEFT JOIN LATERAL (
+    SELECT k, trim_scale(-k * $1::numeric)::text AS level,
+           (SELECT MIN(r.date) FROM running r WHERE r.date > (
+               SELECT MAX(s.date) FROM running s
+               WHERE s.peak = 0 OR (s.value - s.peak) * 100 > -k * $1::numeric * s.peak)) AS crossed_on
+    FROM generate_series(1, LEAST(depth.levels, $2::numeric)::int) AS k
+) lv ON true
+ORDER BY lv.k`
 
 	netContributionsSQL = `
 SELECT COALESCE(SUM(amount), 0)::text FROM cash_transactions
@@ -206,4 +237,42 @@ func (s *Store) seriesSummary(ctx context.Context, column string, from, to domai
 	summary.Latest.Date, summary.ChangePercent = latestDate.Time, decimalPtr(changePercent)
 
 	return &summary, nil
+}
+
+// GetDrawdownState returns the drawdown of the latest securities value from
+// the all-time high and the levels it is at or below. Changes in value, not returns.
+func (s *Store) GetDrawdownState(ctx context.Context, increment domain.Decimal) (domain.DrawdownState, error) {
+	if increment.Sign() <= 0 {
+		return domain.DrawdownState{}, fmt.Errorf("%w: the increment %q must be positive", domain.ErrInvalidInput, increment)
+	}
+
+	rows, err := s.db.QueryxContext(ctx, drawdownStateSQL, string(increment), maxDrawdownLevels)
+	if err != nil {
+		return domain.DrawdownState{}, fmt.Errorf("reading drawdown state: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	state := domain.DrawdownState{Levels: []domain.DrawdownLevel{}}
+
+	for rows.Next() {
+		var (
+			level     sql.NullString
+			crossedOn sql.NullTime
+		)
+
+		err := rows.Scan(&state.Date, &state.ValueUSD, &state.DrawdownPercent, &state.HighDate, &state.HighValueUSD, &level, &crossedOn)
+		if err != nil {
+			return domain.DrawdownState{}, fmt.Errorf("scanning drawdown state: %w", err)
+		}
+
+		if level.Valid {
+			state.Levels = append(state.Levels, domain.DrawdownLevel{Level: domain.Decimal(level.String), CrossedOn: crossedOn.Time})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return domain.DrawdownState{}, fmt.Errorf("reading drawdown state: %w", err)
+	}
+
+	return state, nil
 }

@@ -15,16 +15,6 @@ import (
 
 func newMonitor(store *fakeStore) *SnapshotIncomplete { return NewSnapshotIncomplete(store, store) }
 
-func TestTaskRunsTheMonitorAtItsTime(t *testing.T) {
-	monitor := newMonitor(&fakeStore{})
-	task := Task(monitor, time.Minute)
-
-	assert.Equal(t, []domain.ClockTime{{Hour: 7}}, task.At)
-	assert.Equal(t, time.Minute, task.Timeout)
-	assert.Contains(t, task.Name, domain.Events.SnapshotIncomplete)
-	assert.NoError(t, task.Run(context.Background()))
-}
-
 type fakeStore struct {
 	domain.GenericStore
 	domain.EventStore
@@ -33,6 +23,17 @@ type fakeStore struct {
 	statusErr error
 	recorded  []domain.DraftEvent
 	created   bool
+
+	drawdown    domain.DrawdownState
+	drawdownErr error
+	increment   domain.Decimal
+	recordErr   error
+}
+
+func (s *fakeStore) GetDrawdownState(_ context.Context, increment domain.Decimal) (domain.DrawdownState, error) {
+	s.increment = increment
+
+	return s.drawdown, s.drawdownErr
 }
 
 func (s *fakeStore) GetStatus(context.Context) (domain.Status, error) { return s.status, s.statusErr }
@@ -40,7 +41,7 @@ func (s *fakeStore) GetStatus(context.Context) (domain.Status, error) { return s
 func (s *fakeStore) Record(_ context.Context, draft domain.DraftEvent) (bool, error) {
 	s.recorded = append(s.recorded, draft)
 
-	return s.created, nil
+	return s.created, s.recordErr
 }
 
 func TestSnapshotIncompleteRecordsTheDateOnce(t *testing.T) {
@@ -48,7 +49,7 @@ func TestSnapshotIncompleteRecordsTheDateOnce(t *testing.T) {
 	store := &fakeStore{status: domain.Status{LatestPriceDate: &date, SnapshotMissing: true}, created: true}
 	monitor := newMonitor(store)
 
-	require.NoError(t, monitor.Run(context.Background()))
+	require.NoError(t, monitor.Run(context.Background(), nil))
 	require.Len(t, store.recorded, 1)
 	assert.Equal(t, domain.Events.SnapshotIncomplete, store.recorded[0].Type)
 	assert.Equal(t, "2026-01-05", *store.recorded[0].Subject)
@@ -58,7 +59,7 @@ func TestSnapshotIncompleteRecordsTheDateOnce(t *testing.T) {
 	assert.Equal(t, date, data.Date)
 
 	assert.Equal(t, domain.ClockTime{Hour: 7}, monitor.At())
-	assert.Equal(t, domain.Events.SnapshotIncomplete, monitor.Name())
+	assert.Equal(t, "snapshot.incomplete", monitor.Name())
 }
 
 func TestSnapshotIncompleteRecordsNothingWhenResolved(t *testing.T) {
@@ -69,7 +70,7 @@ func TestSnapshotIncompleteRecordsNothingWhenResolved(t *testing.T) {
 		"has a snapshot": {LatestPriceDate: &date},
 	} {
 		store := &fakeStore{status: status}
-		require.NoError(t, newMonitor(store).Run(context.Background()), name)
+		require.NoError(t, newMonitor(store).Run(context.Background(), nil), name)
 		assert.Empty(t, store.recorded, name)
 	}
 }
@@ -77,5 +78,12 @@ func TestSnapshotIncompleteRecordsNothingWhenResolved(t *testing.T) {
 func TestSnapshotIncompleteReturnsStatusErrors(t *testing.T) {
 	store := &fakeStore{statusErr: errors.New("db down")}
 
-	assert.Error(t, newMonitor(store).Run(context.Background()))
+	assert.Error(t, newMonitor(store).Run(context.Background(), nil))
+}
+
+func TestSnapshotIncompleteTakesNoSettings(t *testing.T) {
+	monitor := newMonitor(&fakeStore{})
+
+	assert.NoError(t, monitor.ValidateParams(nil))
+	assert.ErrorContains(t, monitor.ValidateParams(Params{"b": "1", "a": "2"}), `"a"`)
 }

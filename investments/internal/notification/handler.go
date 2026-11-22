@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/rthomazel/mcp/investments/internal/config/fileloader"
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
@@ -18,14 +19,14 @@ const (
 // Source is the one notification handler, expanded for the current
 // configuration. It implements domain.EventHandlerSource.
 type Source struct {
-	loader        *Loader
+	loader        *fileloader.Loader[Config]
 	updates       domain.UpdateStore
 	renderers     map[string]map[string]Renderer
 	telegramToken string
 }
 
 // NewSource builds a Source with the renderers from NewRenderers.
-func NewSource(loader *Loader, updates domain.UpdateStore, telegramToken string) *Source {
+func NewSource(loader *fileloader.Loader[Config], updates domain.UpdateStore, telegramToken string) *Source {
 	return &Source{loader: loader, updates: updates, renderers: NewRenderers(updates), telegramToken: telegramToken}
 }
 
