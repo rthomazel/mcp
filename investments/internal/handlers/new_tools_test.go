@@ -58,7 +58,7 @@ type cashOps struct {
 }
 
 func cashHandler(store *cashStore) *Handler {
-	stores := store.fakeStore.bundle(store)
+	stores := store.bundle(store)
 	stores.Cash = cashOps{cashStore: store}
 
 	return New(stores, nil, time.Minute)
