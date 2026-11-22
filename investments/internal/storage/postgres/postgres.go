@@ -33,6 +33,7 @@ type Store struct {
 	db             *sqlx.DB
 	stalePriceDays int
 	marketLocation *time.Location
+	clock          func() time.Time // replaceable in tests
 }
 
 // Open connects to the database and returns the store and a cleanup function.
@@ -66,7 +67,7 @@ func Open(dsn string, stalePriceDays int) (*Store, func() error, error) {
 		return nil, nil, fmt.Errorf("loading timezone %s: %w", marketTimezone, err)
 	}
 
-	store := &Store{db: handle, stalePriceDays: stalePriceDays, marketLocation: location}
+	store := &Store{db: handle, stalePriceDays: stalePriceDays, marketLocation: location, clock: time.Now}
 
 	return store, handle.Close, nil
 }

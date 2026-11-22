@@ -117,7 +117,7 @@ func (s *Store) referenceDate(date *domain.Date) domain.Date {
 		return *date
 	}
 
-	year, month, day := time.Now().In(s.marketLocation).Date()
+	year, month, day := s.clock().In(s.marketLocation).Date()
 
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }

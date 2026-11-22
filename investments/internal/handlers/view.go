@@ -360,6 +360,33 @@ type statusView struct {
 	LatestSnapshotDate *string                `json:"latest_snapshot_date"`
 	SnapshotMissing    bool                   `json:"snapshot_missing"`
 	NeedsAttention     []updateView           `json:"needs_attention"`
+	GivenUpEvents      []eventView            `json:"given_up_events"`
+	ExpiredEvents      []eventView            `json:"expired_events"`
+}
+
+// eventView never carries the event payload.
+type eventView struct {
+	ID         int64   `json:"id"`
+	Type       string  `json:"type"`
+	RecordedAt string  `json:"recorded_at"`
+	Failures   int     `json:"failures"`
+	GivenUpAt  *string `json:"given_up_at"`
+}
+
+func toEventViews(events []domain.Event) []eventView {
+	views := make([]eventView, 0, len(events))
+
+	for _, event := range events {
+		view := eventView{ID: event.ID, Type: event.Type, RecordedAt: event.CreatedAt.UTC().Format(time.RFC3339), Failures: event.Failures}
+		if event.GivenUpAt != nil {
+			at := event.GivenUpAt.UTC().Format(time.RFC3339)
+			view.GivenUpAt = &at
+		}
+
+		views = append(views, view)
+	}
+
+	return views
 }
 
 type valuePointView struct {
@@ -465,6 +492,7 @@ func toStatusView(status domain.Status) statusView {
 		Date: formatDate(status.Date), Healthy: status.Healthy, Reasons: status.Reasons, Instruments: instruments,
 		LatestPriceDate: formatOptionalDate(status.LatestPriceDate), LatestSnapshotDate: formatOptionalDate(status.LatestSnapshotDate),
 		SnapshotMissing: status.SnapshotMissing, NeedsAttention: toUpdateViews(status.NeedsAttention),
+		GivenUpEvents: toEventViews(status.GivenUpEvents), ExpiredEvents: toEventViews(status.ExpiredEvents),
 	}
 }
 

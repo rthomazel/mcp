@@ -14,6 +14,9 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/data"
 	"github.com/rthomazel/mcp/investments/internal/handlers"
 	"github.com/rthomazel/mcp/investments/internal/marketdata"
+	"github.com/rthomazel/mcp/investments/internal/monitor"
+	"github.com/rthomazel/mcp/investments/internal/notify"
+	"github.com/rthomazel/mcp/investments/internal/outbox"
 	"github.com/rthomazel/mcp/investments/internal/provider/tiingo"
 	"github.com/rthomazel/mcp/investments/internal/storage/postgres"
 )
@@ -62,6 +65,19 @@ func run() error {
 	var running sync.WaitGroup
 
 	running.Go(func() { scheduler.Run(ctx) })
+
+	monitors, err := monitor.NewScheduler([]monitor.Monitor{monitor.NewSnapshotIncomplete(store)})
+	if err != nil {
+		stop()
+
+		return fmt.Errorf("building monitor scheduler: %w", err)
+	}
+
+	source := notify.NewSource(notify.NewLoader(cfg.NotificationsConfigFile), store, os.Getenv)
+	worker := outbox.NewWorker(store, source)
+
+	running.Go(func() { monitors.Run(ctx) })
+	running.Go(func() { worker.Run(ctx) })
 
 	defer func() {
 		stop()

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### feat
+
+- **(notifications)** outbox of events with per-handler retries, exponential backoff and give-up after 10 failures; notifications routed through a versioned YAML file (`INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE`) to Telegram or a stub channel, by category. A 07:00 New York monitor announces a latest price date without a completed snapshot once per date. `get_status` lists events given up on and expired ones; `remove_event` clears them. Adds the `events` table and promotes `go.yaml.in/yaml/v3` to a direct dependency.
+
 ### build
 
 - **(container)** add OCI image labels (`org.opencontainers.image.title`, `source`, `version`, `revision`) to the runtime image. The release workflow passes `VERSION` and `REVISION` (commit SHA) as build args, so `docker image inspect` shows which release is running; local builds report `local` / `unknown`.

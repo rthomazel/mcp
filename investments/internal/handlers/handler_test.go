@@ -222,7 +222,7 @@ func TestRegisterAddsTheTools(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"add_instrument", "list_instruments", "add_transaction", "list_transactions", "get_positions",
 		"get_portfolio", "get_prices", "refresh_prices", "get_snapshots", "rebuild_snapshots", "list_updates",
-		"add_cash_transaction", "list_cash_transactions", "get_cash", "get_status", "get_value_history",
+		"add_cash_transaction", "list_cash_transactions", "get_cash", "get_status", "get_value_history", "remove_event",
 	}, names)
 
 	for name, tool := range s.ListTools() {

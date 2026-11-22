@@ -64,4 +64,22 @@ type Store interface {
 	ListSnapshots(ctx context.Context, filter SnapshotFilter) ([]SnapshotRow, error)
 	// ListUpdates returns updates log rows, newest first, limited. Returns ErrInvalidInput.
 	ListUpdates(ctx context.Context, filter UpdateFilter) ([]Update, error)
+	// RecordEvent validates draft and inserts it into the outbox. With a
+	// subject, an existing event of the same type and subject makes it a no-op
+	// reporting created false. Returns ErrInvalidInput.
+	RecordEvent(ctx context.Context, draft DraftEvent) (created bool, err error)
+	// ListDueEvents returns up to limit events Event.Eligible accepts now,
+	// oldest first. Returns ErrInvalidInput for a non-positive limit.
+	ListDueEvents(ctx context.Context, limit int) ([]Event, error)
+	// SaveEventOutcome applies one handling pass in one transaction: merges
+	// succeeded handler names, marks handled, or counts a failure with backoff
+	// and gives up at MaxEventFailures (error log, notification.failed event).
+	// Returns ErrInvalidInput or ErrEventNotFound.
+	SaveEventOutcome(ctx context.Context, id int64, outcome EventOutcome) error
+	// RemoveEvent deletes an event given up on or expired. Returns
+	// ErrEventNotFound or ErrEventNotRemovable.
+	RemoveEvent(ctx context.Context, id int64) error
+	// PruneEvents deletes fully handled events older than EventRetention and
+	// returns how many.
+	PruneEvents(ctx context.Context) (int, error)
 }

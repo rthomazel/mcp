@@ -24,6 +24,10 @@ var (
 	// ErrSnapshotExists is returned when snapshot rows exist for a date that is
 	// not marked completed.
 	ErrSnapshotExists = errors.New("snapshot already exists")
+	// ErrEventNotFound is returned for an unknown event id.
+	ErrEventNotFound = errors.New("event not found")
+	// ErrEventNotRemovable is returned when removing an event that is neither given up on nor expired.
+	ErrEventNotRemovable = errors.New("event is not given up on or expired")
 )
 
 // NegativeBalanceError reports the first ledger entry at which ownership goes negative.
