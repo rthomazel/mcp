@@ -11,7 +11,7 @@ defaultStalePriceDays = 5, from the spec: a price five or more days older than t
 2. QueryTimeout Duration
 3. StalePriceDays int
 4. TiingoAPIKey string, the market data credential, a server-side secret
-5. NotificationsFile string, the path of the notifications YAML file, empty meaning no file
+5. NotificationsConfigFile string, the path of the notifications configuration YAML file, empty meaning no file
 
 # Functions
 
@@ -21,7 +21,7 @@ defaultStalePriceDays = 5, from the spec: a price five or more days older than t
 2. Read INVESTMENTS_MCP_QUERY_TIMEOUT as a duration, defaulting to defaultQueryTimeout.
 3. Read INVESTMENTS_MCP_STALE_PRICE_DAYS as an integer, defaulting to defaultStalePriceDays.
 4. Read INVESTMENTS_MCP_TIINGO_API_KEY.
-5. Read INVESTMENTS_MCP_NOTIFICATIONS_FILE, optional.
+5. Read INVESTMENTS_MCP_NOTIFICATIONS_CONFIG_FILE, optional.
 6. Return the populated Config.
 
 #### Errors
