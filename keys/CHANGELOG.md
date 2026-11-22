@@ -19,7 +19,7 @@
     - Em dash (—) separates the short label from the explanation.
 -->
 
-## Unreleased
+## [0.1.5](https://github.com/rthomazel/mcp/releases/tag/keys/v0.1.5) fix: pin mcp-proxy and allow the service Host header
 
 ### fix
 
