@@ -1,5 +1,9 @@
 # Types
 
+## EventHandlers = func(eventType string) []EventHandler
+
+The handlers registered for an event type. None means no handler is registered. A function and not a map, since the set of types a source covers can be open, such as every type with the notification prefix.
+
 ## EventPolicy
 
 1. MaxFailures int, the failed attempts after which an event is given up on
@@ -20,7 +24,7 @@ Event types are dot-separated words, named here and nowhere else.
 
 ## NotificationPrefix = "notification."
 
-Starts the type of every event that produces a notification. The convention replaces a list of notifying types: the notifications worker selects events by it, and the notifications file may configure only types that have it. Events of other types belong to other workers.
+Starts the type of every event that produces a notification. The convention replaces a list of notifying types: the events worker selects events by it, and the notifications file may configure only types that have it. Events of other types are for other handlers, which an events worker with another prefix or none can pick up.
 
 # Types
 
@@ -79,6 +83,12 @@ Payload of Events.NotificationFailed. It never carries the failed event's own pa
 2. Handle(ctx Context, event Event) error
 
 One side effect attached to one event type. Name is persisted in Event.HandledBy, so it is stable: never reused for different behavior, and not removed while events that name it may be in flight. A handler may run more than once for an event, since delivery is at least once.
+
+## EventHandlerSource
+
+1. Handlers(ctx Context) (EventHandlers, error)
+
+The handlers registered for each event type, read fresh on every pass so configuration changes apply without a restart. Implemented by the packages that own handlers, such as notification, and used by the events worker. An error means the handlers are unavailable.
 
 # Functions
 

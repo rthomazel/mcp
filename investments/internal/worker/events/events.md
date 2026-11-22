@@ -8,36 +8,25 @@
 2. PruneInterval Duration, how often to prune handled events
 3. BatchLimit int, the events taken per pass
 4. HandlerTimeout Duration, the deadline for one handler call
+5. TypePrefix string, only events whose type starts with it are handled; main sets domain.NotificationPrefix for now
 
 The worker's tunables, from the server configuration, which defaults them to 30 seconds, 24 hours, 100 and 30 seconds.
 
-## Notifications
+## Worker
 
 1. store domain.Store
-2. source HandlerSource
+2. source domain.EventHandlerSource
 3. settings Settings
 
-The notifications worker: drains the outbox. It holds no state beyond its dependencies and reads no clock; every retry fact lives on the event, and the store decides what is due.
-
-# Interfaces
-
-## HandlerSource
-
-1. Handlers(ctx Context) (Handlers, error)
-
-The handlers registered for each event type, read fresh on every pass so configuration changes apply without a restart. Defined here, implemented by the notification package under worker. An error means the handlers are unavailable.
-
-## Handlers = func(eventType string) []domain.EventHandler
-
-The handlers registered for an event type. None means no handler is registered. A function and not a map, since the set of types is the open set of types with the notification prefix.
+The events worker: drains the events table. It holds no state beyond its dependencies and reads no clock; every retry fact lives on the event, and the store decides what is due.
 
 # Functions
 
-## NewNotifications(store domain.Store, source HandlerSource, settings Settings) *Notifications
+## NewWorker(store domain.Store, source domain.EventHandlerSource, settings Settings) *Worker
 
-Build the notifications worker.
+Build the events worker.
 
-## Notifications.Run(ctx Context)
+## Worker.Run(ctx Context)
 
 1. Run one pass immediately and prune once.
 2. Every PollInterval run another pass, and every PruneInterval prune.
@@ -45,10 +34,10 @@ Build the notifications worker.
 
 A failing pass never stops the loop. The worker runs inside the server process, started from main.
 
-## Notifications.RunOnce(ctx Context)
+## Worker.RunOnce(ctx Context)
 
 1. Read the handlers from source.
-2. List the due events through store.ListDueEvents with domain.NotificationPrefix and BatchLimit.
+2. List the due events through store.ListDueEvents with TypePrefix and BatchLimit.
 3. Handle each one with handleEvent, in the order returned.
 
 #### Errors
@@ -59,9 +48,9 @@ A failing pass never stops the loop. The worker runs inside the server process, 
 
 - **2.** if listing fails, log at error level and return.
 
-The worker takes only events whose type starts with domain.NotificationPrefix, in the query, so events of other types, which other workers with the same retry and backoff pattern may handle, are never read, counted as failures or logged here. The handlers are read before the events are listed, so a broken configuration is logged on every pass, even when no event is due. One pass can be driven directly, so tests need no timer.
+The worker takes only events whose type starts with TypePrefix, in the query, so events of other types, which a worker with another prefix and the same retry and backoff pattern may handle, are never read, counted as failures or logged here. The handlers are read before the events are listed, so a broken configuration is logged on every pass, even when no event is due. One pass can be driven directly, so tests need no timer.
 
-## Notifications.handleEvent(ctx Context, event domain.Event, handlers Handlers, handlersErr error)
+## Worker.handleEvent(ctx Context, event domain.Event, handlers domain.EventHandlers, handlersErr error)
 
 1. if handlersErr is set, save a failed outcome and return.
 2. Look up the handlers registered for event.Type with handlers.
@@ -79,6 +68,6 @@ The worker takes only events whose type starts with domain.NotificationPrefix, i
 
 Retries are per handler: a handler already in HandledBy is skipped, so a failing sibling never reruns it. An event whose handlers have all succeeded before, for example because a route was removed, becomes fully handled here. A failed outcome counts toward the ten failures per event, however many handlers failed. An event with no registered handler, for example a misspelled type, is a warning and a skip: nothing is saved, so no failure is counted and it is never given up on, and the warning repeats on each pass until the event expires and status lists it as expired.
 
-## Notifications.prune(ctx Context)
+## Worker.prune(ctx Context)
 
 Delete the expired history through store.PruneEvents and log the number at info level when it is not zero, or the error at error level.

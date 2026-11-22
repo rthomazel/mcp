@@ -31,7 +31,7 @@ var Events = EventTypes{
 }
 
 // NotificationPrefix starts the type of every event that produces a notification.
-// The convention replaces a list: the notifications worker selects by it, and the
+// The convention replaces a list: the events worker selects by it, and the
 // notifications file may configure only types that have it.
 const NotificationPrefix = "notification."
 
@@ -90,6 +90,17 @@ type NotificationFailedData struct {
 type EventHandler interface {
 	Name() string
 	Handle(ctx context.Context, event Event) error
+}
+
+// EventHandlers returns the handlers registered for an event type; none means
+// no handler is registered. A function and not a map, since the set of types a
+// source covers can be open.
+type EventHandlers func(eventType string) []EventHandler
+
+// EventHandlerSource provides the handlers for each event type, read fresh on
+// every pass so configuration changes apply without a restart.
+type EventHandlerSource interface {
+	Handlers(ctx context.Context) (EventHandlers, error)
 }
 
 // ValidEventType reports whether eventType is dot-separated lowercase words.

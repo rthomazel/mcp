@@ -12,7 +12,7 @@ noChannelHandlerName = "notification.none".
 3. renderers map[string]map[string]Renderer
 4. telegramToken string, the bot token from the server configuration
 
-Implements outbox.HandlerSource. It is the one notification handler, expanded for the current configuration, so the worker sees plain domain.EventHandler values.
+Implements domain.EventHandlerSource. It is the one notification handler, expanded for the current configuration, so the events worker sees plain domain.EventHandler values.
 
 ## channelHandler
 
@@ -35,7 +35,7 @@ Stands in for an event type with no notification.
 
 Build a Source with the renderers from NewRenderers.
 
-## Source.Handlers(ctx Context) (outbox.Handlers, error)
+## Source.Handlers(ctx Context) (domain.EventHandlers, error)
 
 1. Read the configuration from the loader.
 2. Build each configured channel with newChannel, by its key.

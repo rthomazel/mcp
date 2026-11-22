@@ -1,4 +1,4 @@
-package outbox
+package events
 
 import (
 	"context"
@@ -16,33 +16,25 @@ type Settings struct {
 	PollInterval   time.Duration // how often to look for due events
 	PruneInterval  time.Duration // how often to prune handled events
 	BatchLimit     int           // events taken per pass
+	TypePrefix     string        // only events whose type starts with it are handled
 	HandlerTimeout time.Duration // deadline for one handler call
 }
 
-// HandlerSource provides the handlers registered for each event type, read
-// fresh on every pass so configuration changes apply without a restart.
-type HandlerSource interface {
-	Handlers(ctx context.Context) (Handlers, error)
-}
-
-// Handlers returns the handlers registered for an event type; none means no
-// handler is registered.
-type Handlers func(eventType string) []domain.EventHandler
-
-// Notifications drains the outbox. Every retry fact lives on the event.
-type Notifications struct {
+// Worker drains the events table, handling the events whose type starts with
+// the configured prefix. Every retry fact lives on the event.
+type Worker struct {
 	store    domain.Store
-	source   HandlerSource
+	source   domain.EventHandlerSource
 	settings Settings
 }
 
-// NewNotifications builds the notifications worker.
-func NewNotifications(store domain.Store, source HandlerSource, settings Settings) *Notifications {
-	return &Notifications{store: store, source: source, settings: settings}
+// NewWorker builds the events worker.
+func NewWorker(store domain.Store, source domain.EventHandlerSource, settings Settings) *Worker {
+	return &Worker{store: store, source: source, settings: settings}
 }
 
 // Run blocks until ctx is cancelled. A failing pass never stops the loop.
-func (w *Notifications) Run(ctx context.Context) {
+func (w *Worker) Run(ctx context.Context) {
 	w.RunOnce(ctx)
 	w.prune(ctx)
 
@@ -55,7 +47,7 @@ func (w *Notifications) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			slog.InfoContext(ctx, "outbox worker stopped")
+			slog.InfoContext(ctx, "events worker stopped")
 
 			return
 		case <-poll.C:
@@ -67,13 +59,13 @@ func (w *Notifications) Run(ctx context.Context) {
 }
 
 // RunOnce runs one pass over the due events.
-func (w *Notifications) RunOnce(ctx context.Context) {
+func (w *Worker) RunOnce(ctx context.Context) {
 	handlers, handlersErr := w.source.Handlers(ctx)
 	if handlersErr != nil {
 		slog.ErrorContext(ctx, "reading event handlers", "err", handlersErr)
 	}
 
-	events, err := w.store.ListDueEvents(ctx, domain.NotificationPrefix, w.settings.BatchLimit)
+	events, err := w.store.ListDueEvents(ctx, w.settings.TypePrefix, w.settings.BatchLimit)
 	if err != nil {
 		slog.ErrorContext(ctx, "listing due events", "err", err)
 
@@ -85,7 +77,7 @@ func (w *Notifications) RunOnce(ctx context.Context) {
 	}
 }
 
-func (w *Notifications) handleEvent(ctx context.Context, event domain.Event, handlers Handlers, handlersErr error) {
+func (w *Worker) handleEvent(ctx context.Context, event domain.Event, handlers domain.EventHandlers, handlersErr error) {
 	if handlersErr != nil {
 		w.save(ctx, event, domain.EventOutcome{Failed: true})
 
@@ -123,14 +115,14 @@ func (w *Notifications) handleEvent(ctx context.Context, event domain.Event, han
 	w.save(ctx, event, outcome)
 }
 
-func (w *Notifications) run(ctx context.Context, handler domain.EventHandler, event domain.Event) error {
+func (w *Worker) run(ctx context.Context, handler domain.EventHandler, event domain.Event) error {
 	ctx, cancel := context.WithTimeout(ctx, w.settings.HandlerTimeout)
 	defer cancel()
 
 	return handler.Handle(ctx, event)
 }
 
-func (w *Notifications) save(ctx context.Context, event domain.Event, outcome domain.EventOutcome) {
+func (w *Worker) save(ctx context.Context, event domain.Event, outcome domain.EventOutcome) {
 	if err := w.store.SaveEventOutcome(ctx, event.ID, outcome); err != nil {
 		if errors.Is(err, domain.ErrEventNotFound) {
 			slog.WarnContext(ctx, "event removed while handling", "id", event.ID)
@@ -142,7 +134,7 @@ func (w *Notifications) save(ctx context.Context, event domain.Event, outcome do
 	}
 }
 
-func (w *Notifications) prune(ctx context.Context) {
+func (w *Worker) prune(ctx context.Context) {
 	count, err := w.store.PruneEvents(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "pruning events", "err", err)

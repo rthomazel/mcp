@@ -1,4 +1,4 @@
-package outbox
+package events
 
 import (
 	"context"
@@ -44,8 +44,8 @@ func (s *fakeStore) PruneEvents(context.Context) (int, error) {
 	return 0, nil
 }
 
-func newWorker(store domain.Store, source HandlerSource) *Notifications {
-	return NewNotifications(store, source, Settings{
+func newWorker(store domain.Store, source domain.EventHandlerSource) *Worker {
+	return NewWorker(store, source, Settings{TypePrefix: domain.NotificationPrefix,
 		PollInterval: time.Second, PruneInterval: time.Hour, BatchLimit: 100, HandlerTimeout: time.Second,
 	})
 }
@@ -69,7 +69,7 @@ type fakeSource struct {
 	err      error
 }
 
-func (s fakeSource) Handlers(context.Context) (Handlers, error) {
+func (s fakeSource) Handlers(context.Context) (domain.EventHandlers, error) {
 	return func(eventType string) []domain.EventHandler { return s.handlers[eventType] }, s.err
 }
 

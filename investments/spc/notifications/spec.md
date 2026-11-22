@@ -41,7 +41,7 @@ fully handled, and when delivery was given up on, if it was.
 **Event type.** A string of words separated by dots, naming what happened, for
 example notification.snapshot.incomplete. Types are named in one central place in the domain,
 not as scattered literals. An event that produces a notification has a type starting with
-`notification.`; the notifications worker handles only those, and other types are left
+`notification.`; the events worker handles only those, and other types are left
 for workers with other side effects, which follow the same pattern of handlers, retries
 and backoff.
 

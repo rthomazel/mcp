@@ -35,9 +35,9 @@ type Config struct {
 	// EventRetention is how long after it was fully handled an event is kept.
 	EventRetention time.Duration
 
-	// WorkerPollInterval is how often the notifications worker looks for due events.
+	// WorkerPollInterval is how often the events worker looks for due events.
 	WorkerPollInterval time.Duration
-	// WorkerPruneInterval is how often the notifications worker prunes handled events.
+	// WorkerPruneInterval is how often the events worker prunes handled events.
 	WorkerPruneInterval time.Duration
 	// WorkerBatchLimit is the events taken per pass.
 	WorkerBatchLimit int

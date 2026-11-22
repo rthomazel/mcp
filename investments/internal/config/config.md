@@ -14,7 +14,7 @@
 10. EventBackoffBase Duration, the delay after the first failure; each further failure doubles it
 11. EventMaxAge Duration, how long after it was recorded an event is still considered for handling
 12. EventRetention Duration, how long after it was fully handled an event is kept
-13. WorkerPollInterval Duration, how often the notifications worker looks for due events
+13. WorkerPollInterval Duration, how often the events worker looks for due events
 14. WorkerPruneInterval Duration, how often it prunes handled events
 15. WorkerBatchLimit int, the events taken per pass
 16. WorkerHandlerTimeout Duration, the deadline for one handler call
