@@ -4,38 +4,28 @@ supportedVersion = 1, the only format version this build reads.
 implementationTelegram = "telegram".
 implementationStub = "stub".
 defaultFormat = "plain".
+defaultCategory = "default", the name of the one category of a channel written without a categories map.
 
 # Types
 
 ## Config
 
 1. Version int
-2. Channels []ChannelConfig
-3. Routes []Route
+2. Channels map[string]ChannelConfig, by implementation
+3. Notifications map[string]Notification, by event type
 
 The complete notifications configuration, parsed from one YAML file. The handler takes it whole; no event type, producer or monitor refers to anything in it.
 
 ## ChannelConfig
 
-1. Name string, unique, the name routes and handler names use
-2. Implementation string, implementationTelegram or implementationStub
-3. Categories []CategoryConfig
+1. Categories map[string]map[string]string, the settings of each category by category name; for Telegram, chat_id
 
-## CategoryConfig
+Written either as a categories map or as the settings of one category given inline, which becomes the single category defaultCategory. A custom YAML decoder tells them apart: a mapping whose only key is categories is a categories map, a mapping that has categories among other keys is invalid, anything else is inline settings. An empty mapping is a channel with one category without settings. A channel written without any value never reaches that decoder, so Config has its own decoder that gives it the same single default category.
 
-1. Name string, unique within its channel
-2. Settings map[string]string, the category's own settings; for Telegram, chat_id
+## Notification
 
-## Route
-
-1. EventType string
-2. Format string, empty meaning defaultFormat
-3. Targets []Target
-
-## Target
-
-1. Channel string
-2. Category string
+1. Format string, required, defaultFormat
+2. Channels map[string]string, the category of each channel the event is delivered to; an empty category means the channel's only category
 
 The file holds no credentials, so it can be versioned and reviewed. Credentials are server configuration, read from environment variables into config.Config.
 
@@ -74,10 +64,10 @@ The file is read on every call. Passes are thirty seconds apart and the file is 
 ## Config.Validate() error
 
 1. if Version is not supportedVersion, return an error naming the version.
-2. if a channel name is blank or repeated, or its implementation is unknown, return an error naming it.
-3. if a category name is blank or repeated within its channel, return an error naming it.
-4. if a route names an event type that is not in domain.NotifyingEvents, repeats one, or names an unknown format, return an error naming it.
-5. if a target names a channel or category that is not declared, return an error naming the route and target.
+2. if a channel key is not a known implementation, or has an empty categories map, or a blank category name, return an error naming it.
+3. if a Telegram category has no chat_id, return an error naming the category.
+4. if a notification names an event type that is not in domain.NotifyingEvents, has a format other than defaultFormat, or has no channels, return an error naming it.
+5. if a notification names a channel that is not declared, or a category the channel does not have, or omits the category of a channel with more than one, return an error naming the notification and channel.
 6. Return nil.
 
-A route with no targets is valid and silences its event type. A file with an unknown version is rejected whole.
+An event type without a notification is not invalid: it is delivered with a warning. An entry with no channels is invalid, so silencing is removing the entry. A file with an unknown version is rejected whole. A YAML mapping with a repeated key is a parse error.

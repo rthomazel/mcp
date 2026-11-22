@@ -18,10 +18,10 @@ The channel implementation for the Telegram Bot API, sending as the operator's b
 
 # Functions
 
-## NewTelegramChannel(cfg ChannelConfig, token string) *TelegramChannel
+## NewTelegramChannel(name string, cfg ChannelConfig, token string) *TelegramChannel
 
 1. Keep the token, taken from the server configuration.
-2. Collect the chat of each category from its chat_id setting.
+2. Collect the chat of each category from its chat_id setting, keyed by the category name.
 3. Return the channel with a client using telegramTimeout.
 
 The token comes from the server configuration, never from the notifications file.

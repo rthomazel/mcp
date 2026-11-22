@@ -22,16 +22,17 @@ import (
 const validConfig = `
 version: 1
 channels:
-  - name: telegram
-    implementation: telegram
+  telegram:
     categories:
-      - {name: portfolio, settings: {chat_id: "1"}}
-      - {name: system, settings: {chat_id: "2"}}
-routes:
-  - event_type: snapshot.incomplete
-    targets:
-      - {channel: telegram, category: system}
-      - {channel: telegram, category: portfolio}
+      portfolio: {chat_id: "1"}
+      system: {chat_id: "2"}
+  stub: {}
+notifications:
+  snapshot.incomplete:
+    format: plain
+    channels:
+      telegram: portfolio
+      stub:
 `
 
 func writeConfig(t *testing.T, content string) string {
@@ -48,15 +49,35 @@ func TestLoaderReadsAValidFile(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, cfg.Version)
-	assert.Len(t, cfg.Channels[0].Categories, 2)
-	assert.Len(t, cfg.Routes[0].Targets, 2)
+	assert.Equal(t, map[string]string{"chat_id": "2"}, cfg.Channels["telegram"].Categories["system"])
+	assert.Equal(t, map[string]map[string]string{"default": {}}, cfg.Channels["stub"].Categories)
+	assert.Equal(t, "portfolio", cfg.Notifications["snapshot.incomplete"].Channels["telegram"])
+}
+
+func TestChannelWrittenAsInlineSettingsHasOneDefaultCategory(t *testing.T) {
+	cfg, err := NewLoader(writeConfig(t, `
+version: 1
+channels:
+  telegram: {chat_id: 123}
+  stub:
+notifications:
+  notification.failed:
+    format: plain
+    channels:
+      telegram:
+      stub: default
+`)).Current()
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]map[string]string{"default": {"chat_id": "123"}}, cfg.Channels["telegram"].Categories)
+	assert.Equal(t, map[string]map[string]string{"default": {}}, cfg.Channels["stub"].Categories)
 }
 
 func TestLoaderTreatsMissingFileAsUnconfigured(t *testing.T) {
 	for _, path := range []string{"", filepath.Join(t.TempDir(), "missing.yaml")} {
 		cfg, err := NewLoader(path).Current()
 		require.NoError(t, err)
-		assert.Empty(t, cfg.Routes)
+		assert.Empty(t, cfg.Notifications)
 	}
 }
 
@@ -79,29 +100,32 @@ func TestLoaderKeepsTheLastValidConfiguration(t *testing.T) {
 }
 
 func TestConfigValidateRejects(t *testing.T) {
+	const head = "version: 1\nchannels:\n  telegram:\n    categories: {a: {chat_id: '1'}, b: {chat_id: '2'}}\n  stub: {}\n"
+
 	tests := map[string]string{
-		"version":          "version: 2",
-		"parse error":      "version: [",
-		"implementation":   "version: 1\nchannels: [{name: a, implementation: sms}]",
-		"duplicate":        "version: 1\nchannels: [{name: a, implementation: stub}, {name: a, implementation: stub}]",
-		"duplicate cat":    "version: 1\nchannels: [{name: a, implementation: stub, categories: [{name: c}, {name: c}]}]",
-		"unknown event":    "version: 1\nroutes: [{event_type: other.thing}]",
-		"routed twice":     "version: 1\nroutes: [{event_type: snapshot.incomplete}, {event_type: snapshot.incomplete}]",
-		"format":           "version: 1\nroutes: [{event_type: snapshot.incomplete, format: html}]",
-		"undeclared":       "version: 1\nroutes: [{event_type: snapshot.incomplete, targets: [{channel: a, category: b}]}]",
-		"undeclared categ": "version: 1\nchannels: [{name: a, implementation: stub}]\nroutes: [{event_type: snapshot.incomplete, targets: [{channel: a, category: b}]}]",
+		"version":             "version: 2",
+		"parse error":         "version: [",
+		"unknown channel":     "version: 1\nchannels: {sms: {}}",
+		"empty categories":    "version: 1\nchannels: {stub: {categories: {}}}",
+		"mixed shape":         "version: 1\nchannels: {stub: {categories: {a: {}}, other: x}}",
+		"blank category":      "version: 1\nchannels: {stub: {categories: {' ': {}}}}",
+		"telegram no chat":    "version: 1\nchannels: {telegram: {categories: {a: {}}}}",
+		"inline telegram":     "version: 1\nchannels: {telegram: {}}",
+		"duplicate key":       "version: 1\nchannels: {stub: {}, stub: {}}",
+		"unknown event":       head + "notifications: {other.thing: {format: plain, channels: {stub: ''}}}",
+		"missing format":      head + "notifications: {snapshot.incomplete: {channels: {stub: ''}}}",
+		"other format":        head + "notifications: {snapshot.incomplete: {format: html, channels: {stub: ''}}}",
+		"no channels":         head + "notifications: {snapshot.incomplete: {format: plain}}",
+		"empty channels":      head + "notifications: {snapshot.incomplete: {format: plain, channels: {}}}",
+		"undeclared channel":  head + "notifications: {snapshot.incomplete: {format: plain, channels: {email: ''}}}",
+		"undeclared category": head + "notifications: {snapshot.incomplete: {format: plain, channels: {telegram: c}}}",
+		"category left out":   head + "notifications: {snapshot.incomplete: {format: plain, channels: {telegram: ''}}}",
 	}
 
 	for name, content := range tests {
 		_, err := NewLoader(writeConfig(t, content)).Current()
 		assert.Error(t, err, name)
 	}
-}
-
-func TestConfigAllowsARouteWithNoTargets(t *testing.T) {
-	_, err := NewLoader(writeConfig(t, "version: 1\nroutes: [{event_type: snapshot.incomplete}]")).Current()
-
-	assert.NoError(t, err)
 }
 
 func TestTelegramSendsPlainTextToTheCategoryChat(t *testing.T) {
@@ -119,7 +143,7 @@ func TestTelegramSendsPlainTextToTheCategoryChat(t *testing.T) {
 	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
-	channel := NewTelegramChannel(cfg.Channels[0], "secret")
+	channel := NewTelegramChannel("telegram", cfg.Channels["telegram"], "secret")
 	channel.baseURL = server.URL
 
 	require.NoError(t, channel.SendPlainText(context.Background(), "system", "hello"))
@@ -135,10 +159,10 @@ func TestTelegramWithoutCredentialsWarnsAndSucceeds(t *testing.T) {
 	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
-	noToken := NewTelegramChannel(cfg.Channels[0], "")
+	noToken := NewTelegramChannel("telegram", cfg.Channels["telegram"], "")
 	assert.NoError(t, noToken.SendPlainText(context.Background(), "system", "x"))
 
-	noChat := NewTelegramChannel(cfg.Channels[0], "secret")
+	noChat := NewTelegramChannel("telegram", cfg.Channels["telegram"], "secret")
 	assert.NoError(t, noChat.SendPlainText(context.Background(), "unknown", "x"))
 }
 
@@ -151,7 +175,7 @@ func TestTelegramFailuresDoNotLeakTheToken(t *testing.T) {
 	cfg, err := NewLoader(writeConfig(t, validConfig)).Current()
 	require.NoError(t, err)
 
-	channel := NewTelegramChannel(cfg.Channels[0], "secret")
+	channel := NewTelegramChannel("telegram", cfg.Channels["telegram"], "secret")
 	channel.baseURL = server.URL
 
 	err = channel.SendPlainText(context.Background(), "system", "x")
@@ -231,8 +255,8 @@ func TestSourceExpandsTargetsAndFallsBackToNoTarget(t *testing.T) {
 		return out
 	}
 
-	assert.Equal(t, []string{"notification:telegram:system", "notification:telegram:portfolio"}, names(domain.Events.SnapshotIncomplete))
-	assert.Equal(t, []string{"notification:none"}, names(domain.Events.NotificationFailed))
+	assert.Equal(t, []string{"notification.stub.default", "notification.telegram.portfolio"}, names(domain.Events.SnapshotIncomplete))
+	assert.Equal(t, []string{"notification.none"}, names(domain.Events.NotificationFailed))
 
 	unconfigured := NewSource(NewLoader(""), &fakeStore{}, "")
 	handlers, err = unconfigured.Handlers(context.Background())
@@ -265,7 +289,7 @@ func TestTargetHandlerRendersThenSends(t *testing.T) {
 
 	channel := &recordingChannel{}
 	handler := &targetHandler{
-		name: "notification:x:y", channel: channel, category: "y",
+		name: "notification.x.y", channel: channel, category: "y",
 		renderer: NewRenderers(&fakeStore{})[domain.Events.SnapshotIncomplete][defaultFormat],
 	}
 
@@ -275,5 +299,5 @@ func TestTargetHandlerRendersThenSends(t *testing.T) {
 
 	channel.err = errors.New("down")
 	assert.Error(t, handler.Handle(context.Background(), domain.Event{Type: domain.Events.SnapshotIncomplete, Data: data}))
-	assert.Equal(t, "notification:x:y", handler.Name())
+	assert.Equal(t, "notification.x.y", handler.Name())
 }

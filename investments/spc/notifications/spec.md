@@ -227,9 +227,9 @@ evolve; a file with a version the server does not know is rejected.
 
 - Changes to the file take effect without restarting the server, within about one worker
   pass. How the file is loaded and cached is a matter for the models.
-- Secrets are not in the file. The file says where each secret comes from, for example
-  an environment variable, so the file can be versioned and reviewed without exposing
-  the Telegram credential, which can still be rotated without a code change.
+- Credentials are not in the file. They are server configuration, read from the
+  environment, so the file can be versioned and reviewed without exposing the Telegram
+  credential, which can still be rotated without a code change.
 - If no file exists, notifications are unconfigured: an event type has no target, which
   logs a warning and counts as delivered, as described above, so the system runs
   without Telegram.
@@ -242,6 +242,52 @@ evolve; a file with a version the server does not know is rejected.
 - The configuration source is replaceable. A later source, such as a database behind a
   dashboard, supplies the same complete configuration to the handler and changes no
   event type, producer or monitor.
+
+#### Shape and constraints
+
+```yaml
+version: 1
+
+channels:
+  telegram:                  # the key is the implementation: telegram | stub
+    categories:
+      portfolio: {chat_id: "123"}
+      system:    {chat_id: "456"}
+  stub: {}                   # no categories key: the channel has one implicit category, default
+
+notifications:
+  snapshot.incomplete:
+    format: plain            # required, plain is the only format
+    channels:
+      telegram: portfolio
+      stub:                  # value omitted: allowed only for a single-category channel
+  notification.failed:
+    format: plain
+    channels:
+      telegram: system
+```
+
+- `version` must be the supported version; any other value rejects the whole file.
+- Each key under `channels` is a channel implementation the server knows, so a file
+  declares at most one channel per implementation.
+- A channel is either a `categories` map, with at least one category, or the settings of
+  one category given inline, which makes a single category named `default`. Mixing the
+  two is invalid. Category names are free-form, non-blank and unique within the channel.
+- Each implementation validates its own settings. Telegram needs a non-empty `chat_id` for
+  each category; the stub needs none.
+- Each key under `notifications` is an event type that notifies. An unknown type is invalid.
+- Each notification has a `format`, which must be `plain`, and a non-empty `channels`
+  map from a declared channel to one of its categories, so an event reaches at most one
+  category of a channel. The category may be omitted only when the channel has exactly
+  one.
+- To silence an event type, remove its entry. An event type without an entry logs a
+  warning and counts as delivered, as described above; an entry with no channels is
+  invalid.
+- The name stored on an event for one delivery is `notification.<channel>.<category>`,
+  for example `notification.telegram.system` or `notification.stub.default`. Renaming a
+  category, including moving from the single-category form to a `categories` map, changes
+  the name, so events in flight at the time of the edit are delivered again to the new
+  name.
 
 ### Telegram channel implementation
 

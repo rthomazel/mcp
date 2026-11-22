@@ -1,7 +1,7 @@
 # Constants
 
 handlerNamePrefix = "notification".
-noTargetHandlerName = "notification:none".
+noTargetHandlerName = "notification.none".
 
 # Types
 
@@ -27,7 +27,7 @@ Delivers one event to one target: one channel and one of its categories.
 
 No fields.
 
-Stands in for an event type with no target.
+Stands in for an event type with no notification.
 
 # Functions
 
@@ -38,25 +38,25 @@ Build a Source with the renderers from NewRenderers.
 ## Source.Handlers(ctx Context) (map[string][]domain.EventHandler, error)
 
 1. Read the configuration from the loader.
-2. Build each configured channel with newChannel.
-3. For each event type of domain.NotifyingEvents, find its route.
-4. Build one targetHandler for each target of the route, with the renderer for the route's format.
-5. if the route has no target, or there is no route, use a single noTargetHandler.
+2. Build each configured channel with newChannel, by its key.
+3. For each event type of domain.NotifyingEvents, find its notification.
+4. Build one targetHandler for each channel of the notification, in channel name order, for the category it names, or the channel's only category when it names none, with the renderer for the notification's format.
+5. if there is no notification, use a single noTargetHandler.
 6. Return the handlers by event type.
 
 #### Errors
 
 - **1.** if the loader fails, return the error.
 
-Every notifying type has a handler list, so a type without targets is handled and delivered with a warning, never an error. Channels are rebuilt on every call, which is cheap; the configuration may have changed.
+Every notifying type has a handler list, so a type without a notification is handled and delivered with a warning, never an error. Channels are rebuilt on every call, which is cheap; the configuration may have changed.
 
-## newChannel(cfg ChannelConfig, telegramToken string) Channel
+## newChannel(name string, cfg ChannelConfig, telegramToken string) Channel
 
-Return a TelegramChannel for the telegram implementation and a StubChannel otherwise.
+Return a TelegramChannel for the telegram implementation and a StubChannel otherwise. The channel's name is its implementation.
 
 ## targetHandlerName(channel string, category string) string
 
-Return the prefix, the channel and the category joined by colons, for example notification:telegram:portfolio. The name is stored on the event, so it never changes meaning: names are not reused for another purpose and not dropped while events that name them may be in flight.
+Return the prefix, the channel and the category joined by dots, for example notification.telegram.portfolio. The name is stored on the event, so it never changes meaning: names are not reused for another purpose and not dropped while events that name them may be in flight.
 
 ## targetHandler.Name() string
 

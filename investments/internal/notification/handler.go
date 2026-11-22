@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
 const (
 	handlerNamePrefix   = "notification"
-	noTargetHandlerName = handlerNamePrefix + ":none"
+	noTargetHandlerName = handlerNamePrefix + ".none"
 )
 
 // Source is the one notification handler, expanded for the current
@@ -47,36 +49,31 @@ func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, 
 	}
 
 	channels := make(map[string]Channel, len(cfg.Channels))
-	for _, channel := range cfg.Channels {
-		channels[channel.Name] = newChannel(channel, s.telegramToken)
-	}
-
-	routes := make(map[string]Route, len(cfg.Routes))
-	for _, route := range cfg.Routes {
-		routes[route.EventType] = route
+	for name, channel := range cfg.Channels {
+		channels[name] = newChannel(name, channel, s.telegramToken)
 	}
 
 	handlers := make(map[string][]domain.EventHandler, len(domain.NotifyingEvents))
 
 	for _, eventType := range domain.NotifyingEvents {
-		route := routes[eventType]
-		if len(route.Targets) == 0 {
+		notification, ok := cfg.Notifications[eventType]
+		if !ok {
 			handlers[eventType] = []domain.EventHandler{&noTargetHandler{eventType: eventType}}
 
 			continue
 		}
 
-		format := route.Format
-		if format == "" {
-			format = defaultFormat
-		}
+		for _, channelName := range slices.Sorted(maps.Keys(notification.Channels)) {
+			category, err := cfg.resolveCategory(eventType, channelName, notification.Channels[channelName])
+			if err != nil {
+				return nil, err
+			}
 
-		for _, target := range route.Targets {
 			handlers[eventType] = append(handlers[eventType], &targetHandler{
-				name:     targetHandlerName(target.Channel, target.Category),
-				renderer: s.renderers[eventType][format],
-				channel:  channels[target.Channel],
-				category: target.Category,
+				name:     targetHandlerName(channelName, category),
+				renderer: s.renderers[eventType][notification.Format],
+				channel:  channels[channelName],
+				category: category,
 			})
 		}
 	}
@@ -84,17 +81,17 @@ func (s *Source) Handlers(_ context.Context) (map[string][]domain.EventHandler, 
 	return handlers, nil
 }
 
-func newChannel(cfg ChannelConfig, telegramToken string) Channel {
-	if cfg.Implementation == implementationTelegram {
-		return NewTelegramChannel(cfg, telegramToken)
+func newChannel(name string, cfg ChannelConfig, telegramToken string) Channel {
+	if name == implementationTelegram {
+		return NewTelegramChannel(name, cfg, telegramToken)
 	}
 
-	return &StubChannel{name: cfg.Name}
+	return &StubChannel{name: name}
 }
 
 // targetHandlerName is stored on events, so it never changes meaning.
 func targetHandlerName(channel, category string) string {
-	return handlerNamePrefix + ":" + channel + ":" + category
+	return handlerNamePrefix + "." + channel + "." + category
 }
 
 func (h *targetHandler) Name() string { return h.name }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 
 	"go.yaml.in/yaml/v3"
@@ -19,39 +20,98 @@ const (
 	implementationTelegram = "telegram"
 	implementationStub     = "stub"
 	defaultFormat          = "plain"
+	defaultCategory        = "default"
+	categoriesKey          = "categories"
 )
 
 // Config is the complete notifications configuration, parsed from one YAML file.
 type Config struct {
-	Version  int             `yaml:"version"`
-	Channels []ChannelConfig `yaml:"channels"`
-	Routes   []Route         `yaml:"routes"`
+	Version       int                      `yaml:"version"`
+	Channels      map[string]ChannelConfig `yaml:"channels"`
+	Notifications map[string]Notification  `yaml:"notifications"`
 }
 
-// ChannelConfig declares one channel and its categories.
+// UnmarshalYAML reads the file and gives a channel written without a value, which
+// the YAML decoder never hands to ChannelConfig, its one default category.
+func (c *Config) UnmarshalYAML(node *yaml.Node) error {
+	var raw struct {
+		Version       int                       `yaml:"version"`
+		Channels      map[string]*ChannelConfig `yaml:"channels"`
+		Notifications map[string]Notification   `yaml:"notifications"`
+	}
+
+	if err := node.Decode(&raw); err != nil {
+		return err //nolint:wrapcheck // the caller names the file
+	}
+
+	c.Version, c.Notifications = raw.Version, raw.Notifications
+	c.Channels = make(map[string]ChannelConfig, len(raw.Channels))
+
+	for name, channel := range raw.Channels {
+		if channel == nil {
+			channel = &ChannelConfig{Categories: map[string]map[string]string{defaultCategory: {}}}
+		}
+
+		c.Channels[name] = *channel
+	}
+
+	return nil
+}
+
+// ChannelConfig holds the settings of each category of a channel. It is
+// written either as a categories map or as the settings of one category given
+// inline, which becomes the category defaultCategory.
 type ChannelConfig struct {
-	Name           string           `yaml:"name"`
-	Implementation string           `yaml:"implementation"`
-	Categories     []CategoryConfig `yaml:"categories"`
+	Categories map[string]map[string]string
 }
 
-// CategoryConfig declares one category of a channel.
-type CategoryConfig struct {
-	Name     string            `yaml:"name"`
-	Settings map[string]string `yaml:"settings"`
+// Notification routes one event type to one category of each of its channels.
+type Notification struct {
+	Format   string            `yaml:"format"`
+	Channels map[string]string `yaml:"channels"` // channel to category; empty means the channel's only category
 }
 
-// Route sends one event type to its targets.
-type Route struct {
-	EventType string   `yaml:"event_type"`
-	Format    string   `yaml:"format"`
-	Targets   []Target `yaml:"targets"`
-}
+// UnmarshalYAML accepts a categories map or inline settings of one category.
+func (c *ChannelConfig) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
+		c.Categories = map[string]map[string]string{defaultCategory: {}}
 
-// Target is one channel and one of its categories.
-type Target struct {
-	Channel  string `yaml:"channel"`
-	Category string `yaml:"category"`
+		return nil
+	}
+
+	var raw map[string]yaml.Node
+	if err := node.Decode(&raw); err != nil {
+		return fmt.Errorf("channel must be a mapping: %w", err)
+	}
+
+	categories, hasCategories := raw[categoriesKey]
+	if hasCategories {
+		if len(raw) > 1 {
+			return errors.New("channel mixes a categories map with inline settings")
+		}
+
+		var decoded map[string]map[string]string
+		if err := categories.Decode(&decoded); err != nil {
+			return fmt.Errorf("decoding categories: %w", err)
+		}
+
+		c.Categories = decoded
+
+		return nil
+	}
+
+	var settings map[string]string
+	if err := node.Decode(&settings); err != nil {
+		return fmt.Errorf("decoding channel settings: %w", err)
+	}
+
+	if settings == nil {
+		settings = map[string]string{}
+	}
+
+	c.Categories = map[string]map[string]string{defaultCategory: settings}
+
+	return nil
 }
 
 // Validate checks the configuration as a whole.
@@ -60,60 +120,72 @@ func (c Config) Validate() error {
 		return fmt.Errorf("unsupported configuration version %d, expected %d", c.Version, supportedVersion)
 	}
 
-	categories := map[string][]string{}
-
-	for _, channel := range c.Channels {
-		if channel.Name == "" {
-			return errors.New("a channel has no name")
+	for name, channel := range c.Channels {
+		if name != implementationTelegram && name != implementationStub {
+			return fmt.Errorf("unknown channel implementation %q", name)
 		}
 
-		if _, exists := categories[channel.Name]; exists {
-			return fmt.Errorf("channel %q is declared twice", channel.Name)
+		if len(channel.Categories) == 0 {
+			return fmt.Errorf("channel %q has no categories", name)
 		}
 
-		if channel.Implementation != implementationTelegram && channel.Implementation != implementationStub {
-			return fmt.Errorf("channel %q has unknown implementation %q", channel.Name, channel.Implementation)
-		}
-
-		names := []string{}
-
-		for _, category := range channel.Categories {
-			if category.Name == "" || slices.Contains(names, category.Name) {
-				return fmt.Errorf("channel %q has a blank or repeated category %q", channel.Name, category.Name)
+		for category, settings := range channel.Categories {
+			if strings.TrimSpace(category) == "" {
+				return fmt.Errorf("channel %q has a blank category name", name)
 			}
 
-			names = append(names, category.Name)
+			if name == implementationTelegram && strings.TrimSpace(settings[settingChatID]) == "" {
+				return fmt.Errorf("telegram category %q has no chat_id", category)
+			}
 		}
-
-		categories[channel.Name] = names
 	}
 
-	seen := []string{}
-
-	for _, route := range c.Routes {
-		if !slices.Contains(domain.NotifyingEvents, route.EventType) {
-			return fmt.Errorf("route for unknown event type %q", route.EventType)
+	for eventType, notification := range c.Notifications {
+		if !slices.Contains(domain.NotifyingEvents, eventType) {
+			return fmt.Errorf("notification for unknown event type %q", eventType)
 		}
 
-		if slices.Contains(seen, route.EventType) {
-			return fmt.Errorf("event type %q is routed twice", route.EventType)
+		if notification.Format != defaultFormat {
+			return fmt.Errorf("notification %q has format %q, expected %q", eventType, notification.Format, defaultFormat)
 		}
 
-		seen = append(seen, route.EventType)
-
-		if route.Format != "" && route.Format != defaultFormat {
-			return fmt.Errorf("route %q has unknown format %q", route.EventType, route.Format)
+		if len(notification.Channels) == 0 {
+			return fmt.Errorf("notification %q has no channels; remove it to silence the event type", eventType)
 		}
 
-		for _, target := range route.Targets {
-			names, ok := categories[target.Channel]
-			if !ok || !slices.Contains(names, target.Category) {
-				return fmt.Errorf("route %q targets undeclared %s/%s", route.EventType, target.Channel, target.Category)
+		for channelName, category := range notification.Channels {
+			if _, err := c.resolveCategory(eventType, channelName, category); err != nil {
+				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+// resolveCategory returns the category a notification delivers to on a
+// channel: the one named, or the channel's only one when none is named.
+func (c Config) resolveCategory(eventType, channelName, category string) (string, error) {
+	channel, ok := c.Channels[channelName]
+	if !ok {
+		return "", fmt.Errorf("notification %q names undeclared channel %q", eventType, channelName)
+	}
+
+	if category == "" {
+		if len(channel.Categories) != 1 {
+			return "", fmt.Errorf("notification %q must name a category of channel %q", eventType, channelName)
+		}
+
+		for only := range channel.Categories {
+			return only, nil
+		}
+	}
+
+	if _, ok := channel.Categories[category]; !ok {
+		return "", fmt.Errorf("notification %q names undeclared category %q of channel %q", eventType, category, channelName)
+	}
+
+	return category, nil
 }
 
 // Loader reads the configuration file and remembers the last valid result.

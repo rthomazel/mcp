@@ -31,17 +31,17 @@ type TelegramChannel struct {
 
 // NewTelegramChannel builds the channel with the bot token from the server
 // configuration; the notifications file never holds a credential.
-func NewTelegramChannel(cfg ChannelConfig, token string) *TelegramChannel {
+func NewTelegramChannel(name string, cfg ChannelConfig, token string) *TelegramChannel {
 	chats := make(map[string]string, len(cfg.Categories))
 
-	for _, category := range cfg.Categories {
-		if chat := category.Settings[settingChatID]; chat != "" {
-			chats[category.Name] = chat
+	for category, settings := range cfg.Categories {
+		if chat := settings[settingChatID]; chat != "" {
+			chats[category] = chat
 		}
 	}
 
 	return &TelegramChannel{
-		name: cfg.Name, token: token, chats: chats,
+		name: name, token: token, chats: chats,
 		client: &http.Client{Timeout: telegramTimeout}, baseURL: telegramBaseURL,
 	}
 }
