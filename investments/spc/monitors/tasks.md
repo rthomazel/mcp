@@ -12,6 +12,10 @@ agents: claude
 Each task is reviewed through its models before code. Specs are in this directory; technical
 design belongs in the models.
 
+Every message renderer rounds what it prints: percents to one decimal and dollar amounts to cents,
+with the helpers in the notification render model. Events keep the exact figures. Each monitor's
+renderer is tested with unrounded input.
+
 ## [x] 1. Durations
 
 Add the duration parser and its date arithmetic as a small package, with the accepted and rejected

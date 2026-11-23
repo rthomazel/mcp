@@ -110,14 +110,24 @@ It never repeats the failed event's payload.
 
 - **2.** if the percent is not a decimal number, return an error naming it.
 
+## roundedDollars(amount Decimal) (string, error)
+
+Round to cents, halves away from zero, with math/big, and never return a negative zero: an amount that rounds to zero is 0.00.
+
+## dollars(amounts ...Decimal) ([]string, error)
+
+Round each amount with roundedDollars, in order, naming the failure.
+
 ## roundedPercent(percent Decimal) (string, error)
 
 Round to one decimal place, halves away from zero, with math/big so no float is involved, and keep the sign. Shared by the renderers that show a percent.
 
-## signedDollars(amount Decimal) string
+## signedDollars(amount Decimal) (string, error)
 
-Write the amount with its sign before the dollar sign: +$34, -$50. Zero is written +$0.
+Round the amount to cents, then write it with its sign before the dollar sign: +$34.00, -$50.00. Zero is written +$0.00.
 
-## contributorList(contributors []domain.Contributor) string
+## contributorList(contributors []domain.Contributor) (string, error)
 
 Join each symbol and its signed dollars with commas.
+
+Every percent is rounded to one decimal and every dollar amount to cents in the renderer, never earlier: events keep the exact figures from the database, and a message never shows more digits than a reader can use. A renderer for a new event type uses roundedPercent and roundedDollars for each number it prints.

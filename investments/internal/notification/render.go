@@ -81,11 +81,16 @@ func (r *PortfolioDrawdownRenderer) Render(_ context.Context, event domain.Event
 		return "", fmt.Errorf("rounding drawdown percent: %w", err)
 	}
 
+	amounts, err := dollars(data.ValueUSD, data.HighValueUSD)
+	if err != nil {
+		return "", err
+	}
+
 	return fmt.Sprintf("Portfolio is down %s%% from its high, crossing the %s%% level on %s.\n"+
 		"Securities value on %s: $%s. High on %s: $%s.\n"+
 		"This value change is affected by sales and withdrawals.",
 		strings.TrimPrefix(drawdown, "-"), data.Level, data.CrossedOn.Format(time.DateOnly),
-		data.Date.Format(time.DateOnly), data.ValueUSD, data.HighDate.Format(time.DateOnly), data.HighValueUSD), nil
+		data.Date.Format(time.DateOnly), amounts[0], data.HighDate.Format(time.DateOnly), amounts[1]), nil
 }
 
 // Render names the date, the new value, the previous high and the last announced high.
@@ -100,6 +105,11 @@ func (r *PortfolioATHRenderer) Render(_ context.Context, event domain.Event) (st
 		return "", fmt.Errorf("rounding increase percent: %w", err)
 	}
 
+	amounts, err := dollars(data.ValueUSD, data.IncreaseUSD, data.PreviousHighValueUSD)
+	if err != nil {
+		return "", err
+	}
+
 	last := "none"
 	if data.LastAnnouncedDate != nil {
 		last = data.LastAnnouncedDate.Format(time.DateOnly)
@@ -108,8 +118,8 @@ func (r *PortfolioATHRenderer) Render(_ context.Context, event domain.Event) (st
 	return fmt.Sprintf("Portfolio reached a new all-time high on %s: $%s.\n"+
 		"That is $%s (%s%%) above the previous high of $%s on %s. Last announced high: %s.\n"+
 		"This value change is affected by sales and withdrawals.",
-		data.Date.Format(time.DateOnly), data.ValueUSD, data.IncreaseUSD, increase,
-		data.PreviousHighValueUSD, data.PreviousHighDate.Format(time.DateOnly), last), nil
+		data.Date.Format(time.DateOnly), amounts[0], amounts[1], increase,
+		amounts[2], data.PreviousHighDate.Format(time.DateOnly), last), nil
 }
 
 // Render names the window, the market movement, the values, the split between
@@ -125,6 +135,21 @@ func (r *PortfolioMovementRenderer) Render(_ context.Context, event domain.Event
 		return "", fmt.Errorf("rounding market percent: %w", err)
 	}
 
+	market, err := signedDollars(data.MarketUSD)
+	if err != nil {
+		return "", err
+	}
+
+	trades, err := signedDollars(data.TradesUSD)
+	if err != nil {
+		return "", err
+	}
+
+	values, err := dollars(data.StartValueUSD, data.EndValueUSD)
+	if err != nil {
+		return "", err
+	}
+
 	verb := "rose"
 	if data.Direction == "down" {
 		verb = "fell"
@@ -132,16 +157,23 @@ func (r *PortfolioMovementRenderer) Render(_ context.Context, event domain.Event
 
 	text := fmt.Sprintf("Market prices moved the portfolio %s: it %s %s%% (%s) over %s, from %s to %s.\n"+
 		"Securities value went from $%s to $%s: market %s, trades %s.",
-		data.Direction, verb, strings.TrimPrefix(percent, "-"), signedDollars(data.MarketUSD), data.Window,
-		data.StartDate.Format(time.DateOnly), data.Date.Format(time.DateOnly),
-		data.StartValueUSD, data.EndValueUSD, signedDollars(data.MarketUSD), signedDollars(data.TradesUSD))
+		data.Direction, verb, strings.TrimPrefix(percent, "-"), market, data.Window,
+		data.StartDate.Format(time.DateOnly), data.Date.Format(time.DateOnly), values[0], values[1], market, trades)
 
-	if len(data.Gainers) > 0 {
-		text += "\nLargest gains: " + contributorList(data.Gainers) + "."
-	}
+	for _, line := range []struct {
+		label        string
+		contributors []domain.Contributor
+	}{{"Largest gains", data.Gainers}, {"Largest losses", data.Losers}} {
+		if len(line.contributors) == 0 {
+			continue
+		}
 
-	if len(data.Losers) > 0 {
-		text += "\nLargest losses: " + contributorList(data.Losers) + "."
+		list, err := contributorList(line.contributors)
+		if err != nil {
+			return "", err
+		}
+
+		text += "\n" + line.label + ": " + list + "."
 	}
 
 	return text + "\nThis value change is affected by sales and withdrawals.", nil
@@ -157,22 +189,64 @@ func roundedPercent(percent domain.Decimal) (string, error) {
 	return rat.FloatString(1), nil
 }
 
-// signedDollars writes an amount with its sign before the dollar sign.
-func signedDollars(amount domain.Decimal) string {
-	if strings.HasPrefix(string(amount), "-") {
-		return "-$" + strings.TrimPrefix(string(amount), "-")
+// roundedDollars rounds an amount to cents, halves away from zero, never negative zero.
+func roundedDollars(amount domain.Decimal) (string, error) {
+	rat, ok := new(big.Rat).SetString(string(amount))
+	if !ok {
+		return "", fmt.Errorf("%q is not a decimal number", amount)
 	}
 
-	return "+$" + string(amount)
+	text := rat.FloatString(2)
+	if strings.Trim(text, "-0.") == "" {
+		return "0.00", nil
+	}
+
+	return text, nil
 }
 
-func contributorList(contributors []domain.Contributor) string {
-	parts := make([]string, len(contributors))
-	for i, contributor := range contributors {
-		parts[i] = contributor.Symbol + " " + signedDollars(contributor.MovementUSD)
+// signedDollars writes an amount rounded to cents with its sign before the dollar sign.
+func signedDollars(amount domain.Decimal) (string, error) {
+	text, err := roundedDollars(amount)
+	if err != nil {
+		return "", err
 	}
 
-	return strings.Join(parts, ", ")
+	if strings.HasPrefix(text, "-") {
+		return "-$" + strings.TrimPrefix(text, "-"), nil
+	}
+
+	return "+$" + text, nil
+}
+
+// dollars rounds each amount to cents, in order.
+func dollars(amounts ...domain.Decimal) ([]string, error) {
+	rounded := make([]string, len(amounts))
+
+	for i, amount := range amounts {
+		text, err := roundedDollars(amount)
+		if err != nil {
+			return nil, fmt.Errorf("rounding amount: %w", err)
+		}
+
+		rounded[i] = text
+	}
+
+	return rounded, nil
+}
+
+func contributorList(contributors []domain.Contributor) (string, error) {
+	parts := make([]string, len(contributors))
+
+	for i, contributor := range contributors {
+		amount, err := signedDollars(contributor.MovementUSD)
+		if err != nil {
+			return "", fmt.Errorf("rounding movement of %s: %w", contributor.Symbol, err)
+		}
+
+		parts[i] = contributor.Symbol + " " + amount
+	}
+
+	return strings.Join(parts, ", "), nil
 }
 
 // Render names the failed event's type, recorded time and attempts, never its payload.
