@@ -14,10 +14,13 @@ agents: claude
 Settings that name a span of time, such as the window, interval and look-back of the monitors,
 are written as short readable text and parsed by one shared parser, so every setting accepts the
 same forms and rejects the same mistakes. The operator may write 5 days, 12 months, 3mo or 1y2mo.
-The system works on daily data and calendar dates, so the finest unit is the day.
+The system works on daily data and calendar dates, so the finest span is the day. Hours are accepted
+because they are common in configuration, such as 72h, but only as whole days.
 
 The standard library's duration parser knows only hours, minutes and seconds and has no day, week,
-month or year, so the parser is the project's own, small by design: few forms, fixed rules.
+month or year, and cannot combine them with the calendar units, so the parser is the project's own,
+small by design: few forms, fixed rules. A value the standard library accepts as hours, such as 72h,
+is accepted here too.
 
 ## Concepts
 
@@ -32,12 +35,13 @@ whatever the number, so 1 days and 2 day are valid.
 
 | Unit  | Short | Long forms     |
 | ----- | ----- | -------------- |
+| hour   | h     | hour, hours    |
 | day   | d     | day, days      |
 | week  | w     | week, weeks    |
 | month | mo    | month, months  |
 | year  | y     | year, years    |
 
-A week is seven days. Units are case-insensitive.
+A week is seven days and an hour is a twenty-fourth of a day. Units are case-insensitive.
 
 ## Behavior
 
@@ -57,6 +61,9 @@ component any number of spaces is allowed; nowhere else.
 
 - A number is a whole number of one to four digits, with no sign, no fraction and no separators.
   Leading zeros are allowed: 05d is five days.
+- Hours must be a multiple of 24, so they are a whole number of days: 24h and 72h are one and three
+  days, while 1h, 36h and 90h are rejected. This holds beside other components too, so 1w48h is
+  nine days and 1d12h is rejected.
 - The total must be greater than zero. Zero components are allowed beside a positive one, so
   1y0d is one year, and 0d or 0y0mo are rejected.
 - A bare number with no unit is always rejected, whether written as text or as a YAML number, so
@@ -103,6 +110,8 @@ Accepted:
 | 2 day          | two days, singular accepted      |
 | 3days          | three days, no space             |
 | 1w, 2 weeks    | seven and fourteen days          |
+| 72h, 24 hours  | three and one days               |
+| 1w48h          | nine days                        |
 | 3mo, 12 months | three and twelve months          |
 | 1y, 1 year     | one year                         |
 | 2 WEEKS, 1Y    | upper case                       |
@@ -126,7 +135,8 @@ Rejected:
 | 1.5y, 0.5d                        | fraction                                   |
 | 1,000d, 1_000d                    | separator                                  |
 | 10000d                            | number longer than four digits             |
-| 72h, 90m, 30s, 1h30m              | unit not supported, the finest is the day  |
+| 1h, 36h, 90h, 1d12h               | hours that are not a whole number of days  |
+| 90m, 30s, 1h30m, 72h30m           | minutes and seconds are not supported      |
 | 1q, 2 quarters, 1 fortnight       | unit not known                             |
 | 1y 2mo, 1 year 2 months           | several components must be written together in short units |
 | 1year2months                      | long units only in a single component      |
@@ -143,7 +153,8 @@ Rejected:
 
 These are left out on purpose; a value like these is rejected. Say if one should be added.
 
-- Hours, minutes, seconds and the standard library's forms such as 72h.
+- Minutes, seconds and the standard library's mixed forms such as 1h30m.
+- Hours that are not a whole number of days, such as 36h; they are rejected, not rounded.
 - Fractions of a unit, such as 1.5y or half a day.
 - Trading or business days, such as 5 trading days. A duration is always calendar time.
 - Several components with spaces, commas, long names or the word and.
@@ -152,7 +163,7 @@ These are left out on purpose; a value like these is rejected. Say if one should
 - ISO 8601 durations.
 - Other languages and non-ASCII digits.
 - A maximum total: only the four digit limit applies, so 9999y is accepted.
-- A unit shorter than the data's granularity: nothing below one day exists.
+- A span shorter than the data's granularity: nothing below one day exists.
 - The special values none, off, forever or all. A setting that needs to be off is disabled in
   its own way.
 - Reading a duration anywhere but configuration, such as in an agent tool's arguments.
@@ -164,7 +175,7 @@ These are left out on purpose; a value like these is rejected. Say if one should
 - A YAML number given for a duration is rejected as having no unit.
 - One month before 31 March is 28 February; one year before 29 February 2028 is 28 February 2027;
   1mo2w before 20 March is 6 February.
-- 7d and 1w apply identically; 12mo and 1y apply identically.
+- 7d, 1w and 168h apply identically; 12mo and 1y apply identically; 72h is three days.
 - An invalid duration in the monitors file stops the server at start and is logged; the same
   edit on a running server keeps the last valid content, as the monitors configuration says.
 
@@ -176,6 +187,8 @@ These are left out on purpose; a value like these is rejected. Say if one should
 - Month and year arithmetic clamps to the end of the month, so a date is never moved forward past
   the month it was counting into.
 - Not accepting a bare number removes any doubt about the unit.
+- Hours are accepted to match what the standard library and other tools take, but only as whole
+  days, since a part of a day would silently round on daily data.
 - Parsed at validation so an error is found at startup and never at the 7:00 AM run.
 
 ## Refs
