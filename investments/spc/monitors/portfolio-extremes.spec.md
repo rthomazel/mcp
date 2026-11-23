@@ -83,9 +83,10 @@ with no state of its own:
   still at it. Fully handled events are deleted after a year, so a stay below a level that lasts
   longer than a year announces it once more.
 
-The message names the level crossed, the current drawdown and its date, the date of the high and
-the crossing date, and gives the securities value at the high and the current securities value.
-The wording is the renderer's.
+The message names the level crossed, the current drawdown rounded to one decimal place and its
+date, the date of the high and the crossing date, and gives the securities value at the high and
+the current securities value. Only the message is rounded; the event keeps the exact figure. The
+wording is the renderer's.
 
 ### Portfolio high
 
@@ -107,7 +108,7 @@ new value is in dollars and percent, and the date of the last announced high.
 
 Both measures are changes in value, not investment return: selling or withdrawing money lowers
 the securities value, and buying or depositing raises the high, so the figure can fall or hide a
-decline, or reach a high, without a market move. Both messages say so. A measure that excludes
+decline, or reach a high, without a market move. Both messages say so, briefly: this value change is affected by sales and withdrawals. A measure that excludes
 money moved in and out is a separate, later feature.
 
 ### Configuration
