@@ -2,6 +2,7 @@
 
 maxDigits = 4, the most digits of a number.
 hoursPerDay = 24, daysPerWeek = 7, monthsInYear = 12.
+daysPerMonth = 30.4375, the length of a month when two durations are compared.
 
 # Vars
 
@@ -48,6 +49,10 @@ The error format is: setting "{setting}": duration "{text}" is invalid: {reason}
 ## Duration.String() string
 
 Return the trimmed text as written.
+
+## Duration.Compare(other Duration) int
+
+Return -1, 0 or 1 comparing Months times daysPerMonth plus Days. Approximate, only for checking that one span is not shorter than another, such as a look-back against a window: 1y is longer than 365d and 1mo is between 29d and 31d. It never moves a date.
 
 ## Duration.Before(date Time) Time
 

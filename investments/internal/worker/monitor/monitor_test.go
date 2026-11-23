@@ -36,6 +36,29 @@ type fakeStore struct {
 	window      duration.Duration
 	threshold   domain.Decimal
 	latest      *domain.Event
+
+	drift      *domain.AllocationDrift
+	driftErr   error
+	groups     []domain.AllocationGroup
+	volatility map[string]*domain.PriceVolatility
+	volErrs    map[string]error
+	lookback   duration.Duration
+	volQueries []string
+}
+
+func (s *fakeStore) GetAllocationDrift(_ context.Context, groups []domain.AllocationGroup) (*domain.AllocationDrift, error) {
+	s.groups = groups
+
+	return s.drift, s.driftErr
+}
+
+func (s *fakeStore) GetPriceVolatility(_ context.Context, ticker string, window, lookback duration.Duration,
+	threshold domain.Decimal,
+) (*domain.PriceVolatility, error) {
+	s.window, s.lookback, s.threshold = window, lookback, threshold
+	s.volQueries = append(s.volQueries, ticker)
+
+	return s.volatility[ticker], s.volErrs[ticker]
 }
 
 func (s *fakeStore) GetHighState(context.Context) (*domain.HighState, error) { return s.high, nil }
@@ -46,7 +69,9 @@ func (s *fakeStore) GetMarketMovement(_ context.Context, window duration.Duratio
 	return s.movement, s.movementErr
 }
 
-func (s *fakeStore) Latest(context.Context, string) (*domain.Event, error) { return s.latest, nil }
+func (s *fakeStore) Latest(context.Context, string, string) (*domain.Event, error) {
+	return s.latest, nil
+}
 
 func (s *fakeStore) GetDrawdownState(_ context.Context, increment domain.Decimal) (domain.DrawdownState, error) {
 	s.increment = increment

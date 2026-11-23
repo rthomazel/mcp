@@ -9,7 +9,7 @@ pruneEventsSQL = delete the events whose processed_at is the policy's Retention 
 givenUpEventsSQL = select the full rows with processed_at null, given_up_at set and expired_at after now, newest first by created_at then id, limited.
 expiredEventsSQL = select the full rows with processed_at null and expired_at not after now, newest first by created_at then id, limited.
 
-latestEventSQL = select the full row of the newest event of a type by created_at then id.
+latestEventSQL = select the full row of the newest event of a type by created_at then id, whose subject starts with the prefix when it is not empty.
 
 # Functions
 
@@ -79,9 +79,9 @@ An expired or given-up event is never selected, so it cannot block, slow or crow
 
 A notification-failed event that is itself given up on only logs and is shown by status, so a failing channel cannot cascade. The log line is the dependable record, since the announcement needs the channel that may be failing. The payload is never logged. Reading the clock once per call keeps the timestamps of one outcome equal.
 
-## Events.Latest(ctx Context, eventType string) (*domain.Event, error)
+## Events.Latest(ctx Context, eventType string, subjectPrefix string) (*domain.Event, error)
 
-Select through latestEventSQL and return the row, nil when there is none, or the wrapped error.
+Select through latestEventSQL with the type and the prefix and return the row, nil when there is none, or the wrapped error.
 
 ## Events.Remove(ctx Context, id int64) error
 

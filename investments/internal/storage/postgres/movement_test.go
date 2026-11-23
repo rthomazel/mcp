@@ -165,7 +165,7 @@ func TestLatestEvent(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	latest, err := store.Events.Latest(ctx, "a.b")
+	latest, err := store.Events.Latest(ctx, "a.b", "")
 	require.NoError(t, err)
 	assert.Nil(t, latest)
 
@@ -174,8 +174,16 @@ func TestLatestEvent(t *testing.T) {
 	recordDraft(t, store, "a.b", &second)
 	recordDraft(t, store, "a.c", &first)
 
-	latest, err = store.Events.Latest(ctx, "a.b")
+	latest, err = store.Events.Latest(ctx, "a.b", "")
 	require.NoError(t, err)
 	require.NotNil(t, latest)
 	assert.Equal(t, "two", *latest.Subject)
+
+	latest, err = store.Events.Latest(ctx, "a.b", "on")
+	require.NoError(t, err)
+	assert.Equal(t, "one", *latest.Subject, "subject prefix")
+
+	latest, err = store.Events.Latest(ctx, "a.b", "x")
+	require.NoError(t, err)
+	assert.Nil(t, latest)
 }

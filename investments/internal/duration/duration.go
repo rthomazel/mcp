@@ -1,6 +1,7 @@
 package duration
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ const (
 	hoursPerDay  = 24
 	daysPerWeek  = 7
 	monthsInYear = 12
+	daysPerMonth = 30.4375
 )
 
 // Duration is a calendar span: months and days, applied to a date.
@@ -59,6 +61,15 @@ func Parse(setting, text string) (Duration, error) {
 
 // String is the text as written, trimmed.
 func (d Duration) String() string { return d.text }
+
+// Compare orders two durations, -1, 0 or 1, counting a month as 30.4375 days.
+// It is approximate, for checking that one span is not shorter than another;
+// it is never used to move a date.
+func (d Duration) Compare(other Duration) int {
+	return cmp.Compare(d.approxDays(), other.approxDays())
+}
+
+func (d Duration) approxDays() float64 { return float64(d.Months)*daysPerMonth + float64(d.Days) }
 
 // Before is the date one duration earlier: months first, clamped to the end of
 // the month, then days.

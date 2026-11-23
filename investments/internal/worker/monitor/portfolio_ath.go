@@ -63,7 +63,7 @@ func (m *PortfolioATH) Run(ctx context.Context, params Params) error {
 		return nil
 	}
 
-	last, err := lastEventDate(ctx, m.events, domain.Events.PortfolioATH)
+	last, err := lastEventDate(ctx, m.events, domain.Events.PortfolioATH, "")
 	if err != nil {
 		return err
 	}

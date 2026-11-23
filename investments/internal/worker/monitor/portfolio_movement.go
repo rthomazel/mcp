@@ -75,7 +75,7 @@ func (m *PortfolioMovement) Run(ctx context.Context, params Params) error {
 		return nil
 	}
 
-	last, err := lastEventDate(ctx, m.events, domain.Events.PortfolioMovement)
+	last, err := lastEventDate(ctx, m.events, domain.Events.PortfolioMovement, "")
 	if err != nil {
 		return err
 	}

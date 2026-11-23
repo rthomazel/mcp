@@ -101,3 +101,22 @@ func TestEquivalentSpansApplyIdentically(t *testing.T) {
 
 	assert.NotEqual(t, thirty.Before(from), month.Before(from))
 }
+
+func TestCompareOrdersSpans(t *testing.T) {
+	parse := func(text string) Duration {
+		d, err := Parse("w", text)
+		require.NoError(t, err)
+
+		return d
+	}
+
+	for _, tc := range []struct {
+		left, right string
+		want        int
+	}{
+		{"1d", "2d", -1}, {"2w", "14d", 0}, {"1mo", "29d", 1}, {"1mo", "31d", -1}, {"3mo", "1y", -1},
+		{"1y", "365d", 1}, {"1y", "12mo", 0}, {"6mo", "2w", 1},
+	} {
+		assert.Equal(t, tc.want, parse(tc.left).Compare(parse(tc.right)), "%s against %s", tc.left, tc.right)
+	}
+}

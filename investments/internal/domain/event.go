@@ -25,6 +25,8 @@ type EventTypes struct {
 	PortfolioDrawdown  string
 	PortfolioATH       string
 	PortfolioMovement  string
+	AllocationDrift    string
+	PriceVolatility    string
 }
 
 // Events holds the event type names, dot-separated lowercase words.
@@ -34,6 +36,8 @@ var Events = EventTypes{
 	PortfolioDrawdown:  "notification.portfolio.drawdown",
 	PortfolioATH:       "notification.portfolio.ath",
 	PortfolioMovement:  "notification.portfolio.movement",
+	AllocationDrift:    "notification.allocation.drift",
+	PriceVolatility:    "notification.price.volatility",
 }
 
 // NotificationPrefix starts the type of every event that produces a notification.
@@ -120,6 +124,35 @@ type PortfolioMovementData struct {
 	TradesUSD     Decimal       `json:"trades_usd"`
 	Gainers       []Contributor `json:"gainers"`
 	Losers        []Contributor `json:"losers"`
+}
+
+// AllocationDriftData is the payload of Events.AllocationDrift. The subject of
+// the event is the group name, the side and the stay start, joined by at signs.
+type AllocationDriftData struct {
+	Group             string             `json:"group"`
+	Side              string             `json:"side"`
+	Date              Date               `json:"date"`
+	StayStart         Date               `json:"stay_start"`
+	AllocationPercent Decimal            `json:"allocation_percent"`
+	MinPercent        *Decimal           `json:"min_percent,omitempty"`
+	MaxPercent        *Decimal           `json:"max_percent,omitempty"`
+	Members           []MemberAllocation `json:"members"`
+}
+
+// PriceVolatilityData is the payload of Events.PriceVolatility. The subject of
+// the event is the ticker, the date and the direction, joined by at signs.
+type PriceVolatilityData struct {
+	Instrument        string  `json:"instrument"`
+	Date              Date    `json:"date"`
+	Direction         string  `json:"direction"`
+	Window            string  `json:"window"`
+	Lookback          string  `json:"lookback"`
+	StartDate         Date    `json:"start_date"`
+	MovePercent       Decimal `json:"move_percent"`
+	Variation         Decimal `json:"variation"`
+	Threshold         Decimal `json:"threshold"`
+	VolatilityPercent Decimal `json:"volatility_percent"`
+	Moves             int     `json:"moves"`
 }
 
 // NotificationFailedData is the payload of Events.NotificationFailed. It

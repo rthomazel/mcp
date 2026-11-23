@@ -38,12 +38,12 @@ needed. See the portfolio extremes spec.
 
 Add the market movement calculation over a window in SQL, the window and interval settings, and the monitor. See the portfolio movement spec.
 
-## [ ] 5. Allocation drift
+## [x] 5. Allocation drift
 
 Add group allocation over the snapshot series, the stay start, and the monitor. See the
 allocation drift spec.
 
-## [ ] 6. Price volatility
+## [x] 6. Price volatility
 
 Add the window move and volatility calculation over adjusted closes, the window and interval settings, and the monitor. See the
 price volatility spec.

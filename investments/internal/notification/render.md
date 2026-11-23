@@ -24,6 +24,14 @@ No fields.
 
 No fields.
 
+## AllocationDriftRenderer
+
+No fields.
+
+## PriceVolatilityRenderer
+
+No fields.
+
 ## NotificationFailedRenderer
 
 No fields.
@@ -32,7 +40,7 @@ No fields.
 
 ## NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer
 
-Return the renderer for domain.Events.SnapshotIncomplete, domain.Events.PortfolioDrawdown, domain.Events.PortfolioATH, domain.Events.PortfolioMovement and domain.Events.NotificationFailed under defaultFormat.
+Return the renderer for domain.Events.SnapshotIncomplete, domain.Events.PortfolioDrawdown, domain.Events.PortfolioATH, domain.Events.PortfolioMovement, domain.Events.AllocationDrift, domain.Events.PriceVolatility and domain.Events.NotificationFailed under defaultFormat.
 
 ## SnapshotIncompleteRenderer.Render(ctx Context, event domain.Event) (string, error)
 
@@ -109,6 +117,43 @@ It never repeats the failed event's payload.
 ---
 
 - **2.** if the percent is not a decimal number, return an error naming it.
+
+## AllocationDriftRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as AllocationDriftData.
+2. Take the bound that was crossed, the maximum for above and the minimum for below.
+3. Round the allocation and the bound with percentsAgainst, and each member's share with roundedPercent.
+4. Return a message naming the group, the side and the bound crossed, the allocation against the bound, the start of the stay and the date it was judged, the members with their shares, and saying that the allocation changes with trades as well as with prices.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if the bound that applies is missing, return an error saying so.
+
+---
+
+- **3.** if a percent is not a decimal number, return an error naming it.
+
+## PriceVolatilityRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as PriceVolatilityData.
+2. Round the move, the variation, the threshold and the volatility with roundedPercent.
+3. Return a message naming the instrument, rose or fell with the move without its sign, the window and its dates, the variation in standard deviations against the threshold, the usual move and how many moves and what look-back it comes from, and saying that moves use adjusted closes.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if a figure is not a decimal number, return an error naming it.
+
+## percentsAgainst(allocation Decimal, bound Decimal) (allocationText string, boundText string, err error)
+
+Round both to one decimal with roundedPercent; when the two texts are equal, which would make a group outside its band read as exactly at the bound, round both to two decimals instead.
 
 ## roundedDollars(amount Decimal) (string, error)
 

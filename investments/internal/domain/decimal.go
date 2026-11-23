@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 	"time"
@@ -23,6 +24,19 @@ func ParseDecimal(s string) (Decimal, error) {
 	}
 
 	return Decimal(s), nil
+}
+
+// Compare returns -1, 0 or 1 by exact value, for validating settings. Money is
+// never added or divided in Go.
+func (d Decimal) Compare(other Decimal) int {
+	left, _ := new(big.Rat).SetString(strings.TrimSpace(string(d)))
+	right, _ := new(big.Rat).SetString(strings.TrimSpace(string(other)))
+
+	if left == nil || right == nil {
+		return strings.Compare(string(d), string(other))
+	}
+
+	return left.Cmp(right)
 }
 
 // Sign returns -1, 0 or 1.
