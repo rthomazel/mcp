@@ -24,9 +24,9 @@ which is the start of its backfilled history. Adjusted close is used so a split 
 is never a fall. An all-time high is the highest value of the series, the earliest date
 winning a tie.
 
-**Drawdown, increment, level, crossing, new high and spacing.** As defined for the portfolio
+**Drawdown, increment, level, crossing, new high and interval.** As defined for the portfolio
 drawdown and portfolio all-time high monitors, applied to an instrument's series instead of the
-securities value. A level is announced per instrument, and a crossing and a spacing are
+securities value. A level is announced per instrument, and a crossing and an interval are
 tracked per instrument.
 
 **Selection.** The instruments a monitor watches: a list of tickers, or the word held for
@@ -56,7 +56,7 @@ high, the crossing date, and the adjusted close at the high and now.
 ### Instrument all-time high
 
 - When the latest date is a new high of the instrument and no instrument ATH event exists
-  for it within the spacing days before that date, it records one instrument ATH event.
+  for it fewer than interval days before that date, it records one instrument ATH event.
   The subject of the event is the instrument and the date.
 - It records nothing otherwise, and an instrument's first price is not a new high.
 
@@ -75,13 +75,13 @@ monitors:
     increment_pct: "5"
     instruments: [QQQ, VOO]      # a list of tickers, or: held
   instrument.ath:
-    min_days_between: 15         # optional, 15 by default
+    interval_days: 15            # optional, 15 by default
     instruments: held
 ```
 
 - `increment_pct` is required for instrument.drawdown, a positive decimal written as quoted
   text.
-- `min_days_between` is a whole number, zero or more, which may be written as a plain
+- `interval_days` is a whole number of at least 1, which may be written as a plain
   number.
 - `instruments` is required: the word held, or a non-empty list of tickers without repeats.
 - Any other setting is invalid, whether or not the entry is disabled. A ticker that is not
@@ -93,19 +93,19 @@ monitors:
   -10 events once; later days at or below those levels record nothing; after a recovery above
   -5 and a new fall to -5, the -5 level is announced again.
 - A split or a dividend does not change the drawdown.
-- With the default spacing, an instrument's new highs on consecutive days record one event;
+- With the default interval, an instrument's new highs on consecutive days record one event;
   a new high fifteen or more days after the announced one records another; instruments are
   spaced independently.
 - With the selection held, an instrument bought later is watched from its next run, and one
   sold is not.
-- A missing or non-positive increment, an empty list, a repeated ticker, a negative spacing
+- A missing or non-positive increment, an empty list, a repeated ticker, an interval below 1
   or an unknown key makes the monitors file invalid.
 - With no enabled entry, nothing is recorded.
 
 ## Decisions
 
 - One spec for two monitors that differ only in what they announce.
-- The same level and spacing semantics as the portfolio monitors, so the operator learns the
+- The same level and interval semantics as the portfolio monitors, so the operator learns the
   behavior once.
 
 ## Risks
@@ -118,4 +118,4 @@ monitors:
 
 - Related: 2026-11-21-notifications, the outbox and monitor mechanism this uses.
 - Related: 2026-11-22-monitors-configuration, the file that turns them on.
-- Related: 2026-11-23-monitor-portfolio-extremes, whose levels, crossings and spacing they follow.
+- Related: 2026-11-23-monitor-portfolio-extremes, whose levels, crossings and interval they follow.

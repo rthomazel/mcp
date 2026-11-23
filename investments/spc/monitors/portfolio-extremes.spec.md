@@ -44,8 +44,9 @@ The first snapshot has nothing before it and is not a new high.
 
 **ATH.** The abbreviation of all-time high, used in the name of the monitor and its event.
 
-**Spacing.** The number of days that must have passed since the date of the last announced high
-before another is announced.
+**Interval.** The least number of days between two announced highs, measured from the date of the
+last announced high to the latest date. The same setting and meaning as in the portfolio movement
+and price volatility monitors.
 
 ## Behavior
 
@@ -92,16 +93,16 @@ wording is the renderer's.
 
 ### Portfolio all-time high
 
-- When the latest date is a new high and no portfolio ATH event exists whose date is within the
-  spacing days before it, it records one portfolio ATH event. The subject of the event is the
-  date of the high.
-- Otherwise it records nothing. A high that the spacing suppresses is not announced later by
+- When the latest date is a new high and no portfolio ATH event exists dated fewer than interval
+  days before it, it records one portfolio ATH event. The subject of the event is the date of the
+  high.
+- Otherwise it records nothing. A high that the interval suppresses is not announced later by
   itself; only a date that is a new high when judged is announced.
 
 A date is judged once however often the monitor runs, because the date is the subject. Weekends
 and holidays judge the same date again and record nothing new. When the monitor is first enabled
 on a date that is a high, that high is announced. Removing the latest event makes the monitor
-announce a new high within the spacing again.
+announce a new high within the interval again.
 
 The message names the date, the new value, the previous high with its date, how far above it the
 new value is in dollars and percent, and the date of the last announced high.
@@ -124,12 +125,12 @@ monitors:
   portfolio.drawdown:
     increment_pct: "3"           # required, a percent greater than zero, written as text
   portfolio.ath:
-    min_days_between: 15         # optional, 15 by default
+    interval_days: 15            # optional, 15 by default
 ```
 
 - A missing or non-positive increment makes the file invalid.
-- `min_days_between` is a whole number of days, zero or more, which may be written as a plain
-  number. Zero announces every new high.
+- `interval_days` is a whole number of days of at least 1, which may be written as a plain
+  number. An interval of 1 announces every new high.
 - Any other setting is invalid, whether or not the entry is disabled.
 - With no entry a monitor does not run.
 
@@ -153,7 +154,7 @@ monitors:
   announces an older level out of order.
 - The series and the all-time high are the value history's.
 - Value drawdown first, with the flow-adjusted measure left for a separate feature.
-- Spacing is measured from the date of the last announced high and not from when its event was
+- The interval is measured from the date of the last announced high and not from when its event was
   created, so a late run does not shift the window. The default of fifteen days is the
   operator's choice, since an uptrend can set new highs on most days.
 - The messages carry the amounts as well as the percentages, so a percentage can be read against
@@ -173,13 +174,13 @@ monitors:
 - A missing or non-positive increment makes the monitors file invalid.
 - The drawdown the monitor reads equals the distance from the all-time high that the value
   history reports for the latest date.
-- With the default spacing, a new high on a date records one high event; a new high on each of
+- With the default interval, a new high on a date records one high event; a new high on each of
   the next fourteen days records nothing; a new high fifteen days or more after the announced
   one records an event.
 - A value equal to the previous high, or below it, records no high event; the first snapshot
   alone records none; running again for the same date records none.
-- With a spacing of zero, every date that is a new high records an event.
-- A negative or non-numeric spacing makes the monitors file invalid.
+- With an interval of 1, every date that is a new high records an event.
+- An interval below 1 or non-numeric makes the monitors file invalid.
 - The messages name the dates and amounts described above and say the figure is a change in
   value and not a return.
 

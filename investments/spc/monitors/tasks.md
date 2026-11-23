@@ -21,7 +21,7 @@ instrument selection (list of tickers, or held). See the monitors configuration 
 
 Refactor the portfolio drawdown monitor into the portfolio extremes design, with the drawdown
 and the new high sharing the value series, and run it at 7:00 instead of 7:05. Add the portfolio
-all-time high (ATH) monitor with the spacing lookup over earlier events. No compatibility with the old drawdown
+all-time high (ATH) monitor with the interval lookup over earlier events. No compatibility with the old drawdown
 code is needed. See the portfolio extremes spec.
 
 ## [ ] 3. Portfolio movement
@@ -44,7 +44,7 @@ Add the monitor over the latest daily range. See the price target spec.
 
 ## [ ] 7. Instrument drawdown and instrument all-time high
 
-Add the per-instrument series, levels, crossings and spacing, sharing code with the portfolio
+Add the per-instrument series, levels, crossings and interval, sharing code with the portfolio
 monitors where the models allow. Depends on tasks 1 and 2, whose extremes engine it reuses. See the instrument extremes spec.
 
 ## [ ] 8. Notification renderers and routing
