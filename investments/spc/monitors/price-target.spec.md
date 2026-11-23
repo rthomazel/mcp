@@ -1,7 +1,7 @@
 ---
 id: 2026-11-23-monitor-price-target
 type: spec
-summary: Monitor that notifies the operator once, and again after a year, when an instrument's daily price range reaches a configured target price, within a tolerance.
+summary: Monitor that notifies the operator once, and again after a year, when an instrument's daily price range reaches a configured target price.
 author: Thom
 created: 2026-11-23
 agents: claude
@@ -18,14 +18,11 @@ system already stores; there is no intraday price.
 
 ## Concepts
 
-**Target.** An instrument, a price, and a tolerance in percent. The band is the price plus and
-minus the tolerance, so a target of 232 with a tolerance of 3 covers 225.04 to 238.96. The
-band means the operator need not know whether the price will arrive from above or below, and
-a tolerance of zero is an exact price.
+**Target.** An instrument and a price.
 
-**Reached.** A target is reached on a price date when the day's range from low to high touches
-the band. Using the range and not the close catches a price that crossed the band during the
-day and closed outside it. The unadjusted prices are used, since a target is a price the
+**Reached.** A target is reached on a price date when the price lies within the day's range
+from low to high. Using the range and not the close catches a price that was touched during the
+day and closed away from it, so no tolerance is needed. The unadjusted prices are used, since a target is a price the
 operator sees on a quote.
 
 ## Behavior
@@ -37,14 +34,14 @@ the store. A target whose instrument has no price on that date is skipped.
   instrument and price. The subject of the event is the instrument and the price.
 - It records nothing otherwise.
 
-Each target is announced once however long the price stays in the band. The outbox deletes
+Each target is announced once however long the price stays within the day's range. The outbox deletes
 fully handled events after a year, so the target is announced again after that if the price
-is in the band then, which gives once a year with no state of the monitor's own. Weekends and
+is within the range then, which gives once a year with no state of the monitor's own. Weekends and
 holidays judge the same date again and record nothing new. When a target is added while the
-price is already in the band, it is announced at the next run. Removing the event makes the
-target announce again if the price is still in the band.
+price is already within the range, it is announced at the next run. Removing the event makes the
+target announce again if the price is still within the range.
 
-The message names the instrument, the target price and the band, the date, and the day's low,
+The message names the instrument, the target price, the date, and the day's low,
 high and close. The wording is the renderer's.
 
 ### Configuration
@@ -58,13 +55,11 @@ monitors:
     targets:
       - instrument: QQQ
         price: "232"
-        tolerance_pct: "3"       # optional, zero by default
       - instrument: QQQ
         price: "250"
 ```
 
 - `instrument` is a ticker; `price` is a positive decimal written as quoted text.
-- `tolerance_pct` is a decimal from zero up to but not including 100, written as quoted text.
 - The same instrument may have several targets; the same instrument and price twice is
   invalid.
 - Any other key is invalid, whether or not the entry is disabled. A ticker that is not
@@ -72,14 +67,14 @@ monitors:
 
 ## Acceptance criteria
 
-- With a target of 232 and a tolerance of 3, a day whose range includes any price from 225.04
-  to 238.96 records one event; later days in the band record nothing.
-- A day that gaps over the band, with a low above it or a high below it, records nothing; a
-  day that crosses the band and closes outside it records an event.
+- With a target of 232, a day with a low of 230 and a high of 236 records one event; later days
+  whose range includes 232 record nothing.
+- A day that gaps over the target, with a low above it or a high below it, records nothing; a
+  day that touches the target and closes away from it records an event.
 - After the event has been deleted, because it was handled more than a year ago or removed, a
-  price still or again in the band records a new event.
+  price still or again within the range records a new event.
 - Two targets of one instrument are announced independently.
-- A price that is not positive, a tolerance of 100 or more, a repeated instrument and price
+- A price that is not positive, a repeated instrument and price
   pair or an unknown key makes the monitors file invalid.
 - With no enabled entry, nothing is recorded.
 
@@ -89,7 +84,8 @@ monitors:
   captures a touch within the day.
 - Once a year comes from the outbox's one year retention of handled events, so the subject
   carries no year and the monitor needs nothing extra.
-- The tolerance is both sides, so a target can be written without a direction.
+- The range needs no direction or tolerance: a target is reached whether the price comes from
+  above or below.
 
 ## Refs
 
