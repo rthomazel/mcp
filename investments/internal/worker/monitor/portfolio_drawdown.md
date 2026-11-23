@@ -1,6 +1,6 @@
 # Constants
 
-portfolioDrawdownAt = 07:05 in the market timezone, after the snapshot-incomplete monitor.
+portfolioDrawdownAt = 07:00 in the market timezone, with every monitor.
 incrementKey = "increment_pct", the one setting.
 
 # Types

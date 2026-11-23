@@ -84,6 +84,16 @@ func (p Params) Duration(key string) (duration.Duration, bool, error) {
 	return parsed, true, err
 }
 
+// DurationOr reads a duration setting, the fallback text when it is missing.
+func (p Params) DurationOr(key, fallback string) (duration.Duration, error) {
+	parsed, ok, err := p.Duration(key)
+	if err != nil || ok {
+		return parsed, err
+	}
+
+	return duration.Parse(key, fallback)
+}
+
 // Mappings reads a setting that must be a non-empty list of mappings.
 func (p Params) Mappings(key string) ([]Params, bool, error) {
 	items, ok, err := p.list(key)

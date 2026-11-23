@@ -16,6 +16,14 @@ Turns an event into plain, channel-neutral text, with no markup, so no handler i
 
 No fields.
 
+## PortfolioATHRenderer
+
+No fields.
+
+## PortfolioMovementRenderer
+
+No fields.
+
 ## NotificationFailedRenderer
 
 No fields.
@@ -24,7 +32,7 @@ No fields.
 
 ## NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer
 
-Return the renderer for domain.Events.SnapshotIncomplete, domain.Events.PortfolioDrawdown and domain.Events.NotificationFailed under defaultFormat.
+Return the renderer for domain.Events.SnapshotIncomplete, domain.Events.PortfolioDrawdown, domain.Events.PortfolioATH, domain.Events.PortfolioMovement and domain.Events.NotificationFailed under defaultFormat.
 
 ## SnapshotIncompleteRenderer.Render(ctx Context, event domain.Event) (string, error)
 
@@ -70,3 +78,46 @@ The message is built from the payload alone. Only the message is rounded; the pa
 - **1.** if decoding fails, return the wrapped error.
 
 It never repeats the failed event's payload.
+
+## PortfolioATHRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as PortfolioATHData.
+2. Round the increase percent with roundedPercent.
+3. Return a message naming the date and the new value, the dollar and percent increase over the previous high with its value and date, the date of the last announced high or none, and saying that this value change is affected by sales and withdrawals.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if the percent is not a decimal number, return an error naming it.
+
+## PortfolioMovementRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as PortfolioMovementData.
+2. Round the market percent with roundedPercent.
+3. Build a message naming the direction as rose or fell, the rounded percent without its sign and the market dollars with a sign, the window as written, its start and end dates, the securities values at both ends and the split of the change into market and trades.
+4. if there are gainers, add a line listing them by symbol with signed dollars.
+5. if there are losers, add a line listing them the same way.
+6. Add that this value change is affected by sales and withdrawals, and return the message.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if the percent is not a decimal number, return an error naming it.
+
+## roundedPercent(percent Decimal) (string, error)
+
+Round to one decimal place, halves away from zero, with math/big so no float is involved, and keep the sign. Shared by the renderers that show a percent.
+
+## signedDollars(amount Decimal) string
+
+Write the amount with its sign before the dollar sign: +$34, -$50. Zero is written +$0.
+
+## contributorList(contributors []domain.Contributor) string
+
+Join each symbol and its signed dollars with commas.

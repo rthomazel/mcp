@@ -13,7 +13,7 @@ import (
 
 const incrementKey = "increment_pct"
 
-var portfolioDrawdownAt = domain.ClockTime{Hour: 7, Minute: 5}
+var portfolioDrawdownAt = domain.ClockTime{Hour: 7}
 
 // PortfolioDrawdown watches the securities value falling to multiples of an
 // increment below its all-time high.
@@ -32,7 +32,7 @@ func (m *PortfolioDrawdown) Name() string {
 	return strings.TrimPrefix(domain.Events.PortfolioDrawdown, domain.NotificationPrefix)
 }
 
-// At is 07:05 market time, after the snapshot-incomplete monitor.
+// At is 07:00 market time.
 func (m *PortfolioDrawdown) At() domain.ClockTime { return portfolioDrawdownAt }
 
 // ValidateParams requires a positive increment and rejects any other setting.

@@ -21,7 +21,7 @@ func TestPortfolioDrawdownIsNamedAfterItsEvent(t *testing.T) {
 	monitor := newDrawdown(&fakeStore{})
 
 	assert.Equal(t, "portfolio.drawdown", monitor.Name())
-	assert.Equal(t, domain.ClockTime{Hour: 7, Minute: 5}, monitor.At())
+	assert.Equal(t, domain.ClockTime{Hour: 7}, monitor.At())
 }
 
 func TestPortfolioDrawdownRecordsOneEventPerLevel(t *testing.T) {

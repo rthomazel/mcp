@@ -20,6 +20,8 @@ How the outbox retries, expires and retains events. The values are server config
 1. Events.SnapshotIncomplete = "notification.snapshot.incomplete"
 2. Events.NotificationFailed = "notification.failed"
 3. Events.PortfolioDrawdown = "notification.portfolio.drawdown"
+4. Events.PortfolioATH = "notification.portfolio.ath"
+5. Events.PortfolioMovement = "notification.portfolio.movement"
 
 Event types are dot-separated words, named here and nowhere else.
 
@@ -78,6 +80,34 @@ Payload of Events.SnapshotIncomplete. The subject of the event is the date, form
 7. HighValueUSD Decimal, the securities value on HighDate
 
 Payload of Events.PortfolioDrawdown. The subject of the event is the level, an at sign and the crossing date, for example -6@2026-11-10. The level is formatted without trailing zeros, so a level keeps its subject when the increment changes to another divisor of it.
+
+## PortfolioATHData
+
+1. Date Date, the date of the new high
+2. ValueUSD Decimal, the securities value on Date
+3. PreviousHighDate Date
+4. PreviousHighValueUSD Decimal
+5. IncreaseUSD Decimal, over the previous high
+6. IncreasePercent Decimal, over the previous high
+7. LastAnnouncedDate *Date, the date of the last announced high, nil for the first
+
+Payload of Events.PortfolioATH. The subject of the event is Date, formatted YYYY-MM-DD.
+
+## PortfolioMovementData
+
+1. Date Date, the latest snapshot date
+2. Direction string, up or down
+3. Window string, the window as the operator wrote it
+4. StartDate Date, the base date of the window
+5. StartValueUSD Decimal
+6. EndValueUSD Decimal
+7. MarketUSD Decimal
+8. MarketPercent Decimal, of StartValueUSD
+9. TradesUSD Decimal
+10. Gainers []Contributor
+11. Losers []Contributor
+
+Payload of Events.PortfolioMovement. The subject of the event is Date, an at sign and Direction, for example 2026-11-20@up. Date is also what the monitor's interval is measured from.
 
 ## NotificationFailedData
 

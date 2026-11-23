@@ -11,6 +11,8 @@
 7. GetStatus(ctx Context) (Status, error)
 8. GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
 9. GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
+10. GetHighState(ctx Context) (*HighState, error)
+11. GetMarketMovement(ctx Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
 
 The generic store, for everything that has no narrower store: instruments, the ledger and the read-only reports. Groups of related methods have their own stores below. Tests mock each store with mockery. Implemented by internal/storage/postgres.
 Each method of every store is a self-contained unit of work in its own transaction; composing several store calls into one transaction is not supported.
@@ -50,6 +52,14 @@ Returns the securities value, and cash and account equity where cash snapshots e
 ### GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
 
 Returns the drawdown of the latest securities value from the all-time high, and for each multiple of increment the drawdown is at or below the date its current stay at that level began, over the series GetValueHistory uses. The all-time high is over every stored date, whatever the range. Returns ErrInvalidInput for an increment that is not positive, and an empty state, no date and no levels, when there are no snapshots. Changes in value, not returns.
+
+### GetHighState(ctx Context) (*HighState, error)
+
+Returns the latest securities value against the highest earlier value, over the series GetValueHistory uses, nil when there are no snapshots. Changes in value, not returns.
+
+### GetMarketMovement(ctx Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
+
+Returns the securities value change over window ending at the latest snapshot date that prices explain, with the part trades explain, the largest gainers and losers by symbol, and whether the percent reaches the threshold in either direction. The window start is the window counted back from the latest date by duration arithmetic. Nil when there are no snapshots or none on or before the window start. Returns ErrInvalidInput for a threshold that is not positive. Changes in value, not returns.
 
 ## CashStore
 
@@ -138,6 +148,7 @@ Returns updates log rows matching filter, newest first by start time, limited. R
 3. SaveOutcome(ctx Context, id int64, outcome EventOutcome) error
 4. Remove(ctx Context, id int64) error
 5. Prune(ctx Context) (int, error)
+6. Latest(ctx Context, eventType string) (*Event, error)
 
 The events outbox. Consumed by the events worker, the monitors and the remove_event tool.
 
@@ -156,6 +167,10 @@ Applies the outcome of one handling pass in one transaction: adds the succeeded 
 ### Remove(ctx Context, id int64) error
 
 Deletes an event that was given up on or has expired. Returns ErrEventNotFound for an unknown id, and ErrEventNotRemovable for an event that is pending, backing off or fully handled; nothing is deleted then.
+
+### Latest(ctx Context, eventType string) (*Event, error)
+
+Returns the most recently recorded event of the type, handled or not, newest by recorded time then id; nil when there is none, which includes events deleted by pruning. Monitors read the date in its payload to space their announcements.
 
 ### Prune(ctx Context) (int, error)
 

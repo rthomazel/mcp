@@ -324,6 +324,67 @@ func TestPortfolioDrawdownRenderer(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestPortfolioATHRenderer(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	last := day.AddDate(0, 0, -16)
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioATH][defaultFormat]
+
+	data, err := json.Marshal(domain.PortfolioATHData{
+		Date: day, ValueUSD: "110000", PreviousHighDate: day.AddDate(0, 0, -3), PreviousHighValueUSD: "108000",
+		IncreaseUSD: "2000", IncreasePercent: "1.851851", LastAnnouncedDate: &last,
+	})
+	require.NoError(t, err)
+
+	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "new all-time high on 2026-11-20: $110000")
+	assert.Contains(t, text, "$2000 (1.9%) above the previous high of $108000 on 2026-11-17")
+	assert.Contains(t, text, "Last announced high: 2026-11-04.")
+	assert.Contains(t, text, "This value change is affected by sales and withdrawals.")
+
+	data, err = json.Marshal(domain.PortfolioATHData{Date: day, IncreasePercent: "1"})
+	require.NoError(t, err)
+
+	text, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Last announced high: none.")
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
+}
+
+func TestPortfolioMovementRenderer(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioMovement][defaultFormat]
+
+	data, err := json.Marshal(domain.PortfolioMovementData{
+		Date: day, Direction: "down", Window: "3d", StartDate: day.AddDate(0, 0, -3), StartValueUSD: "100000",
+		EndValueUSD: "96000", MarketUSD: "-3456", MarketPercent: "-3.456", TradesUSD: "-544",
+		Gainers: []domain.Contributor{{Symbol: "GLD", MovementUSD: "120"}},
+		Losers:  []domain.Contributor{{Symbol: "QQQ", MovementUSD: "-2000"}, {Symbol: "VOO", MovementUSD: "-1576"}},
+	})
+	require.NoError(t, err)
+
+	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "fell 3.5% (-$3456) over 3d, from 2026-11-17 to 2026-11-20")
+	assert.Contains(t, text, "from $100000 to $96000: market -$3456, trades -$544")
+	assert.Contains(t, text, "Largest gains: GLD +$120.")
+	assert.Contains(t, text, "Largest losses: QQQ -$2000, VOO -$1576.")
+	assert.Contains(t, text, "This value change is affected by sales and withdrawals.")
+
+	data, err = json.Marshal(domain.PortfolioMovementData{Date: day, Direction: "up", Window: "1d", MarketUSD: "10", MarketPercent: "0.5"})
+	require.NoError(t, err)
+
+	text, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "rose 0.5% (+$10)")
+	assert.NotContains(t, text, "Largest")
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
+}
+
 func TestPortfolioDrawdownRendererRounding(t *testing.T) {
 	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioDrawdown][defaultFormat]
 

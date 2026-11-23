@@ -33,6 +33,9 @@ WHERE processed_at IS NULL AND given_up_at IS NULL
 ORDER BY created_at, id
 LIMIT $3`
 
+	latestEventSQL = `
+SELECT ` + eventColumns + ` FROM events WHERE type = $1 ORDER BY created_at DESC, id DESC LIMIT 1`
+
 	lockEventSQL = `SELECT ` + eventColumns + ` FROM events WHERE id = $1 FOR UPDATE`
 
 	saveEventSQL = `
@@ -113,6 +116,20 @@ func (s *Events) ListDue(ctx context.Context, typePrefix string, limit int) ([]d
 	}
 
 	return s.queryEvents(ctx, s.db, dueEventsSQL, s.clock(), typePrefix, limit)
+}
+
+// Latest returns the most recently recorded event of the type, nil when there is none.
+func (s *Events) Latest(ctx context.Context, eventType string) (*domain.Event, error) {
+	events, err := s.queryEvents(ctx, s.db, latestEventSQL, eventType)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(events) == 0 {
+		return nil, nil //nolint:nilnil // no event of the type
+	}
+
+	return &events[0], nil
 }
 
 // SaveOutcome applies the outcome of one handling pass in one transaction.
