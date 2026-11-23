@@ -3,7 +3,6 @@ package monitor
 import (
 	"fmt"
 	"slices"
-	"strconv"
 
 	"go.yaml.in/yaml/v3"
 
@@ -16,9 +15,6 @@ const (
 	versionKey       = "version"
 	monitorsKey      = "monitors"
 )
-
-// Params are the settings of one monitor, as text.
-type Params map[string]string
 
 // Config is the monitors configuration, parsed from one YAML file.
 type Config struct {
@@ -79,23 +75,25 @@ func (c *Config) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// UnmarshalYAML reads disabled as a boolean and every other key as a setting.
+// UnmarshalYAML reads disabled as a boolean and every other key as a setting
+// of any shape.
 func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
 		return nil
 	}
 
-	var raw map[string]string
+	var raw map[string]any
 	if err := node.Decode(&raw); err != nil {
-		return fmt.Errorf("entry must be a mapping of text values: %w", err)
+		return fmt.Errorf("entry must be a mapping: %w", err)
 	}
 
 	if value, ok := raw[disabledKey]; ok {
-		if value != "true" && value != "false" {
-			return fmt.Errorf("%s must be true or false, got %q", disabledKey, value)
+		disabled, isBool := value.(bool)
+		if !isBool {
+			return fmt.Errorf("%s must be true or false, got %v", disabledKey, value)
 		}
 
-		e.Disabled, _ = strconv.ParseBool(value)
+		e.Disabled = disabled
 
 		delete(raw, disabledKey)
 	}

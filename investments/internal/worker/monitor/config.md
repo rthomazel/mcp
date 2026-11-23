@@ -19,9 +19,9 @@ The monitors configuration, parsed from one YAML file by the file loader. It is 
 ## Entry
 
 1. Disabled bool, false when omitted
-2. Params Params, every key of the entry other than disabledKey
+2. Params Params, every key of the entry other than disabledKey, of any shape
 
-A custom YAML decoder reads the entry as a mapping of text values. disabled must be exactly true or false, otherwise it returns an error naming the key; each other key becomes a setting, and a nested value is an error. Settings that must stay exact, such as a percentage, are written as text and read by the monitor as decimals.
+A custom YAML decoder reads the entry as a mapping. disabled must be a YAML boolean, otherwise it returns an error naming the key; each other key becomes a setting whatever its shape: text, number, list or nested mapping. The monitor reads and checks the shape with the Params accessors. A repeated key at any depth is a parse error.
 
 # Functions
 
