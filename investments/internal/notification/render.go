@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -67,10 +68,15 @@ func (r *PortfolioDrawdownRenderer) Render(_ context.Context, event domain.Event
 		return "", fmt.Errorf("decoding portfolio drawdown data: %w", err)
 	}
 
+	drawdown, ok := new(big.Rat).SetString(string(data.DrawdownPercent))
+	if !ok {
+		return "", fmt.Errorf("rounding drawdown percent %q: not a decimal number", data.DrawdownPercent)
+	}
+
 	return fmt.Sprintf("Portfolio is down %s%% from its high, crossing the %s%% level on %s.\n"+
 		"Securities value on %s: $%s. High on %s: $%s.\n"+
-		"This is a change in value, not investment return: sales and withdrawals lower it too.",
-		strings.TrimPrefix(string(data.DrawdownPercent), "-"), data.Level, data.CrossedOn.Format(time.DateOnly),
+		"This value change is affected by sales and withdrawals.",
+		strings.TrimPrefix(drawdown.FloatString(1), "-"), data.Level, data.CrossedOn.Format(time.DateOnly),
 		data.Date.Format(time.DateOnly), data.ValueUSD, data.HighDate.Format(time.DateOnly), data.HighValueUSD), nil
 }
 
