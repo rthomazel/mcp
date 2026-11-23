@@ -5,6 +5,10 @@ dailySeriesSQL = the daily series as one relation: every distinct date in snapsh
 historyPointsSQL = from dailySeriesSQL within the range, group dates into windows of the filter's day count, the window number being the whole days from the range start divided by it, and keep the last date of each window, ordered by date ascending.
 seriesSummarySQL = over one value column of dailySeriesSQL, null values excluded: the latest row in the range; the maximum over all rows on or before the range end with the earliest date winning a tie; latest minus that maximum, absolute and as a percent; the baseline, the last row on or before the range start, else the first row in the range; change from the baseline, absolute and as a percent; the highest and lowest rows in the range; and the largest peak-to-trough fall within the range, the deepest percent below a running maximum with the earliest trough winning a tie, with its peak and trough dates and whether a later row reaches the peak again. All arithmetic in SQL, always over daily rows whatever the window.
 netContributionsSQL = sum the amounts of DEPOSIT and WITHDRAWAL cash_transactions whose effective date is after the equity baseline date through the latest equity date, zero when there are none.
+highStateSQL = over dailySeriesSQL securities value, take the latest row and the highest value on an earlier date, the earliest date winning a tie; report the latest, the previous high, whether the latest is strictly greater, and the difference in dollars and as a percent of the previous high, null without a previous row.
+marketMovesCTE = the movement of each instrument held on two consecutive snapshot dates, the earlier date's quantity times the change in close price, for the dates after $1, the window start. Consecutive means consecutive among the dates that have snapshot rows; instruments missing on either date contribute nothing.
+marketMovementSQL = from marketMovesCTE, take the base, the securities value on the last snapshot date on or before $1, and the latest, the value on the newest snapshot date; return their dates and values, the market total as the sum of movements, trades as the latest minus the base minus the market total, the market total as a percent of the base, and whether it is at or above $2 or at or below minus $2, by cross multiplication and false when the base is zero. No row when there is no base date.
+marketContributorsSQL = from marketMovesCTE, sum the movements by instrument symbol, largest first, symbol breaking ties.
 maxDrawdownLevels = 100, the most levels one state reports.
 drawdownLevelsSQL = over dailySeriesSQL securities value, take each row's percent below the running maximum of the values up to and including its date, zero when the maximum is zero; take the latest row and the all-time high, its date, the earliest date reaching the maximum, and its value; generate the levels, minus the increment times one up to the deepest multiple the latest drawdown reaches, at most maxDrawdownLevels; and for each level the crossing, the date of the first row after the most recent row whose percent is above the level. Percent values are in percent units, computed by Postgres with trim_scale, as in seriesSummarySQL.
 
@@ -52,6 +56,45 @@ All-time high is bounded by the range end so that a past range is not measured a
 Percent values are in percent units, such as -12.5, computed by Postgres. A zero baseline gives no change percent rather than an error.
 Reads are independent selects on one handle, no transaction, as in GetStatus.
 Decimals are rendered with trim_scale, so a division does not leave trailing zeros. The summary SQL is one template over the value column, securities or equity, so both series use the same definitions.
+
+## Store.GetHighState(ctx Context) (*domain.HighState, error)
+
+1. Select the state via highStateSQL.
+2. if there is no row, return nil.
+3. Return the state, with Previous and the increases only when there is a previous row.
+
+#### Errors
+
+- **1.** if the query fails, return the wrapped error.
+
+## Store.GetMarketMovement(ctx Context, window duration.Duration, threshold domain.Decimal) (*domain.MarketMovement, error)
+
+1. if threshold is not positive, return domain.ErrInvalidInput.
+2. Read the latest snapshot date.
+3. if there is none, return nil.
+4. Compute the window start with window.Before(latest), so the calendar arithmetic is the duration package's alone.
+5. Select the totals via marketMovementSQL.
+6. if there is no row, the window starts before the first snapshot, return nil.
+7. List the instrument movements via marketContributorsSQL, then keep as Gainers the first MaxContributors with a positive movement and as Losers the last MaxContributors with a negative one, largest loss first.
+8. Return the movement.
+
+#### Errors
+
+- **1.** return domain.ErrInvalidInput naming the threshold.
+
+---
+
+- **2.** if the query fails, return the wrapped error.
+
+---
+
+- **5.** if the query fails, return the wrapped error.
+
+---
+
+- **7.** if the query fails, return the wrapped error.
+
+Dates are snapshot dates, so a weekend has none and a window starting on one uses the Friday before it as its base. Instruments are matched by id, so a position that is sold and bought back contributes on the days it was held on both dates. Reads are independent selects on one handle, no transaction.
 
 ## Store.GetDrawdownState(ctx Context, increment domain.Decimal) (domain.DrawdownState, error)
 

@@ -17,8 +17,10 @@ with settings, the portfolio drawdown, has its own spec, and so does each monito
 since. 2026-11-23 added structured settings and the instrument concept for the monitors that
 watch groups and lists of instruments.
 
-All monitors run daily at 7:00 AM Eastern. They read the state the 6:00 AM price refresh
-left and do not depend on one another, so they need no order. A monitor may space its own
+All monitors run daily at one time, 7:00 AM Eastern by default, which is server configuration, not
+part of this file: INVESTMENTS_MCP_MONITORS_RUN_TIME, like the price refresh run times. They read the
+state the 6:00 AM price refresh left and do not depend on one another, so they need no order. The
+specs of the monitors say 7:00 AM for that default. A monitor may space its own
 announcements with an interval setting, but it is still scheduled and judged daily.
 
 ## Intent
@@ -103,7 +105,7 @@ A monitor runs only when its entry exists and is not disabled.
 
 All monitors are scheduled whether or not they are enabled, and read the file when their
 time comes. Enabling, disabling and retuning take effect at the monitor's next run, with
-no restart. The time of day a monitor runs stays part of the monitor and is not in the
+no restart. The time of day monitors run is the server's and is not in the
 file.
 
 ### Loading and validation
@@ -142,7 +144,8 @@ announcing an incomplete snapshot until the operator adds the entry shown above.
 ## Non-goals
 
 - Environment variables for monitor settings.
-- Changing the time of day a monitor runs, or the market timezone, from the file.
+- Changing the time of day monitors run, or the market timezone, from this file. They are
+  server settings, read at start, and one time serves every monitor.
 - Settings shared by several monitors.
 - Routing, formats or channels, which stay in the notifications file.
 - Validating that an enabled monitor has a notification entry.

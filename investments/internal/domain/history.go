@@ -66,6 +66,41 @@ type DrawdownState struct {
 	Levels          []DrawdownLevel // shallowest first, capped by the store
 }
 
+// HighState is the latest securities value against the highest earlier value.
+type HighState struct {
+	Date            Date
+	ValueUSD        Decimal
+	Previous        *Extreme // highest earlier value, earliest date wins a tie; nil for the first snapshot
+	NewHigh         bool     // the value is strictly above every earlier one
+	IncreaseUSD     Decimal  // over the previous high; empty without one
+	IncreasePercent Decimal  // over the previous high; empty without one
+}
+
+// Contributor is an instrument and its market movement over a window.
+type Contributor struct {
+	Symbol      string  `json:"symbol"`
+	MovementUSD Decimal `json:"movement_usd"`
+}
+
+// MarketMovement is the securities value change over a window that prices
+// alone explain, with the part trades explain. A change in value, not a return.
+type MarketMovement struct {
+	StartDate     Date          // last snapshot date on or before the window start
+	EndDate       Date          // latest snapshot date
+	StartValueUSD Decimal       // securities value on StartDate
+	EndValueUSD   Decimal       // securities value on EndDate
+	MarketUSD     Decimal       // sum of daily shares held at the previous snapshot times the price change
+	MarketPercent *Decimal      // of StartValueUSD; nil when it is zero
+	TradesUSD     Decimal       // the value change minus MarketUSD
+	AtLeastUp     bool          // MarketPercent is at or above the threshold
+	AtLeastDown   bool          // MarketPercent is at or below minus the threshold
+	Gainers       []Contributor // largest positive movements first, at most MaxContributors
+	Losers        []Contributor // largest negative movements first, at most MaxContributors
+}
+
+// MaxContributors is the most gainers and the most losers a movement reports.
+const MaxContributors = 3
+
 // ValueHistory is the series and its summaries.
 type ValueHistory struct {
 	From                Date

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
+	"github.com/rthomazel/mcp/investments/internal/duration"
 )
 
 func newMonitor(store *fakeStore) *SnapshotIncomplete { return NewSnapshotIncomplete(store, store) }
@@ -28,7 +29,24 @@ type fakeStore struct {
 	drawdownErr error
 	increment   domain.Decimal
 	recordErr   error
+
+	high        *domain.HighState
+	movement    *domain.MarketMovement
+	movementErr error
+	window      duration.Duration
+	threshold   domain.Decimal
+	latest      *domain.Event
 }
+
+func (s *fakeStore) GetHighState(context.Context) (*domain.HighState, error) { return s.high, nil }
+
+func (s *fakeStore) GetMarketMovement(_ context.Context, window duration.Duration, threshold domain.Decimal) (*domain.MarketMovement, error) {
+	s.window, s.threshold = window, threshold
+
+	return s.movement, s.movementErr
+}
+
+func (s *fakeStore) Latest(context.Context, string) (*domain.Event, error) { return s.latest, nil }
 
 func (s *fakeStore) GetDrawdownState(_ context.Context, increment domain.Decimal) (domain.DrawdownState, error) {
 	s.increment = increment
@@ -58,7 +76,6 @@ func TestSnapshotIncompleteRecordsTheDateOnce(t *testing.T) {
 	require.NoError(t, json.Unmarshal(store.recorded[0].Data, &data))
 	assert.Equal(t, date, data.Date)
 
-	assert.Equal(t, domain.ClockTime{Hour: 7}, monitor.At())
 	assert.Equal(t, "snapshot.incomplete", monitor.Name())
 }
 

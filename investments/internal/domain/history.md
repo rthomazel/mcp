@@ -1,3 +1,7 @@
+# Constants
+
+MaxContributors = 3, the most gainers and the most losers a MarketMovement lists.
+
 # Types
 
 ## HistoryFilter
@@ -66,6 +70,38 @@ The day after the most recent date whose drawdown was shallower than the level. 
 6. Levels []DrawdownLevel, every level the drawdown is at or below, shallowest first, capped by the store
 
 The securities value drawdown over the same daily series and the same all-time high as SeriesSummary, so FromHighPercent of the latest date and DrawdownPercent agree. No levels means the drawdown is shallower than the first.
+
+## HighState
+
+1. Date Date, the latest date of the series
+2. ValueUSD Decimal, the securities value on Date
+3. Previous *Extreme, the highest value on an earlier date, the earliest date winning a tie, nil for the first snapshot
+4. NewHigh bool, the value is strictly greater than every earlier one; false without Previous
+5. IncreaseUSD Decimal, ValueUSD minus the previous high; empty without Previous
+6. IncreasePercent Decimal, as a percent of the previous high, empty without Previous or when it is zero
+
+Over the same daily series as DrawdownState and SeriesSummary. A value equal to the previous high is not a new high.
+
+## Contributor
+
+1. Symbol string
+2. MovementUSD Decimal, the instrument's market movement over the window
+
+## MarketMovement
+
+1. StartDate Date, the last snapshot date on or before the window start
+2. EndDate Date, the latest snapshot date
+3. StartValueUSD Decimal, the securities value on StartDate
+4. EndValueUSD Decimal, the securities value on EndDate
+5. MarketUSD Decimal, the sum of the daily market movements of the snapshot dates after the window start
+6. MarketPercent *Decimal, MarketUSD as a percent of StartValueUSD, nil when that is zero
+7. TradesUSD Decimal, EndValueUSD minus StartValueUSD minus MarketUSD
+8. AtLeastUp bool, MarketPercent is at or above the threshold
+9. AtLeastDown bool, MarketPercent is at or below minus the threshold
+10. Gainers []Contributor, the largest positive movements first, at most MaxContributors
+11. Losers []Contributor, the largest negative movements first, at most MaxContributors
+
+The daily market movement of a date is the sum over instruments held on both it and the snapshot date before it of the shares of the earlier date times the change in close price. Shares bought or sold, and positions opened or closed, contribute only to TradesUSD. A change in value, not a return: dividends and cash are not part of it. The threshold comparisons are done by the store without rounding and are false when the start value is zero.
 
 ## ValueHistory
 

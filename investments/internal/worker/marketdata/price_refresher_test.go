@@ -404,15 +404,17 @@ func TestRefreshInstrumentFromLaterDateNeverOpensAGap(t *testing.T) {
 	assert.Equal(t, day(2), *result.From, "the start is clamped to the latest stored date")
 }
 
+var testRunTimes = []domain.ClockTime{{Hour: 6}, {Hour: 20, Minute: 30}}
+
 func TestRunTimesDescription(t *testing.T) {
-	assert.Equal(t, "06:00, 20:30 America/New_York", RunTimesDescription("America/New_York"))
+	assert.Equal(t, "06:00, 20:30 America/New_York", RunTimesDescription([]domain.ClockTime{{Hour: 6}, {Hour: 20, Minute: 30}}, "America/New_York"))
 }
 
 func TestRefreshTaskRunsTheJob(t *testing.T) {
 	fake := &jobStore{instruments: twoInstruments(), latest: new(day(2)), snapshot: domain.SnapshotResult{Date: day(2), Complete: true}}
-	task := RefreshTask(newJob(fake, &jobProvider{}))
+	task := RefreshTask(newJob(fake, &jobProvider{}), testRunTimes)
 
-	assert.Equal(t, runTimes, task.At)
+	assert.Equal(t, testRunTimes, task.At)
 	assert.Equal(t, runTimeout, task.Timeout)
 	require.NoError(t, task.Run(context.Background()))
 	assert.Equal(t, []domain.Date{day(2)}, fake.snapshotted)
@@ -421,6 +423,6 @@ func TestRefreshTaskRunsTheJob(t *testing.T) {
 func TestRefreshTaskReturnsTheJobError(t *testing.T) {
 	store := &jobStore{instruments: twoInstruments(), recordErr: errors.New("db down")}
 
-	assert.Error(t, RefreshTask(newJob(store, &jobProvider{})).Run(context.Background()))
+	assert.Error(t, RefreshTask(newJob(store, &jobProvider{}), testRunTimes).Run(context.Background()))
 	assert.Empty(t, store.snapshotted)
 }

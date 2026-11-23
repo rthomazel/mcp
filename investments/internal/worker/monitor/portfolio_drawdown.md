@@ -1,6 +1,5 @@
 # Constants
 
-portfolioDrawdownAt = 07:05 in the market timezone, after the snapshot-incomplete monitor.
 incrementKey = "increment_pct", the one setting.
 
 # Types
@@ -21,10 +20,6 @@ Build the monitor.
 ## PortfolioDrawdown.Name() string
 
 Return domain.Events.PortfolioDrawdown without domain.NotificationPrefix, portfolio.drawdown, the key of its entry in the monitors configuration.
-
-## PortfolioDrawdown.At() ClockTime
-
-Return portfolioDrawdownAt.
 
 ## PortfolioDrawdown.ValidateParams(params Params) error
 

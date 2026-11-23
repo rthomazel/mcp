@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/rthomazel/mcp/investments/internal/domain"
+	"github.com/rthomazel/mcp/investments/internal/duration"
 )
 
 // maxDrawdownLevels is the most levels one drawdown state reports.
@@ -111,6 +112,59 @@ LEFT JOIN LATERAL (
     FROM generate_series(1, LEAST(depth.levels, $2::numeric)::int) AS k
 ) lv ON true
 ORDER BY lv.k`
+
+	// highStateSQL compares the latest securities value with the highest earlier one, the earliest date winning a tie.
+	highStateSQL = `WITH ` + dailySeriesSQL + `, latest AS (
+    SELECT date, securities AS value FROM daily ORDER BY date DESC LIMIT 1
+), previous AS (
+    SELECT d.date, d.securities AS value FROM daily d, latest WHERE d.date < latest.date ORDER BY d.securities DESC, d.date LIMIT 1
+)
+SELECT latest.date, trim_scale(latest.value)::text,
+       previous.date, trim_scale(previous.value)::text,
+       COALESCE(latest.value > previous.value, false),
+       trim_scale(latest.value - previous.value)::text,
+       trim_scale((latest.value - previous.value) / NULLIF(previous.value, 0) * 100)::text
+FROM latest LEFT JOIN previous ON true`
+
+	// marketMovesCTE gives the daily market movement of each instrument held on two consecutive snapshot
+	// dates, the shares of the earlier date times the price change, for the dates after $1, the window start.
+	marketMovesCTE = `
+dates AS (SELECT DISTINCT date FROM snapshots),
+steps AS (SELECT date, LAG(date) OVER (ORDER BY date) AS prev FROM dates),
+moves AS (
+    SELECT cur.instrument_id, prv.quantity * (cur.close_price - prv.close_price) AS movement
+    FROM steps
+    JOIN snapshots prv ON prv.date = steps.prev
+    JOIN snapshots cur ON cur.date = steps.date AND cur.instrument_id = prv.instrument_id
+    WHERE steps.date > $1::date
+)`
+
+	// marketMovementSQL takes $1, the window start, and $2, the threshold in percent. The base is the last
+	// snapshot date on or before the start; no row without one. The threshold is compared by cross
+	// multiplication so no division rounds it, and never when the base value is zero.
+	marketMovementSQL = `WITH ` + marketMovesCTE + `, base AS (
+    SELECT date, SUM(market_value_usd) AS value FROM snapshots
+    WHERE date = (SELECT MAX(date) FROM snapshots WHERE date <= $1::date) GROUP BY date
+), latest AS (
+    SELECT date, SUM(market_value_usd) AS value FROM snapshots
+    WHERE date = (SELECT MAX(date) FROM snapshots) GROUP BY date
+), market AS (
+    SELECT COALESCE(SUM(movement), 0) AS total FROM moves
+)
+SELECT base.date, trim_scale(base.value)::text, latest.date, trim_scale(latest.value)::text,
+       trim_scale(market.total)::text,
+       trim_scale(latest.value - base.value - market.total)::text,
+       trim_scale(market.total / NULLIF(base.value, 0) * 100)::text,
+       base.value > 0 AND market.total * 100 >= $2::numeric * base.value,
+       base.value > 0 AND market.total * 100 <= -$2::numeric * base.value
+FROM base, latest, market`
+
+	// marketContributorsSQL takes $1, the window start, and lists the movement of each instrument, largest first.
+	marketContributorsSQL = `WITH ` + marketMovesCTE + `
+SELECT i.symbol, trim_scale(SUM(moves.movement))::text
+FROM moves JOIN instruments i ON i.id = moves.instrument_id
+GROUP BY i.symbol
+ORDER BY SUM(moves.movement) DESC, i.symbol`
 
 	netContributionsSQL = `
 SELECT COALESCE(SUM(amount), 0)::text FROM cash_transactions
@@ -275,4 +329,115 @@ func (s *Store) GetDrawdownState(ctx context.Context, increment domain.Decimal) 
 	}
 
 	return state, nil
+}
+
+// GetHighState returns the latest securities value against the highest earlier
+// value. A change in value, not a return.
+func (s *Store) GetHighState(ctx context.Context) (*domain.HighState, error) {
+	var (
+		state                                          domain.HighState
+		latestDate, previousDate                       sql.NullTime
+		previousValue, increaseUSD, increasePercentage sql.NullString
+	)
+
+	err := s.db.QueryRowxContext(ctx, highStateSQL).Scan(&latestDate, &state.ValueUSD,
+		&previousDate, &previousValue, &state.NewHigh, &increaseUSD, &increasePercentage)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil //nolint:nilnil // no snapshots
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("reading high state: %w", err)
+	}
+
+	state.Date = latestDate.Time
+
+	if previousDate.Valid {
+		state.Previous = &domain.Extreme{Date: previousDate.Time, ValueUSD: domain.Decimal(previousValue.String)}
+		state.IncreaseUSD, state.IncreasePercent = domain.Decimal(increaseUSD.String), domain.Decimal(increasePercentage.String)
+	}
+
+	return &state, nil
+}
+
+// GetMarketMovement returns the market movement over window ending at the
+// latest snapshot date, and the instruments that contributed most.
+func (s *Store) GetMarketMovement(ctx context.Context, window duration.Duration, threshold domain.Decimal) (*domain.MarketMovement, error) {
+	if threshold.Sign() <= 0 {
+		return nil, fmt.Errorf("%w: the threshold %q must be positive", domain.ErrInvalidInput, threshold)
+	}
+
+	var latest sql.NullTime
+	if err := s.db.GetContext(ctx, &latest, `SELECT MAX(date) FROM snapshots`); err != nil {
+		return nil, fmt.Errorf("reading latest snapshot date: %w", err)
+	}
+
+	if !latest.Valid {
+		return nil, nil //nolint:nilnil // no snapshots
+	}
+
+	start := window.Before(latest.Time)
+
+	var (
+		movement domain.MarketMovement
+		percent  sql.NullString
+	)
+
+	err := s.db.QueryRowxContext(ctx, marketMovementSQL, start, string(threshold)).Scan(
+		&movement.StartDate, &movement.StartValueUSD, &movement.EndDate, &movement.EndValueUSD,
+		&movement.MarketUSD, &movement.TradesUSD, &percent, &movement.AtLeastUp, &movement.AtLeastDown)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil //nolint:nilnil // no snapshot on or before the window start
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("reading market movement: %w", err)
+	}
+
+	movement.MarketPercent = decimalPtr(percent)
+
+	if err := s.addContributors(ctx, start, &movement); err != nil {
+		return nil, err
+	}
+
+	return &movement, nil
+}
+
+func (s *Store) addContributors(ctx context.Context, start domain.Date, movement *domain.MarketMovement) error {
+	var all []domain.Contributor
+
+	rows, err := s.db.QueryxContext(ctx, marketContributorsSQL, start)
+	if err != nil {
+		return fmt.Errorf("reading market movement contributors: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var contributor domain.Contributor
+		if err := rows.Scan(&contributor.Symbol, &contributor.MovementUSD); err != nil {
+			return fmt.Errorf("scanning contributor: %w", err)
+		}
+
+		all = append(all, contributor)
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("reading market movement contributors: %w", err)
+	}
+
+	movement.Gainers, movement.Losers = []domain.Contributor{}, []domain.Contributor{}
+
+	for _, contributor := range all {
+		if contributor.MovementUSD.Sign() > 0 && len(movement.Gainers) < domain.MaxContributors {
+			movement.Gainers = append(movement.Gainers, contributor)
+		}
+	}
+
+	for i := len(all) - 1; i >= 0; i-- {
+		if all[i].MovementUSD.Sign() < 0 && len(movement.Losers) < domain.MaxContributors {
+			movement.Losers = append(movement.Losers, all[i])
+		}
+	}
+
+	return nil
 }

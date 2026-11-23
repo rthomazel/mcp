@@ -1,6 +1,10 @@
 package domain
 
-import "context"
+import (
+	"context"
+
+	"github.com/rthomazel/mcp/investments/internal/duration"
+)
 
 // GenericStore is the generic persistence interface: instruments, the ledger and the
 // read-only reports. Related methods live in the narrower stores below. Each
@@ -30,6 +34,14 @@ type GenericStore interface {
 	// when its current stay there began. Returns ErrInvalidInput for an
 	// increment that is not positive, and an empty state without snapshots.
 	GetDrawdownState(ctx context.Context, increment Decimal) (DrawdownState, error)
+	// GetHighState returns the latest securities value against the highest
+	// earlier value, nil without snapshots.
+	GetHighState(ctx context.Context) (*HighState, error)
+	// GetMarketMovement returns the securities value change over window ending
+	// at the latest snapshot date that prices explain, nil when there is no
+	// snapshot on or before the window's start. Returns ErrInvalidInput for a
+	// threshold that is not positive.
+	GetMarketMovement(ctx context.Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
 	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
 	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
 	// GetPortfolio values active positions at real closes as of date, or today
@@ -104,6 +116,9 @@ type EventStore interface {
 	// and gives up at the configured maximum failures (error log,
 	// notification.failed event). Returns ErrInvalidInput or ErrEventNotFound.
 	SaveOutcome(ctx context.Context, id int64, outcome EventOutcome) error
+	// Latest returns the most recently recorded event of the type, nil when
+	// there is none.
+	Latest(ctx context.Context, eventType string) (*Event, error)
 	// Remove deletes an event given up on or expired. Returns
 	// ErrEventNotFound or ErrEventNotRemovable.
 	Remove(ctx context.Context, id int64) error

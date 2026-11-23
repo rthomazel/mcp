@@ -23,6 +23,8 @@ type EventTypes struct {
 	SnapshotIncomplete string
 	NotificationFailed string
 	PortfolioDrawdown  string
+	PortfolioATH       string
+	PortfolioMovement  string
 }
 
 // Events holds the event type names, dot-separated lowercase words.
@@ -30,6 +32,8 @@ var Events = EventTypes{
 	SnapshotIncomplete: "notification.snapshot.incomplete",
 	NotificationFailed: "notification.failed",
 	PortfolioDrawdown:  "notification.portfolio.drawdown",
+	PortfolioATH:       "notification.portfolio.ath",
+	PortfolioMovement:  "notification.portfolio.movement",
 }
 
 // NotificationPrefix starts the type of every event that produces a notification.
@@ -88,6 +92,34 @@ type PortfolioDrawdownData struct {
 	ValueUSD        Decimal `json:"value_usd"`
 	HighDate        Date    `json:"high_date"`
 	HighValueUSD    Decimal `json:"high_value_usd"`
+}
+
+// PortfolioATHData is the payload of Events.PortfolioATH. The subject of the
+// event is the date of the high.
+type PortfolioATHData struct {
+	Date                 Date    `json:"date"`
+	ValueUSD             Decimal `json:"value_usd"`
+	PreviousHighDate     Date    `json:"previous_high_date"`
+	PreviousHighValueUSD Decimal `json:"previous_high_value_usd"`
+	IncreaseUSD          Decimal `json:"increase_usd"`
+	IncreasePercent      Decimal `json:"increase_percent"`
+	LastAnnouncedDate    *Date   `json:"last_announced_date,omitempty"`
+}
+
+// PortfolioMovementData is the payload of Events.PortfolioMovement. The
+// subject of the event is the date, an at sign and the direction, up or down.
+type PortfolioMovementData struct {
+	Date          Date          `json:"date"`
+	Direction     string        `json:"direction"`
+	Window        string        `json:"window"`
+	StartDate     Date          `json:"start_date"`
+	StartValueUSD Decimal       `json:"start_value_usd"`
+	EndValueUSD   Decimal       `json:"end_value_usd"`
+	MarketUSD     Decimal       `json:"market_usd"`
+	MarketPercent Decimal       `json:"market_percent"`
+	TradesUSD     Decimal       `json:"trades_usd"`
+	Gainers       []Contributor `json:"gainers"`
+	Losers        []Contributor `json:"losers"`
 }
 
 // NotificationFailedData is the payload of Events.NotificationFailed. It

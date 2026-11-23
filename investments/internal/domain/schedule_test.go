@@ -158,3 +158,29 @@ func TestRunOnceGivesTheTaskItsTimeout(t *testing.T) {
 
 	assert.True(t, deadlineSet)
 }
+
+func TestParseClockTimes(t *testing.T) {
+	for text, want := range map[string][]ClockTime{
+		"07:00":           {{Hour: 7}},
+		"7:05":            {{Hour: 7, Minute: 5}},
+		"20:30,06:00":     {{Hour: 6}, {Hour: 20, Minute: 30}},
+		" 06:00 , 20:30 ": {{Hour: 6}, {Hour: 20, Minute: 30}},
+		"00:00,23:59":     {{}, {Hour: 23, Minute: 59}},
+	} {
+		got, err := ParseClockTimes(text)
+
+		require.NoError(t, err, text)
+		assert.Equal(t, want, got, text)
+	}
+
+	for _, text := range []string{"", "7", "24:00", "07:60", "7am", "07:00;08:00", "07:00,", "07:00,07:00", "-1:00", "07:00:00"} {
+		_, err := ParseClockTimes(text)
+
+		assert.ErrorIs(t, err, ErrInvalidInput, text)
+	}
+}
+
+func TestClockTimeString(t *testing.T) {
+	assert.Equal(t, "07:05", ClockTime{Hour: 7, Minute: 5}.String())
+	assert.Equal(t, "20:30", ClockTime{Hour: 20, Minute: 30}.String())
+}

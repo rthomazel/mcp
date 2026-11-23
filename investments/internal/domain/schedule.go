@@ -1,9 +1,12 @@
 package domain
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -12,6 +15,44 @@ import (
 type ClockTime struct {
 	Hour   int
 	Minute int
+}
+
+// String is the time as HH:MM.
+func (c ClockTime) String() string { return fmt.Sprintf("%02d:%02d", c.Hour, c.Minute) }
+
+// ParseClockTime reads a 24 hour HH:MM time of day.
+func ParseClockTime(text string) (ClockTime, error) {
+	parsed, err := time.Parse("15:04", strings.TrimSpace(text))
+	if err != nil {
+		return ClockTime{}, fmt.Errorf("%w: %q is not a time of day written HH:MM", ErrInvalidInput, text)
+	}
+
+	return ClockTime{Hour: parsed.Hour(), Minute: parsed.Minute()}, nil
+}
+
+// ParseClockTimes reads a comma separated list of HH:MM times, returned
+// ascending. An empty list or a repeated time is invalid.
+func ParseClockTimes(text string) ([]ClockTime, error) {
+	var times []ClockTime
+
+	for part := range strings.SplitSeq(text, ",") {
+		clock, err := ParseClockTime(part)
+		if err != nil {
+			return nil, err
+		}
+
+		times = append(times, clock)
+	}
+
+	slices.SortFunc(times, func(a, b ClockTime) int { return cmp.Or(cmp.Compare(a.Hour, b.Hour), cmp.Compare(a.Minute, b.Minute)) })
+
+	for i := 1; i < len(times); i++ {
+		if times[i] == times[i-1] {
+			return nil, fmt.Errorf("%w: the time %s is listed more than once", ErrInvalidInput, times[i])
+		}
+	}
+
+	return times, nil
 }
 
 // ScheduledTask is work that runs daily at fixed times of day.

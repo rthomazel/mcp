@@ -37,6 +37,10 @@ Read the setting with Text, then parse it with domain.ParseDecimal. A number wri
 
 - **2.** return the unit-is-missing error.
 
+## Params.DurationOr(key string, fallback string) (duration.Duration, error)
+
+Return the setting as Params.Duration reads it, or the fallback text parsed with the key as its setting name when the setting is missing. The fallbacks are the monitors' documented defaults.
+
 ## Params.Mappings(key string) ([]Params, bool, error)
 
 Return the setting as a non-empty list of mappings, each as Params so nested keys are checked with the same accessors. Another shape or an empty list is an error naming the setting and, for an item, its position.

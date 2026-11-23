@@ -1,7 +1,3 @@
-# Constants
-
-snapshotIncompleteAt = 07:00 in the market timezone, an hour after the last price refresh run of the day.
-
 # Types
 
 ## SnapshotIncomplete
@@ -20,10 +16,6 @@ Build the monitor.
 ## SnapshotIncomplete.Name() string
 
 Return domain.Events.SnapshotIncomplete without domain.NotificationPrefix, snapshot.incomplete, the key of its entry in the monitors configuration.
-
-## SnapshotIncomplete.At() ClockTime
-
-Return snapshotIncompleteAt.
 
 ## SnapshotIncomplete.ValidateParams(params Params) error
 

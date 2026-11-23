@@ -3,9 +3,8 @@
 ## Monitor
 
 1. Name() string
-2. At() domain.ClockTime
-3. ValidateParams(params Params) error
-4. Run(ctx Context, params Params) error
+2. ValidateParams(params Params) error
+3. Run(ctx Context, params Params) error
 
 A job that judges a condition on the current state and records an event when it holds. Run records at most one event for each subject, and knows nothing about how events are handled. A monitor does not know how or when other jobs ran, only what state they left.
 
@@ -19,11 +18,11 @@ Return an error naming any setting that is unknown, missing when required or mal
 
 # Functions
 
-## Task(monitor Monitor, timeout Duration, loader *fileloader.Loader[Config]) domain.ScheduledTask
+## Task(monitor Monitor, at domain.ClockTime, timeout Duration, loader *fileloader.Loader[Config]) domain.ScheduledTask
 
-Return the task named after the monitor, run daily at the monitor's At with the given timeout, whose run is run for the monitor. The timeout is the server configuration's.
+Return the task named after the monitor, run daily at the given time of day with the given timeout, whose run is run for the monitor. The time and the timeout are the server configuration's, the same time for every monitor, and a monitor does not know when it runs.
 
-Scheduling is domain.Scheduler's: a failing monitor never stops its schedule or the other tasks, and there is no run at startup. If the server was down at the monitor's time, the next scheduled time judges the state then. Every monitor is scheduled whether or not it is enabled.
+Scheduling is domain.Scheduler's: a failing monitor never stops its schedule or the other tasks, and there is no run at startup. If the server was down at the run time, the next scheduled time judges the state then. Every monitor is scheduled whether or not it is enabled.
 
 ## run(ctx Context, monitor Monitor, loader *fileloader.Loader[Config]) error
 

@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
 // Config is the server configuration. Every tunable has a default, so only the
@@ -25,6 +27,10 @@ type Config struct {
 
 	// MarketTimezone is the IANA zone of the market day, shared by the price refresh job, the monitors and today's date.
 	MarketTimezone string
+	// PriceRefreshRunTimes are the times of day the price refresh job runs, ascending, in the market timezone.
+	PriceRefreshRunTimes []domain.ClockTime
+	// MonitorsRunTime is the time of day every monitor runs, in the market timezone.
+	MonitorsRunTime domain.ClockTime
 	// MaxHistoryPoints is the most points one value history query returns.
 	MaxHistoryPoints int
 
@@ -55,6 +61,8 @@ func Defaults() Config {
 		QueryTimeout:         30 * time.Second,
 		StalePriceDays:       5,
 		MarketTimezone:       "America/New_York",
+		PriceRefreshRunTimes: []domain.ClockTime{{Hour: 6}, {Hour: 20, Minute: 30}},
+		MonitorsRunTime:      domain.ClockTime{Hour: 7},
 		MaxHistoryPoints:     1000,
 		EventMaxFailures:     10,
 		EventBackoffBase:     30 * time.Second,
@@ -87,6 +95,10 @@ func Load() (*Config, error) {
 
 	if v := os.Getenv("INVESTMENTS_MCP_MARKET_TIMEZONE"); v != "" {
 		cfg.MarketTimezone = v
+	}
+
+	if err := readRunTimes(&cfg); err != nil {
+		return nil, err
 	}
 
 	durations := []struct {
@@ -126,6 +138,30 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// readRunTimes overrides the price refresh and monitor run times with the
+// HH:MM values of their variables, when set.
+func readRunTimes(cfg *Config) error {
+	if v := os.Getenv("INVESTMENTS_MCP_PRICE_REFRESH_RUN_TIMES"); v != "" {
+		times, err := domain.ParseClockTimes(v)
+		if err != nil {
+			return fmt.Errorf("parsing INVESTMENTS_MCP_PRICE_REFRESH_RUN_TIMES: %w", err)
+		}
+
+		cfg.PriceRefreshRunTimes = times
+	}
+
+	if v := os.Getenv("INVESTMENTS_MCP_MONITORS_RUN_TIME"); v != "" {
+		clock, err := domain.ParseClockTime(v)
+		if err != nil {
+			return fmt.Errorf("parsing INVESTMENTS_MCP_MONITORS_RUN_TIME: %w", err)
+		}
+
+		cfg.MonitorsRunTime = clock
+	}
+
+	return nil
 }
 
 // readDuration overrides *field with the positive duration in the variable, when set.
