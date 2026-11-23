@@ -18,7 +18,8 @@ since. 2026-11-23 added structured settings and the instrument concept for the m
 watch groups and lists of instruments.
 
 All monitors run daily at 7:00 AM Eastern. They read the state the 6:00 AM price refresh
-left and do not depend on one another, so they need no order.
+left and do not depend on one another, so they need no order. A monitor may space its own
+announcements with an interval setting, but it is still scheduled and judged daily.
 
 ## Intent
 

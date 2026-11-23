@@ -21,12 +21,12 @@ instrument selection (list of tickers, or held). See the monitors configuration 
 
 Refactor the portfolio drawdown monitor into the portfolio extremes design, with the drawdown
 and the new high sharing the value series, and run it at 7:00 instead of 7:05. Add the portfolio
-high monitor with the spacing lookup over earlier events. No compatibility with the old drawdown
+all-time high (ATH) monitor with the spacing lookup over earlier events. No compatibility with the old drawdown
 code is needed. See the portfolio extremes spec.
 
 ## [ ] 3. Portfolio movement
 
-Add the market movement calculation in SQL and the monitor. See the portfolio movement spec.
+Add the market movement calculation over a window in SQL, the window and interval settings, and the monitor. See the portfolio movement spec.
 
 ## [ ] 4. Allocation drift
 
@@ -35,14 +35,14 @@ allocation drift spec.
 
 ## [ ] 5. Price volatility
 
-Add the daily move and volatility calculation over adjusted closes and the monitor. See the
+Add the window move and volatility calculation over adjusted closes, the window and interval settings, and the monitor. See the
 price volatility spec.
 
 ## [ ] 6. Price target
 
 Add the monitor over the latest daily range. See the price target spec.
 
-## [ ] 7. Instrument drawdown and instrument high
+## [ ] 7. Instrument drawdown and instrument all-time high
 
 Add the per-instrument series, levels, crossings and spacing, sharing code with the portfolio
 monitors where the models allow. Depends on tasks 1 and 2, whose extremes engine it reuses. See the instrument extremes spec.

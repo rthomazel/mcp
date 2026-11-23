@@ -7,11 +7,11 @@ created: 2026-11-23
 agents: claude
 ---
 
-# Monitors: instrument drawdown and instrument high
+# Monitors: instrument drawdown and instrument all-time high
 
 ## Description
 
-The instrument counterparts of the portfolio drawdown and portfolio high monitors, built on
+The instrument counterparts of the portfolio drawdown and portfolio all-time high monitors, built on
 the same monitor mechanism and configured in the monitors configuration. They watch the
 price series of chosen instruments instead of the securities value, with the same rules,
 so one description covers both. They are two monitors with separate entries because an
@@ -25,7 +25,7 @@ is never a fall. An all-time high is the highest value of the series, the earlie
 winning a tie.
 
 **Drawdown, increment, level, crossing, new high and spacing.** As defined for the portfolio
-drawdown and portfolio high monitors, applied to an instrument's series instead of the
+drawdown and portfolio all-time high monitors, applied to an instrument's series instead of the
 securities value. A level is announced per instrument, and a crossing and a spacing are
 tracked per instrument.
 
@@ -53,10 +53,10 @@ already below levels announces them, one message each.
 The message names the instrument, the level, the drawdown and its date, the date of the
 high, the crossing date, and the adjusted close at the high and now.
 
-### Instrument high
+### Instrument all-time high
 
-- When the latest date is a new high of the instrument and no instrument high event exists
-  for it within the spacing days before that date, it records one instrument high event.
+- When the latest date is a new high of the instrument and no instrument ATH event exists
+  for it within the spacing days before that date, it records one instrument ATH event.
   The subject of the event is the instrument and the date.
 - It records nothing otherwise, and an instrument's first price is not a new high.
 
@@ -66,15 +66,15 @@ instrument.
 
 ### Configuration
 
-The monitors are named instrument.drawdown and instrument.high and record
-notification.instrument.drawdown and notification.instrument.high.
+The monitors are named instrument.drawdown and instrument.ath and record
+notification.instrument.drawdown and notification.instrument.ath.
 
 ```yaml
 monitors:
   instrument.drawdown:
     increment_pct: "5"
     instruments: [QQQ, VOO]      # a list of tickers, or: held
-  instrument.high:
+  instrument.ath:
     min_days_between: 15         # optional, 15 by default
     instruments: held
 ```

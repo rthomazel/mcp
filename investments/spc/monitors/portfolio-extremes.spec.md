@@ -7,7 +7,7 @@ created: 2026-11-23
 agents: claude
 ---
 
-# Monitors: portfolio drawdown and portfolio high
+# Monitors: portfolio drawdown and portfolio all-time high
 
 ## Description
 
@@ -41,6 +41,8 @@ crossing.
 
 **New high.** The latest date's value is strictly greater than the value of every earlier date.
 The first snapshot has nothing before it and is not a new high.
+
+**ATH.** The abbreviation of all-time high, used in the name of the monitor and its event.
 
 **Spacing.** The number of days that must have passed since the date of the last announced high
 before another is announced.
@@ -88,10 +90,10 @@ date, the date of the high and the crossing date, and gives the securities value
 the current securities value. Only the message is rounded; the event keeps the exact figure. The
 wording is the renderer's.
 
-### Portfolio high
+### Portfolio all-time high
 
-- When the latest date is a new high and no portfolio high event exists whose date is within the
-  spacing days before it, it records one portfolio high event. The subject of the event is the
+- When the latest date is a new high and no portfolio ATH event exists whose date is within the
+  spacing days before it, it records one portfolio ATH event. The subject of the event is the
   date of the high.
 - Otherwise it records nothing. A high that the spacing suppresses is not announced later by
   itself; only a date that is a new high when judged is announced.
@@ -113,15 +115,15 @@ money moved in and out is a separate, later feature.
 
 ### Configuration
 
-The monitors are named portfolio.drawdown and portfolio.high and record
-notification.portfolio.drawdown and notification.portfolio.high, routed by the notifications
+The monitors are named portfolio.drawdown and portfolio.ath and record
+notification.portfolio.drawdown and notification.portfolio.ath, routed by the notifications
 configuration like any other event.
 
 ```yaml
 monitors:
   portfolio.drawdown:
     increment_pct: "3"           # required, a percent greater than zero, written as text
-  portfolio.high:
+  portfolio.ath:
     min_days_between: 15         # optional, 15 by default
 ```
 
