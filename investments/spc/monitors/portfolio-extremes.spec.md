@@ -44,7 +44,7 @@ The first snapshot has nothing before it and is not a new high.
 
 **ATH.** The abbreviation of all-time high, used in the name of the monitor and its event.
 
-**Interval.** The least number of days between two announced highs, measured from the date of the
+**Interval.** The least time, a duration, between two announced highs, measured from the date of the
 last announced high to the latest date. The same setting and meaning as in the portfolio movement
 and price volatility monitors.
 
@@ -93,8 +93,8 @@ wording is the renderer's.
 
 ### Portfolio all-time high
 
-- When the latest date is a new high and no portfolio ATH event exists dated fewer than interval
-  days before it, it records one portfolio ATH event. The subject of the event is the date of the
+- When the latest date is a new high and no portfolio ATH event exists dated less than the
+  interval before it, it records one portfolio ATH event. The subject of the event is the date of the
   high.
 - Otherwise it records nothing. A high that the interval suppresses is not announced later by
   itself; only a date that is a new high when judged is announced.
@@ -125,12 +125,12 @@ monitors:
   portfolio.drawdown:
     increment_pct: "3"           # required, a percent greater than zero, written as text
   portfolio.ath:
-    interval_days: 15            # optional, 15 by default
+    interval: 15d                # optional, 15 days by default
 ```
 
 - A missing or non-positive increment makes the file invalid.
-- `interval_days` is a whole number of days of at least 1, which may be written as a plain
-  number. An interval of 1 announces every new high.
+- `interval` is a duration as the duration spec defines it, written with a unit, so a bare number
+  is invalid. An interval of 1d announces every new high.
 - Any other setting is invalid, whether or not the entry is disabled.
 - With no entry a monitor does not run.
 
@@ -179,8 +179,9 @@ monitors:
   one records an event.
 - A value equal to the previous high, or below it, records no high event; the first snapshot
   alone records none; running again for the same date records none.
-- With an interval of 1, every date that is a new high records an event.
-- An interval below 1 or non-numeric makes the monitors file invalid.
+- With an interval of 1d, every date that is a new high records an event.
+- An interval that is not a valid duration, such as a bare number or zero, makes the monitors file
+  invalid, and at server start stops the server.
 - The messages name the dates and amounts described above and say the figure is a change in
   value and not a return.
 

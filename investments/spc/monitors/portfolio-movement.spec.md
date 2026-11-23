@@ -25,26 +25,26 @@ position held on the earlier date of the shares held then multiplied by the chan
 instrument's price. Shares bought or sold on the later date, or positions opened or closed on
 it, contribute nothing for that day.
 
-**Window.** A number of dates of the snapshot series, counted back from the latest date, so
-weekends and holidays are not counted. The market movement over a window is the sum of the
-daily market movements of the days it spans, in dollars; as a percent it is divided by the
-securities value on the date before the window starts. A window of one day is the movement of
-the latest date alone.
+**Window.** A duration, one day by default, counted back from the latest snapshot date as the
+duration spec says. The market movement over a window is the sum of the daily market movements of
+the snapshot dates after the window's start date through the latest date, in dollars; as a percent
+it is divided by the securities value on the last snapshot date on or before the start date. With
+a window of one day it is the movement of the latest date alone.
 
 It is a measure of price movement on what was held, not an investment return: dividends and
 cash are not part of it, and percentages of different windows are not chained. It is the same
 measure the weekly summary idea intends for contributors, winners and losers.
 
-**Interval.** The least number of days between two announcements of this monitor, which makes
-it act as if it ran every that many days. It is measured between dates, from the date of the
-last event this monitor recorded to the latest date.
+**Interval.** The least time between two announcements of this monitor, a duration, one day by
+default, which makes it act as if it ran that often. It is measured from the date of the last event
+this monitor recorded: nothing is recorded until the latest date is at least the interval after it.
 
 ## Behavior
 
 The monitor runs daily at 7:00 AM Eastern and judges the window ending at the latest completed
 snapshot date.
 
-- When fewer days than the interval have passed since the date of its last event, it records
+- When less time than the interval has passed since the date of its last event, it records
   nothing.
 - When the market movement percent over the window is at least the configured threshold in a
   direction the monitor watches, it records one portfolio movement event, unless one already
@@ -72,23 +72,24 @@ monitors:
   portfolio.movement:
     variation_pct: "3"
     direction: both              # optional: up, down or both; both by default
-    window_days: 1               # optional, 1 by default
-    interval_days: 1             # optional, 1 by default
+    window: 1d                   # optional, 1 day by default
+    interval: 1d                 # optional, 1 day by default
 ```
 
 - `variation_pct` is required, a positive decimal written as quoted text.
 - `direction` is up, down or both, both when omitted.
-- `window_days` and `interval_days` are whole numbers of at least 1, which may be written as plain
-  numbers.
+- `window` and `interval` are durations as the duration spec defines them, written with a unit,
+  so a bare number is invalid.
 - Any other setting is invalid, whether or not the entry is disabled.
 
 ## Acceptance criteria
 
 - With the defaults, a day on which the held shares gain 3.4 percent from prices, with a
   threshold of 3, records one event for the date and direction; running again records nothing.
-- With a window of 3, the market movements of the last three dates are added and divided by the
-  value before them; a 3.2 percent total records an event even when no single day reached 3.
-- With a window of 3 and an interval of 3, the same move is announced once, and not again on the
+- With a window of 3d, the market movements of the snapshot dates in the last three calendar days
+  are added and divided by the value on the last snapshot on or before the day the window starts;
+  a 3.2 percent total records an event even when no single day reached 3.
+- With a window of 3d and an interval of 3d, the same move is announced once, and not again on the
   next two days while the window still contains it.
 - A day on which the securities value rises 5 percent only because shares were bought records
   nothing; a day on which a sale lowers the value without a price move records nothing.
@@ -96,8 +97,9 @@ monitors:
   start of the day.
 - A fall of the same size in an unwatched direction records nothing.
 - The message splits the value change into market and trades.
-- A missing, zero or negative threshold, a window or interval below 1, a non-numeric window or
-  an unknown direction makes the monitors file invalid.
+- A missing, zero or negative threshold, a window or interval that is not a valid duration,
+  such as a bare number or zero, or an unknown direction makes the monitors file invalid, and at server
+  start stops the server.
 - With no enabled entry, nothing is recorded.
 
 ## Decisions

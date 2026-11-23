@@ -48,8 +48,9 @@ settings, which belong to that monitor alone.
 does not know. A value is a scalar, a list, or a list of mappings, as the monitor needs: a
 list of instruments, or a list of groups each with its own keys. Numbers that must stay
 exact, such as a percentage threshold or a price, are written as quoted text and read as
-decimals, never as floating point. Counts, such as a number of days, are plain whole
-numbers. Nested keys are validated by the monitor in the same way, and an unknown key at any
+decimals, never as floating point. A span of time, such as a window or an interval, is a duration
+written with a unit, such as 5 days or 3mo, as the duration spec defines; a bare number is invalid.
+Nested keys are validated by the monitor in the same way, and an unknown key at any
 depth is invalid.
 
 **Instrument.** A monitor names an instrument by its ticker. The file loader cannot see the
@@ -113,9 +114,10 @@ there, applied to this file alone:
 - Validation is all or nothing: one invalid entry makes the file invalid.
 - A running file that an edit makes invalid keeps serving its last valid content, and an
   error is logged on every run while it is invalid.
-- When the server starts with an invalid file and there is no earlier valid content, a
-  monitor cannot know whether it is enabled, so its run fails and is logged as a failed
-  monitor, and the next scheduled time tries again.
+- When the server starts with a monitors file that is invalid, the server does not start and
+  reports the error, so a mistake such as a bad duration is found when it is made and not at the
+  7:00 AM run. A path that is not set, and so no file, is not an error. The notifications file
+  keeps its own rule.
 - An invalid monitors file never affects the notifications file, and the reverse: each has
   its own last valid content.
 - The location of each file is separate server configuration, and a path that is not set
@@ -148,6 +150,9 @@ announcing an incomplete snapshot until the operator adds the entry shown above.
 
 ## Decisions
 
+- An invalid monitors file stops the server at start, so a mistake is found when it is made. A
+  running server keeps its last valid content on a bad edit, because stopping a working monitor
+  for a typo would be worse.
 - Two files: monitors and notifications are separate concerns, each with its own version,
   last valid content and validation, so an error in one never freezes the other.
 - Monitor settings are written beside `disabled` in the entry, not under a nested key,
@@ -176,8 +181,7 @@ announcing an incomplete snapshot until the operator adds the entry shown above.
   non-boolean disabled, a repeated key, or settings the monitor rejects is invalid, whether
   or not the entry is disabled.
 - An edit that makes a running file invalid keeps the last valid content in use and logs an
-  error on every run; at startup with no earlier content the monitor run fails and is
-  logged.
+  error on every run; a monitors file that is invalid at startup stops the server with the error.
 - An invalid monitors file leaves notification delivery unaffected, and an invalid
   notifications file leaves monitors unaffected.
 - A monitor's event is recorded and stays in the outbox when its event type has no

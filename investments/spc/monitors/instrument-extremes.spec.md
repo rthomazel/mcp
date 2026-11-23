@@ -56,7 +56,7 @@ high, the crossing date, and the adjusted close at the high and now.
 ### Instrument all-time high
 
 - When the latest date is a new high of the instrument and no instrument ATH event exists
-  for it fewer than interval days before that date, it records one instrument ATH event.
+  for it dated less than the interval before that date, it records one instrument ATH event.
   The subject of the event is the instrument and the date.
 - It records nothing otherwise, and an instrument's first price is not a new high.
 
@@ -75,14 +75,14 @@ monitors:
     increment_pct: "5"
     instruments: [QQQ, VOO]      # a list of tickers, or: held
   instrument.ath:
-    interval_days: 15            # optional, 15 by default
+    interval: 15d                # optional, 15 days by default
     instruments: held
 ```
 
 - `increment_pct` is required for instrument.drawdown, a positive decimal written as quoted
   text.
-- `interval_days` is a whole number of at least 1, which may be written as a plain
-  number.
+- `interval` is a duration as the duration spec defines it, written with a unit, so a bare number
+  is invalid.
 - `instruments` is required: the word held, or a non-empty list of tickers without repeats.
 - Any other setting is invalid, whether or not the entry is disabled. A ticker that is not
   registered is logged as a warning on each run.
@@ -98,7 +98,7 @@ monitors:
   spaced independently.
 - With the selection held, an instrument bought later is watched from its next run, and one
   sold is not.
-- A missing or non-positive increment, an empty list, a repeated ticker, an interval below 1
+- A missing or non-positive increment, an empty list, a repeated ticker, an interval that is not a valid duration
   or an unknown key makes the monitors file invalid.
 - With no enabled entry, nothing is recorded.
 
