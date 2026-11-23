@@ -12,16 +12,17 @@ agents: claude
 Each task is reviewed through its models before code. Specs are in this directory; technical
 design belongs in the models.
 
-## [ ] 1. Structured settings and the 7:00 schedule
+## [ ] 1. Structured settings
 
 Amend the monitors configuration model and loader for list and mapping settings and the
-instrument selection (list of tickers, or held). Move the portfolio drawdown monitor from 7:05
-to 7:00 and update its model. See the monitors configuration and portfolio drawdown specs.
+instrument selection (list of tickers, or held). See the monitors configuration spec.
 
-## [ ] 2. Portfolio high
+## [ ] 2. Portfolio extremes
 
-Add the monitor, with the spacing lookup over earlier events. Reads the same value series as
-the drawdown monitor. See the portfolio high spec.
+Refactor the portfolio drawdown monitor into the portfolio extremes design, with the drawdown
+and the new high sharing the value series, and run it at 7:00 instead of 7:05. Add the portfolio
+high monitor with the spacing lookup over earlier events. No compatibility with the old drawdown
+code is needed. See the portfolio extremes spec.
 
 ## [ ] 3. Portfolio movement
 
@@ -44,7 +45,7 @@ Add the monitor over the latest daily range. See the price target spec.
 ## [ ] 7. Instrument drawdown and instrument high
 
 Add the per-instrument series, levels, crossings and spacing, sharing code with the portfolio
-monitors where the models allow. Depends on tasks 1 and 2. See the instrument extremes spec.
+monitors where the models allow. Depends on tasks 1 and 2, whose extremes engine it reuses. See the instrument extremes spec.
 
 ## [ ] 8. Notification renderers and routing
 

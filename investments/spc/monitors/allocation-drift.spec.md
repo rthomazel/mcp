@@ -116,4 +116,4 @@ monitors:
 - Related: 2026-11-21-notifications, the outbox and monitor mechanism this uses.
 - Related: 2026-11-22-monitors-configuration, the file that turns it on and sets its groups.
 - Related: 2026-11-13-investments-mcp, the allocation concept.
-- Related: 2026-11-22-monitor-portfolio-drawdown, whose crossing technique the stay start follows.
+- Related: 2026-11-23-monitor-portfolio-extremes, whose crossing technique the stay start follows.

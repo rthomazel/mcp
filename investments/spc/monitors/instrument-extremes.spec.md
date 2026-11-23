@@ -118,5 +118,4 @@ monitors:
 
 - Related: 2026-11-21-notifications, the outbox and monitor mechanism this uses.
 - Related: 2026-11-22-monitors-configuration, the file that turns them on.
-- Related: 2026-11-22-monitor-portfolio-drawdown, whose levels and crossings they follow.
-- Related: 2026-11-23-monitor-portfolio-high, whose spacing they follow.
+- Related: 2026-11-23-monitor-portfolio-extremes, whose levels, crossings and spacing they follow.

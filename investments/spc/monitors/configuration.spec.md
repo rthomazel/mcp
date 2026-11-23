@@ -188,8 +188,8 @@ announcing an incomplete snapshot until the operator adds the entry shown above.
 - Related: 2026-11-21-notifications, the monitor mechanism and the configuration file this
   one follows.
 - Related: 2026-11-21-monitor-snapshot-incomplete, the monitor that gains an entry name.
-- Related: 2026-11-22-monitor-portfolio-drawdown, the first monitor with settings.
+- Related: 2026-11-23-monitor-portfolio-extremes, the first monitor with settings.
 - Related: 2026-11-23-monitor-allocation-drift, 2026-11-23-monitor-price-volatility,
-  2026-11-23-monitor-portfolio-movement, 2026-11-23-monitor-portfolio-high,
+  2026-11-23-monitor-portfolio-movement,
   2026-11-23-monitor-instrument-extremes and 2026-11-23-monitor-price-target, which use
   structured settings.
