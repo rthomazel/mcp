@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"maps"
-	"slices"
 	"strings"
 	"time"
 
@@ -36,11 +34,7 @@ func (m *SnapshotIncomplete) At() domain.ClockTime { return snapshotIncompleteAt
 
 // ValidateParams rejects any setting; the monitor takes none.
 func (m *SnapshotIncomplete) ValidateParams(params Params) error {
-	if len(params) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("unknown setting %q", slices.Sorted(maps.Keys(params))[0])
+	return params.Unknown()
 }
 
 // Run records one event per unresolved date.

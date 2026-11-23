@@ -79,7 +79,7 @@ func TestTaskPassesTheEntrySettings(t *testing.T) {
 	task := Task(monitor, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
 
 	require.NoError(t, task.Run(context.Background()))
-	assert.Equal(t, Params{"increment_pct": "3", "count": "5"}, monitor.params)
+	assert.Equal(t, Params{"increment_pct": "3", "count": 5}, monitor.params)
 }
 
 func TestTaskReenablingKeepsTheSettings(t *testing.T) {
@@ -128,6 +128,7 @@ func TestConfigRejects(t *testing.T) {
 		"disabled not boolean":  "version: 1\nmonitors:\n  snapshot.incomplete:\n    disabled: yes please",
 		"disabled misspelled":   "version: 1\nmonitors:\n  snapshot.incomplete:\n    disabled: 1",
 		"repeated key":          "version: 1\nmonitors:\n  snapshot.incomplete: {}\n  snapshot.incomplete: {}",
+		"disabled quoted":       "version: 1\nmonitors:\n  snapshot.incomplete:\n    disabled: \"true\"",
 		"nested setting":        "version: 1\nmonitors:\n  portfolio.drawdown:\n    increment_pct: [3]",
 		"settings it rejects":   "version: 1\nmonitors:\n  snapshot.incomplete:\n    extra: \"1\"",
 		"missing increment":     "version: 1\nmonitors:\n  portfolio.drawdown: {}",
@@ -140,6 +141,19 @@ func TestConfigRejects(t *testing.T) {
 		_, err := NewConfigLoader(writeMonitorsFile(t, content), monitors).Current()
 		assert.Error(t, err, name)
 	}
+}
+
+func TestConfigKeepsStructuredSettings(t *testing.T) {
+	stub := &stubMonitor{}
+	path := writeMonitorsFile(t, "version: 1\nmonitors:\n  stub.monitor:\n    window: 5d\n    instruments: [qqq]\n    groups:\n      - name: a")
+
+	cfg, err := NewConfigLoader(path, []Monitor{stub}).Current()
+
+	require.NoError(t, err)
+	assert.Equal(t, Params{
+		"window": "5d", "instruments": []any{"qqq"},
+		"groups": []any{map[string]any{"name": "a"}},
+	}, cfg.Monitors["stub.monitor"].Params)
 }
 
 func TestConfigAcceptsAValidFile(t *testing.T) {

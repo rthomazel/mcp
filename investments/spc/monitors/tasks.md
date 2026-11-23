@@ -12,12 +12,12 @@ agents: claude
 Each task is reviewed through its models before code. Specs are in this directory; technical
 design belongs in the models.
 
-## [ ] 1. Durations
+## [x] 1. Durations
 
 Add the duration parser and its date arithmetic as a small package, with the accepted and rejected
 cases of the duration spec as tests. See the duration spec.
 
-## [ ] 2. Structured settings
+## [x] 2. Structured settings
 
 Amend the monitors configuration model and loader for list and mapping settings, duration settings
 and the instrument selection (list of tickers, or held), and make an invalid monitors file disable every

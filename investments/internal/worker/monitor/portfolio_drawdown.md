@@ -28,8 +28,8 @@ Return portfolioDrawdownAt.
 
 ## PortfolioDrawdown.ValidateParams(params Params) error
 
-1. if a setting other than incrementKey is present, return an error naming the first, in name order.
-2. Parse the increment setting with domain.ParseDecimal.
+1. Reject any setting other than incrementKey with Params.Unknown.
+2. Read the increment setting with Params.Decimal.
 3. Return nil.
 
 #### Errors

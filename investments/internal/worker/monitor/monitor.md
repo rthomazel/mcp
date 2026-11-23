@@ -1,9 +1,3 @@
-# Types
-
-## Params map[string]string
-
-The settings of one monitor from its entry in the monitors configuration, as text. The monitor alone knows their meaning.
-
 # Interfaces
 
 ## Monitor
@@ -21,7 +15,7 @@ The key of its entry in the monitors configuration. A monitor that records a not
 
 ### ValidateParams(params Params) error
 
-Return an error naming any setting that is unknown, missing when required or malformed, and nil otherwise. It runs when the configuration is loaded, for disabled entries too, so Run may rely on valid settings.
+Return an error naming any setting that is unknown, missing when required or malformed, and nil otherwise. Params and its accessors are in params.md. It runs when the configuration is loaded, for disabled entries too, so Run may rely on valid settings.
 
 # Functions
 

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"maps"
-	"slices"
 	"strings"
 	"time"
 
@@ -39,10 +37,8 @@ func (m *PortfolioDrawdown) At() domain.ClockTime { return portfolioDrawdownAt }
 
 // ValidateParams requires a positive increment and rejects any other setting.
 func (m *PortfolioDrawdown) ValidateParams(params Params) error {
-	for _, key := range slices.Sorted(maps.Keys(params)) {
-		if key != incrementKey {
-			return fmt.Errorf("unknown setting %q", key)
-		}
+	if err := params.Unknown(incrementKey); err != nil {
+		return err
 	}
 
 	_, err := incrementFrom(params)
@@ -97,18 +93,17 @@ func (m *PortfolioDrawdown) Run(ctx context.Context, params Params) error {
 }
 
 func incrementFrom(params Params) (domain.Decimal, error) {
-	raw, ok := params[incrementKey]
+	increment, ok, err := params.Decimal(incrementKey)
+	if err != nil {
+		return "", err
+	}
+
 	if !ok {
 		return "", fmt.Errorf("setting %q is required", incrementKey)
 	}
 
-	increment, err := domain.ParseDecimal(raw)
-	if err != nil {
-		return "", fmt.Errorf("setting %q: %w", incrementKey, err)
-	}
-
 	if increment.Sign() <= 0 {
-		return "", fmt.Errorf("setting %q must be greater than zero, got %q", incrementKey, raw)
+		return "", fmt.Errorf("setting %q must be greater than zero, got %q", incrementKey, increment)
 	}
 
 	return increment, nil
