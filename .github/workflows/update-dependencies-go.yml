@@ -30,7 +30,7 @@ jobs:
           permission-pull-requests: write
           permission-workflows: write
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.1
         with:
           # Full history needed so the update-go action can diff against origin/main
           fetch-depth: 0
