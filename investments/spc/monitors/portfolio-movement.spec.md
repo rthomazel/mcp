@@ -98,8 +98,7 @@ monitors:
 - A fall of the same size in an unwatched direction records nothing.
 - The message splits the value change into market and trades.
 - A missing, zero or negative threshold, a window or interval that is not a valid duration,
-  such as a bare number or zero, or an unknown direction makes the monitors file invalid, and at server
-  start stops the server.
+  such as a bare number or zero, or an unknown direction makes the monitors file invalid.
 - With no enabled entry, nothing is recorded.
 
 ## Decisions

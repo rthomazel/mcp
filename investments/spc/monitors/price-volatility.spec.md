@@ -106,7 +106,7 @@ monitors:
 - An instrument with a short history or flat prices records nothing and is logged.
 - A threshold that is zero or negative, a window, interval or look-back that is not a valid
   duration, a look-back shorter than the window, a repeated instrument or an unknown key makes the
-  monitors file invalid, and at server start stops the server.
+  monitors file invalid.
 - With no enabled entry, nothing is recorded.
 
 ## Decisions

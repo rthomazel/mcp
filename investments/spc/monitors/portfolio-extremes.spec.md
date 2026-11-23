@@ -181,7 +181,7 @@ monitors:
   alone records none; running again for the same date records none.
 - With an interval of 1d, every date that is a new high records an event.
 - An interval that is not a valid duration, such as a bare number or zero, makes the monitors file
-  invalid, and at server start stops the server.
+  invalid.
 - The messages name the dates and amounts described above and say the figure is a change in
   value and not a return.
 

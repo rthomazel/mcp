@@ -66,6 +66,8 @@ component any number of spaces is allowed; nowhere else.
   nine days and 1d12h is rejected.
 - The total must be greater than zero. Zero components are allowed beside a positive one, so
   1y0d is one year, and 0d or 0y0mo are rejected.
+- Anything shorter than one day is rejected, in whatever unit, until intraday data exists, which
+  is a separate idea.
 - A bare number with no unit is always rejected, whether written as text or as a YAML number, so
   an unclear 15 never silently means days.
 - An empty value is rejected. A setting that is left out takes its own default; one that is
@@ -88,15 +90,16 @@ A duration is applied to a calendar date, the market date, with no time of day.
 ### Errors
 
 Every rejection names the setting, the text as written and the reason in plain words, for example
-that a unit is missing, that the unit is not known, that a unit is repeated, that the number is
+that a unit is missing, that the unit is not known, that the duration is shorter than a day, that a unit is repeated, that the number is
 too long, that the duration is zero, or that forms cannot be mixed. A value with several mistakes
 reports the first.
 
 ### When it is checked
 
 The text is parsed when the configuration is validated, never when a monitor runs, so an invalid
-duration is an invalid file. At server start an invalid file stops the server with the error; the
-monitors configuration describes this and the live reload that follows.
+duration is an invalid file. What an invalid file does, at start and while running, is the monitors
+configuration's: no monitor runs at start, and a running server keeps the last valid content, with
+an error logged.
 
 ## Cases
 
@@ -135,8 +138,9 @@ Rejected:
 | 1.5y, 0.5d                        | fraction                                   |
 | 1,000d, 1_000d                    | separator                                  |
 | 10000d                            | number longer than four digits             |
-| 1h, 36h, 90h, 1d12h               | hours that are not a whole number of days  |
-| 90m, 30s, 1h30m, 72h30m           | minutes and seconds are not supported      |
+| 1h, 12h, 23h                      | shorter than a day, intraday is not supported |
+| 36h, 90h, 1d12h                   | hours that are not a whole number of days  |
+| 90m, 30s, 1h30m, 72h30m           | minutes and seconds, shorter than a day    |
 | 1q, 2 quarters, 1 fortnight       | unit not known                             |
 | 1y 2mo, 1 year 2 months           | several components must be written together in short units |
 | 1year2months                      | long units only in a single component      |
@@ -153,7 +157,8 @@ Rejected:
 
 These are left out on purpose; a value like these is rejected. Say if one should be added.
 
-- Minutes, seconds and the standard library's mixed forms such as 1h30m.
+- Minutes, seconds and the standard library's mixed forms such as 1h30m, and every span shorter
+  than a day, until there is intraday data.
 - Hours that are not a whole number of days, such as 36h; they are rejected, not rounded.
 - Fractions of a unit, such as 1.5y or half a day.
 - Trading or business days, such as 5 trading days. A duration is always calendar time.
@@ -176,8 +181,9 @@ These are left out on purpose; a value like these is rejected. Say if one should
 - One month before 31 March is 28 February; one year before 29 February 2028 is 28 February 2027;
   1mo2w before 20 March is 6 February.
 - 7d, 1w and 168h apply identically; 12mo and 1y apply identically; 72h is three days.
-- An invalid duration in the monitors file stops the server at start and is logged; the same
-  edit on a running server keeps the last valid content, as the monitors configuration says.
+- An invalid duration in the monitors file makes the file invalid: at start no monitor runs and an
+  error is logged, and on a running server the last valid content stays in use, as the monitors
+  configuration says.
 
 ## Decisions
 
@@ -189,10 +195,11 @@ These are left out on purpose; a value like these is rejected. Say if one should
 - Not accepting a bare number removes any doubt about the unit.
 - Hours are accepted to match what the standard library and other tools take, but only as whole
   days, since a part of a day would silently round on daily data.
-- Parsed at validation so an error is found at startup and never at the 7:00 AM run.
+- Parsed at validation so an error is found when the file loads and never at the 7:00 AM run.
 
 ## Refs
 
 - Related: 2026-11-22-monitors-configuration, which validates settings that use durations.
+- Related: 2026-11-23-idea-intraday-data, which would allow spans shorter than a day.
 - Related: 2026-11-23-monitor-portfolio-movement, 2026-11-23-monitor-price-volatility and
   2026-11-23-monitor-portfolio-extremes, which use window, interval and look-back settings.

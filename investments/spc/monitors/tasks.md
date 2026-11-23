@@ -20,8 +20,8 @@ cases of the duration spec as tests. See the duration spec.
 ## [ ] 2. Structured settings
 
 Amend the monitors configuration model and loader for list and mapping settings, duration settings
-and the instrument selection (list of tickers, or held), and make an invalid monitors file stop the
-server at startup. See the monitors configuration spec.
+and the instrument selection (list of tickers, or held), and make an invalid monitors file disable every
+monitor and log an error when there is no earlier valid content. See the monitors configuration spec.
 
 ## [ ] 3. Portfolio extremes
 
