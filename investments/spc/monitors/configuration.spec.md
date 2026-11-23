@@ -5,6 +5,7 @@ summary: A versioned YAML file that turns each monitor on or off and carries its
 author: Thom
 created: 2026-11-22
 agents: claude
+updated: 2026-11-23
 ---
 
 # Monitors configuration
@@ -12,7 +13,12 @@ agents: claude
 ## Status
 
 Draft. It extends the monitor mechanism of the notifications spec. The first monitor
-with settings, the portfolio drawdown, has its own spec.
+with settings, the portfolio drawdown, has its own spec, and so does each monitor added
+since. 2026-11-23 added structured settings and the instrument concept for the monitors that
+watch groups and lists of instruments.
+
+All monitors run daily at 7:00 AM Eastern. They read the state the 6:00 AM price refresh
+left and do not depend on one another, so they need no order.
 
 ## Intent
 
@@ -37,9 +43,18 @@ types.
 **Entry.** The block of one monitor in the file: whether it is disabled, and its
 settings, which belong to that monitor alone.
 
-**Settings.** Named values a monitor reads, written as text. Each monitor defines its
-own and rejects any it does not know. Numbers that must stay exact, such as a percentage
-threshold, are written as quoted text and read as decimals, never as floating point.
+**Settings.** Named values a monitor reads. Each monitor defines its own and rejects any it
+does not know. A value is a scalar, a list, or a list of mappings, as the monitor needs: a
+list of instruments, or a list of groups each with its own keys. Numbers that must stay
+exact, such as a percentage threshold or a price, are written as quoted text and read as
+decimals, never as floating point. Counts, such as a number of days, are plain whole
+numbers. Nested keys are validated by the monitor in the same way, and an unknown key at any
+depth is invalid.
+
+**Instrument.** A monitor names an instrument by its ticker. The file loader cannot see the
+database, so whether a ticker is registered is judged when the monitor runs, as a logged
+warning, and never makes the file invalid. Monitors that watch several instruments may also
+accept the word held, meaning every instrument with an active position.
 
 **File loader.** The shared code that reads a versioned YAML file, validates it,
 remembers the last valid result and serves it when an edit breaks the file. The monitors
@@ -174,3 +189,7 @@ announcing an incomplete snapshot until the operator adds the entry shown above.
   one follows.
 - Related: 2026-11-21-monitor-snapshot-incomplete, the monitor that gains an entry name.
 - Related: 2026-11-22-monitor-portfolio-drawdown, the first monitor with settings.
+- Related: 2026-11-23-monitor-allocation-drift, 2026-11-23-monitor-price-volatility,
+  2026-11-23-monitor-portfolio-movement, 2026-11-23-monitor-portfolio-high,
+  2026-11-23-monitor-instrument-extremes and 2026-11-23-monitor-price-target, which use
+  structured settings.

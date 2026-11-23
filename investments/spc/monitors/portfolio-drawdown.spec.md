@@ -5,6 +5,7 @@ summary: Monitor that notifies the operator once each time the securities value 
 author: Thom
 created: 2026-11-22
 agents: claude
+updated: 2026-11-23
 ---
 
 # Monitor: portfolio drawdown
@@ -36,9 +37,9 @@ a new crossing.
 
 ## Behavior
 
-The monitor runs daily at 7:05 AM Eastern, after the snapshot-incomplete monitor, so the
-latest snapshot has been settled. It reads the securities value series and judges its
-latest date.
+The monitor runs daily at 7:00 AM Eastern, an hour after the last price refresh, so the
+latest snapshot has been settled. It does not depend on the snapshot-incomplete monitor,
+which runs at the same time. It reads the securities value series and judges its latest date.
 
 - For every level the latest drawdown is at or below, it records one drawdown event, unless
   one already exists for that level and crossing. The subject of the event is the level and
@@ -121,7 +122,7 @@ entry the monitor does not run.
 
 ## Acceptance criteria
 
-- At 7:05 AM Eastern, with an increment of 3 and a drawdown of -7.2, one event is recorded
+- At 7:00 AM Eastern, with an increment of 3 and a drawdown of -7.2, one event is recorded
   for the -3 level and one for the -6 level, each once.
 - Running it again, on later days, while the value stays at or below those levels records
   nothing.
@@ -141,4 +142,4 @@ entry the monitor does not run.
 - Related: 2026-11-21-notifications, the outbox and monitor mechanism this uses.
 - Related: 2026-11-22-monitors-configuration, the file that turns it on and sets its increment.
 - Related: 2026-11-15-value-history, whose series and all-time high it shares.
-- Related: 2026-11-21-monitor-snapshot-incomplete, which runs before it.
+- Related: 2026-11-21-monitor-snapshot-incomplete, which runs at the same time.
