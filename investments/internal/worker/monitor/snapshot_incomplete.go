@@ -11,8 +11,6 @@ import (
 	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
-var snapshotIncompleteAt = domain.ClockTime{Hour: 7}
-
 // SnapshotIncomplete watches for a latest price date without a completed snapshot.
 type SnapshotIncomplete struct {
 	store  domain.GenericStore
@@ -28,9 +26,6 @@ func NewSnapshotIncomplete(store domain.GenericStore, events domain.EventStore) 
 func (m *SnapshotIncomplete) Name() string {
 	return strings.TrimPrefix(domain.Events.SnapshotIncomplete, domain.NotificationPrefix)
 }
-
-// At is 07:00 market time.
-func (m *SnapshotIncomplete) At() domain.ClockTime { return snapshotIncompleteAt }
 
 // ValidateParams rejects any setting; the monitor takes none.
 func (m *SnapshotIncomplete) ValidateParams(params Params) error {

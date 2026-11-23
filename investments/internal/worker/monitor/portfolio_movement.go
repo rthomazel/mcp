@@ -17,8 +17,6 @@ const (
 	windowKey    = "window"
 )
 
-var portfolioMovementAt = domain.ClockTime{Hour: 7}
-
 // PortfolioMovement watches the securities value moving over a window because
 // of prices alone.
 type PortfolioMovement struct {
@@ -42,9 +40,6 @@ func NewPortfolioMovement(store domain.GenericStore, events domain.EventStore) *
 func (m *PortfolioMovement) Name() string {
 	return strings.TrimPrefix(domain.Events.PortfolioMovement, domain.NotificationPrefix)
 }
-
-// At is 07:00 market time.
-func (m *PortfolioMovement) At() domain.ClockTime { return portfolioMovementAt }
 
 // ValidateParams requires a positive variation and accepts a direction, a
 // window and an interval.

@@ -27,7 +27,6 @@ func TestPortfolioMovementIsNamedAfterItsEvent(t *testing.T) {
 	monitor := newMovement(&fakeStore{})
 
 	assert.Equal(t, "portfolio.movement", monitor.Name())
-	assert.Equal(t, domain.ClockTime{Hour: 7}, monitor.At())
 }
 
 func TestPortfolioMovementRecordsTheReachedSide(t *testing.T) {

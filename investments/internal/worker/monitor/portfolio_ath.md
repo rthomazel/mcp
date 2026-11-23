@@ -1,6 +1,5 @@
 # Constants
 
-portfolioATHAt = 07:00 in the market timezone.
 intervalKey = "interval", the one setting.
 athDefaultInterval = "15d", the default interval.
 
@@ -22,10 +21,6 @@ Build the monitor.
 ## PortfolioATH.Name() string
 
 Return domain.Events.PortfolioATH without domain.NotificationPrefix, portfolio.ath.
-
-## PortfolioATH.At() ClockTime
-
-Return portfolioATHAt.
 
 ## PortfolioATH.ValidateParams(params Params) error
 

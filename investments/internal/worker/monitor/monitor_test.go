@@ -76,7 +76,6 @@ func TestSnapshotIncompleteRecordsTheDateOnce(t *testing.T) {
 	require.NoError(t, json.Unmarshal(store.recorded[0].Data, &data))
 	assert.Equal(t, date, data.Date)
 
-	assert.Equal(t, domain.ClockTime{Hour: 7}, monitor.At())
 	assert.Equal(t, "snapshot.incomplete", monitor.Name())
 }
 

@@ -1,6 +1,5 @@
 # Constants
 
-portfolioMovementAt = 07:00 in the market timezone.
 variationKey = "variation_pct", windowKey = "window", the settings beside directionKey and intervalKey.
 movementDefaultSpan = "1d", the default window and interval.
 
@@ -29,10 +28,6 @@ Build the monitor.
 ## PortfolioMovement.Name() string
 
 Return domain.Events.PortfolioMovement without domain.NotificationPrefix, portfolio.movement.
-
-## PortfolioMovement.At() ClockTime
-
-Return portfolioMovementAt.
 
 ## PortfolioMovement.ValidateParams(params Params) error
 

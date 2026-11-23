@@ -5,7 +5,7 @@
 1. Hour int
 2. Minute int
 
-A time of day in the market timezone.
+A time of day in the market timezone, written HH:MM.
 
 ## ScheduledTask
 
@@ -25,6 +25,23 @@ Work that runs daily at fixed times. The price refresh job and each monitor are 
 Runs every task at its times of day in the market timezone. It never uses the host's local zone.
 
 # Functions
+
+## ClockTime.String() string
+
+Return the time as zero-padded HH:MM.
+
+## ParseClockTime(text string) (ClockTime, error)
+
+Trim spaces and read a 24 hour HH:MM time of day. Anything else, such as 7am, 24:00, seconds or an empty text, returns domain.ErrInvalidInput naming the text.
+
+## ParseClockTimes(text string) ([]ClockTime, error)
+
+1. Split text on commas and read each part with ParseClockTime.
+2. Sort the times ascending.
+3. if a time is listed twice, return domain.ErrInvalidInput naming it.
+4. Return the times.
+
+An empty text, or an empty part such as a trailing comma, is invalid, so a list has at least one time. Ascending is what ScheduledTask.At requires.
 
 ## NewScheduler(tasks []ScheduledTask, timezone string) (*Scheduler, error)
 

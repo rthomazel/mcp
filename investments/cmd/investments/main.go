@@ -59,7 +59,7 @@ func run() error {
 	refresher := marketdata.NewPriceRefresher(stores.Store, stores.Prices, provider)
 	job := marketdata.NewJob(stores.Prices, stores.Snapshots, stores.Updates, refresher, provider.Name())
 
-	tasks := []domain.ScheduledTask{marketdata.RefreshTask(job)}
+	tasks := []domain.ScheduledTask{marketdata.RefreshTask(job, cfg.PriceRefreshRunTimes)}
 
 	monitors := []monitor.Monitor{
 		monitor.NewSnapshotIncomplete(stores.Store, stores.Events),
@@ -70,7 +70,7 @@ func run() error {
 	monitorsConfig := monitor.NewConfigLoader(cfg.MonitorsConfigFile, monitors)
 
 	for _, m := range monitors {
-		tasks = append(tasks, monitor.Task(m, cfg.MonitorTimeout, monitorsConfig))
+		tasks = append(tasks, monitor.Task(m, cfg.MonitorsRunTime, cfg.MonitorTimeout, monitorsConfig))
 	}
 
 	scheduler, err := domain.NewScheduler(tasks, cfg.MarketTimezone)
@@ -78,7 +78,7 @@ func run() error {
 		return fmt.Errorf("building scheduler: %w", err)
 	}
 
-	slog.Info("price refresh job enabled", "provider", provider.Name(), "run_times", marketdata.RunTimesDescription(cfg.MarketTimezone))
+	slog.Info("price refresh job enabled", "provider", provider.Name(), "run_times", marketdata.RunTimesDescription(cfg.PriceRefreshRunTimes, cfg.MarketTimezone))
 
 	ctx, stop := context.WithCancel(context.Background())
 

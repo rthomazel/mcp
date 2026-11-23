@@ -17,8 +17,6 @@ const (
 	movementDefaultSpan = "1d"
 )
 
-var portfolioATHAt = domain.ClockTime{Hour: 7}
-
 // PortfolioATH watches the securities value reaching a new all-time high.
 type PortfolioATH struct {
 	store  domain.GenericStore
@@ -34,9 +32,6 @@ func NewPortfolioATH(store domain.GenericStore, events domain.EventStore) *Portf
 func (m *PortfolioATH) Name() string {
 	return strings.TrimPrefix(domain.Events.PortfolioATH, domain.NotificationPrefix)
 }
-
-// At is 07:00 market time.
-func (m *PortfolioATH) At() domain.ClockTime { return portfolioATHAt }
 
 // ValidateParams accepts only a valid interval.
 func (m *PortfolioATH) ValidateParams(params Params) error {

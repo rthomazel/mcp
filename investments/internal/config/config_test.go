@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rthomazel/mcp/investments/internal/domain"
 )
 
 func TestLoad(t *testing.T) {
@@ -54,9 +56,40 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, time.Minute, cfg.MonitorTimeout)
 	})
 
+	t.Run("run time overrides", func(t *testing.T) {
+		t.Setenv("INVESTMENTS_MCP_DSN", "postgres://x")
+		t.Setenv("INVESTMENTS_MCP_TIINGO_API_KEY", "key")
+		t.Setenv("INVESTMENTS_MCP_PRICE_REFRESH_RUN_TIMES", "21:00, 05:30")
+		t.Setenv("INVESTMENTS_MCP_MONITORS_RUN_TIME", "08:15")
+
+		cfg, err := Load()
+		require.NoError(t, err)
+		assert.Equal(t, []domain.ClockTime{{Hour: 5, Minute: 30}, {Hour: 21}}, cfg.PriceRefreshRunTimes)
+		assert.Equal(t, domain.ClockTime{Hour: 8, Minute: 15}, cfg.MonitorsRunTime)
+	})
+
+	t.Run("invalid run times", func(t *testing.T) {
+		for name, value := range map[string]string{
+			"INVESTMENTS_MCP_PRICE_REFRESH_RUN_TIMES": "6am",
+			"INVESTMENTS_MCP_MONITORS_RUN_TIME":       "07:00,08:00",
+		} {
+			t.Setenv("INVESTMENTS_MCP_DSN", "postgres://x")
+			t.Setenv("INVESTMENTS_MCP_TIINGO_API_KEY", "key")
+			t.Setenv(name, value)
+
+			_, err := Load()
+			require.Error(t, err, name)
+			assert.Contains(t, err.Error(), name)
+
+			t.Setenv(name, "")
+		}
+	})
+
 	t.Run("defaults match the documented values", func(t *testing.T) {
 		defaults := Defaults()
 		assert.Equal(t, "America/New_York", defaults.MarketTimezone)
+		assert.Equal(t, []domain.ClockTime{{Hour: 6}, {Hour: 20, Minute: 30}}, defaults.PriceRefreshRunTimes)
+		assert.Equal(t, domain.ClockTime{Hour: 7}, defaults.MonitorsRunTime)
 		assert.Equal(t, 1000, defaults.MaxHistoryPoints)
 		assert.Equal(t, 10, defaults.EventMaxFailures)
 		assert.Equal(t, 30*time.Second, defaults.EventBackoffBase)

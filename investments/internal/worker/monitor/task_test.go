@@ -20,7 +20,6 @@ type stubMonitor struct {
 }
 
 func (m *stubMonitor) Name() string                  { return "stub.monitor" }
-func (m *stubMonitor) At() domain.ClockTime          { return domain.ClockTime{Hour: 8} }
 func (m *stubMonitor) ValidateParams(_ Params) error { return nil }
 func (m *stubMonitor) Run(_ context.Context, params Params) error {
 	m.runs++
@@ -40,7 +39,7 @@ func writeMonitorsFile(t *testing.T, content string) string {
 
 func TestTaskIsScheduledAtTheMonitorTime(t *testing.T) {
 	monitor := &stubMonitor{}
-	task := Task(monitor, time.Minute, NewConfigLoader("", []Monitor{monitor}))
+	task := Task(monitor, domain.ClockTime{Hour: 8}, time.Minute, NewConfigLoader("", []Monitor{monitor}))
 
 	assert.Equal(t, []domain.ClockTime{{Hour: 8}}, task.At)
 	assert.Equal(t, time.Minute, task.Timeout)
@@ -66,7 +65,7 @@ func TestTaskRunsTheMonitorOnlyWhenEnabled(t *testing.T) {
 			path = writeMonitorsFile(t, tc.file)
 		}
 
-		task := Task(monitor, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
+		task := Task(monitor, domain.ClockTime{Hour: 8}, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
 
 		require.NoError(t, task.Run(context.Background()), name)
 		assert.Equal(t, tc.runs, monitor.runs, name)
@@ -76,7 +75,7 @@ func TestTaskRunsTheMonitorOnlyWhenEnabled(t *testing.T) {
 func TestTaskPassesTheEntrySettings(t *testing.T) {
 	monitor := &stubMonitor{}
 	path := writeMonitorsFile(t, "version: 1\nmonitors:\n  stub.monitor:\n    disabled: false\n    increment_pct: \"3\"\n    count: 5")
-	task := Task(monitor, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
+	task := Task(monitor, domain.ClockTime{Hour: 8}, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
 
 	require.NoError(t, task.Run(context.Background()))
 	assert.Equal(t, Params{"increment_pct": "3", "count": 5}, monitor.params)
@@ -85,7 +84,7 @@ func TestTaskPassesTheEntrySettings(t *testing.T) {
 func TestTaskReenablingKeepsTheSettings(t *testing.T) {
 	monitor := &stubMonitor{}
 	path := writeMonitorsFile(t, "version: 1\nmonitors:\n  stub.monitor:\n    disabled: true\n    increment_pct: \"3\"")
-	task := Task(monitor, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
+	task := Task(monitor, domain.ClockTime{Hour: 8}, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
 
 	require.NoError(t, task.Run(context.Background()))
 	assert.Zero(t, monitor.runs)
@@ -99,7 +98,7 @@ func TestTaskReenablingKeepsTheSettings(t *testing.T) {
 func TestTaskFailsOnAnInvalidFileWithoutAnEarlierValidOne(t *testing.T) {
 	monitor := &stubMonitor{}
 	path := writeMonitorsFile(t, "version: 9")
-	task := Task(monitor, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
+	task := Task(monitor, domain.ClockTime{Hour: 8}, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
 
 	assert.Error(t, task.Run(context.Background()))
 	assert.Zero(t, monitor.runs)
@@ -108,7 +107,7 @@ func TestTaskFailsOnAnInvalidFileWithoutAnEarlierValidOne(t *testing.T) {
 func TestTaskKeepsTheLastValidFileWhenAnEditBreaksIt(t *testing.T) {
 	monitor := &stubMonitor{}
 	path := writeMonitorsFile(t, "version: 1\nmonitors:\n  stub.monitor: {}")
-	task := Task(monitor, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
+	task := Task(monitor, domain.ClockTime{Hour: 8}, time.Minute, NewConfigLoader(path, []Monitor{monitor}))
 
 	require.NoError(t, task.Run(context.Background()))
 	require.NoError(t, os.WriteFile(path, []byte("version: 1\nmonitors:\n  stub.monitor: {}\n  nope: {}"), 0o600))

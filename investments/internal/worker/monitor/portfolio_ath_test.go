@@ -29,7 +29,6 @@ func TestPortfolioATHIsNamedAfterItsEvent(t *testing.T) {
 	monitor := newATH(&fakeStore{})
 
 	assert.Equal(t, "portfolio.ath", monitor.Name())
-	assert.Equal(t, domain.ClockTime{Hour: 7}, monitor.At())
 }
 
 func TestPortfolioATHRecordsANewHigh(t *testing.T) {

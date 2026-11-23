@@ -15,17 +15,16 @@ import (
 type Monitor interface {
 	// Name is the key of the monitor's entry in the monitors configuration.
 	Name() string
-	At() domain.ClockTime
 	// ValidateParams rejects settings the monitor cannot run with.
 	ValidateParams(params Params) error
 	Run(ctx context.Context, params Params) error
 }
 
-// Task is the monitor as a task for the domain scheduler, run daily at its
-// time of day when the monitors configuration enables it.
-func Task(monitor Monitor, timeout time.Duration, loader *fileloader.Loader[Config]) domain.ScheduledTask {
+// Task is the monitor as a task for the domain scheduler, run daily at the
+// given time of day when the monitors configuration enables it.
+func Task(monitor Monitor, at domain.ClockTime, timeout time.Duration, loader *fileloader.Loader[Config]) domain.ScheduledTask {
 	return domain.ScheduledTask{
-		Name: "monitor " + monitor.Name(), At: []domain.ClockTime{monitor.At()}, Timeout: timeout,
+		Name: "monitor " + monitor.Name(), At: []domain.ClockTime{at}, Timeout: timeout,
 		Run: func(ctx context.Context) error { return run(ctx, monitor, loader) },
 	}
 }

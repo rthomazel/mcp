@@ -1,6 +1,6 @@
 # Constants
 
-runTimes = 06:00 and 20:30, the two price refresh run times in the market timezone, which is the server configuration's, shared with the monitors and with today's date; it defaults to America/New_York.
+The price refresh run times, 06:00 and 20:30 by default, are the server configuration's and passed in, in the market timezone, which is also the server configuration's, shared with the monitors and with today's date; it defaults to America/New_York. 06:00 picks up mutual funds, 20:30 follows the equity close and corrections.
 runTimeout = 30 minutes, the deadline for one price refresh run.
 
 # Types
@@ -94,12 +94,12 @@ By default a refresh does not reach back past the latest stored date. A caller p
 Only instruments with a positive quantity are refreshed; a sold instrument costs no provider request and its prices stop where they were. RefreshInstrument itself ignores holdings, so a caller can still refresh any named instrument. An instrument that becomes held again catches up on the next refresh, because that fetches from its latest stored date through today.
 One instrument failing for any other reason does not stop the others; the caller inspects each result. Recording the outcome in the updates log belongs to the snapshot stage.
 
-## RunTimesDescription(timezone string) string
+## RunTimesDescription(runTimes []domain.ClockTime, timezone string) string
 
-Render the run times for the startup log, for example the two times followed by the market timezone name.
+Render the run times for the startup log, for example the times as HH:MM followed by the market timezone name.
 
-## RefreshTask(job *Job) domain.ScheduledTask
+## RefreshTask(job *Job, runTimes []domain.ClockTime) domain.ScheduledTask
 
-Return the task named price refresh, run at runTimes with runTimeout, whose run executes the job and logs its report, refreshed and failed counts, at info level, or returns its error.
+Return the task named price refresh, run at the given runTimes with runTimeout, whose run executes the job and logs its report, refreshed and failed counts, at info level, or returns its error.
 
 Scheduling itself is domain.Scheduler's. A failed run never stops the schedule; the next slot retries. The job is the only caller, so runs do not overlap; the store lock also guards against an agent rebuild running at the same time. There is no run at startup: a restart does not spend provider requests, and the next slot is at most about fourteen hours away.

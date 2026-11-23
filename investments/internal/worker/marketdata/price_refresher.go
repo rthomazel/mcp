@@ -144,15 +144,11 @@ func (r *PriceRefresher) RefreshAll(ctx context.Context, from *domain.Date) ([]R
 
 const runTimeout = 30 * time.Minute
 
-// runTimes are the price refresh run times, ascending: 06:00 picks up mutual funds,
-// 20:30 follows the equity close and corrections.
-var runTimes = []domain.ClockTime{{Hour: 6}, {Hour: 20, Minute: 30}}
-
 // RunTimesDescription renders the run times for the startup log.
-func RunTimesDescription(timezone string) string {
+func RunTimesDescription(runTimes []domain.ClockTime, timezone string) string {
 	parts := make([]string, 0, len(runTimes))
 	for _, runTime := range runTimes {
-		parts = append(parts, fmt.Sprintf("%02d:%02d", runTime.Hour, runTime.Minute))
+		parts = append(parts, runTime.String())
 	}
 
 	return strings.Join(parts, ", ") + " " + timezone
@@ -160,7 +156,7 @@ func RunTimesDescription(timezone string) string {
 
 // RefreshTask is the price refresh job as a task for the domain scheduler, run at
 // runTimes. A failed run never stops the schedule; the next slot retries.
-func RefreshTask(job *Job) domain.ScheduledTask {
+func RefreshTask(job *Job, runTimes []domain.ClockTime) domain.ScheduledTask {
 	return domain.ScheduledTask{
 		Name: "price refresh", At: runTimes, Timeout: runTimeout,
 		Run: func(ctx context.Context) error {
