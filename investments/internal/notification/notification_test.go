@@ -318,8 +318,30 @@ func TestPortfolioDrawdownRenderer(t *testing.T) {
 	assert.Contains(t, text, "-6% level on 2026-11-18")
 	assert.Contains(t, text, "$92800")
 	assert.Contains(t, text, "2026-11-01: $100000")
-	assert.Contains(t, text, "not investment return")
+	assert.Contains(t, text, "This value change is affected by sales and withdrawals.")
 
 	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
+}
+
+func TestPortfolioDrawdownRendererRounding(t *testing.T) {
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioDrawdown][defaultFormat]
+
+	for percent, want := range map[string]string{
+		"-7.2": "down 7.2%", "-7.24": "down 7.2%", "-7.25": "down 7.3%", "-7.2999999": "down 7.3%",
+		"-7": "down 7.0%", "-12.3456789": "down 12.3%", "-99.96": "down 100.0%",
+	} {
+		data, err := json.Marshal(domain.PortfolioDrawdownData{Level: "-3", DrawdownPercent: domain.Decimal(percent)})
+		require.NoError(t, err)
+
+		text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+		require.NoError(t, err)
+		assert.Contains(t, text, want, percent)
+	}
+
+	data, err := json.Marshal(domain.PortfolioDrawdownData{Level: "-3", DrawdownPercent: "abc"})
+	require.NoError(t, err)
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: data})
 	assert.Error(t, err)
 }
