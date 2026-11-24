@@ -91,6 +91,56 @@ monitors:
   and does so for disabled entries too, so re-enabling never surfaces an old mistake.
 - A mapping with a repeated key is a parse error.
 
+#### Sample file with every monitor
+
+Each monitor's settings are defined in its own spec. This file turns all of them on; delete
+an entry to turn a monitor off, or add `disabled: true` to keep its settings.
+
+```yaml
+version: 1
+
+monitors:
+  snapshot.incomplete: {}
+  portfolio.drawdown:
+    increment_pct: "3"
+  portfolio.ath:
+    interval: 15d                # optional, 15 days by default
+  portfolio.movement:
+    variation_pct: "3"
+    direction: both              # optional: up, down or both
+    window: 1d                   # optional, 1 day by default
+    interval: 1d                 # optional, 1 day by default
+  allocation.drift:
+    groups:
+      - name: us-core
+        instruments: [VOO, VTI]
+        max_pct: "15"
+      - name: gold
+        instruments: [GLD]
+        min_pct: "5"
+        max_pct: "10"
+  price.volatility:
+    window: 1d                   # optional, 1 day by default
+    interval: 1d                 # optional, 1 day by default
+    lookback: 3mo                # optional, 3 months or the window if longer
+    instruments:
+      - instrument: QQQ
+        variation_std_dev: "2.5"
+        direction: both          # optional: up, down or both
+  price.target:
+    targets:
+      - instrument: QQQ
+        price: "232"
+      - instrument: QQQ
+        price: "250"
+  instrument.drawdown:
+    increment_pct: "5"
+    instruments: [QQQ, VOO]      # a list of tickers, or: held
+  instrument.ath:
+    interval: 15d                # optional, 15 days by default
+    instruments: held
+```
+
 ### Which monitors run
 
 A monitor runs only when its entry exists and is not disabled.

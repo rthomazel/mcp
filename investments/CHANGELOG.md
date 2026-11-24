@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [0.5.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.5.0) feat: eight new monitors, durations and configurable run times
+
+### feat
+
+- **(monitors)** `portfolio.ath` announces a new all-time high of the securities value, at most once per `interval` (15 days by default), as `notification.portfolio.ath`.
+- **(monitors)** `portfolio.movement` announces a move of the securities value over a `window` (1 day by default) that prices alone explain, apart from trades, when it reaches `variation_pct`, in `direction` up, down or both, as `notification.portfolio.movement`. The message names the largest gainers and losers.
+- **(monitors)** `allocation.drift` announces each time a group of instruments (`groups` with `instruments`, `min_pct`, `max_pct`) leaves its allocation band, once per stay outside it, as `notification.allocation.drift`.
+- **(monitors)** `price.volatility` announces an instrument's price move over a `window` that is at least `variation_std_dev` standard deviations of its usual moves over a `lookback` (3 months by default), spaced by `interval`, as `notification.price.volatility`. Adjusted closes, and at least 20 moves in the look-back.
+- **(monitors)** `price.target` announces a target `price` of an `instrument` when the latest daily unadjusted low to high range holds it, once, and again after a year if the price is in range then, as `notification.price.target`.
+- **(monitors)** `instrument.drawdown` and `instrument.ath` do for an instrument's adjusted closes what `portfolio.drawdown` and `portfolio.ath` do for the securities value, as `notification.instrument.drawdown` and `notification.instrument.ath`. `instruments` is a list of tickers or `held`, every instrument held on the latest snapshot date.
+- **(config)** durations in monitor settings are written with a unit, `h`, `d`, `w`, `mo` or `y`, for example `15d` or `1mo`. A bare number is rejected, and so is a span shorter than a day. Settings may also be lists and mappings.
+- **(config)** the times of the daily jobs are server configuration: `INVESTMENTS_MCP_PRICE_REFRESH_RUN_TIMES` (a comma separated list, `06:00,20:30` by default) and `INVESTMENTS_MCP_MONITORS_RUN_TIME` (one time shared by every monitor, `07:00` by default), in the market timezone. The defaults are the previous fixed times.
+- **(docs)** sample routing for every event type in the notifications spec and a sample monitors file with every monitor in the monitors configuration spec.
+
+### fix
+
+- **(notifications)** percentages in messages are rounded to one decimal and dollar amounts to cents in the renderers, never before, so the stored event keeps the exact figure. The portfolio drawdown message previously printed the raw percentage and shortens its note.
+- **(notifications)** the portfolio drawdown message rounds its two securities values to the whole dollar.
+
+### misc
+
+- **(deps)** update `go.yaml.in/yaml/v3` to v3.0.6 and drop the unused `github.com/stretchr/objx` requirement.
+- **(store)** the read models the monitors use move out of the generic store into a `MonitorStore`. Mocks are generated, so run `./run mocks` after pulling.
+
 ## [0.4.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.4.0) feat: monitors configuration and portfolio drawdown monitor
 
 ### feat

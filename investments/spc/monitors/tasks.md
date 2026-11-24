@@ -57,7 +57,7 @@ Add the monitor over the latest daily range. See the price target spec.
 Add the per-instrument series, levels, crossings and interval, sharing code with the portfolio
 monitors where the models allow. Depends on tasks 2 and 3, whose settings and extremes engine it reuses. See the instrument extremes spec.
 
-## [ ] 9. Notification renderers and routing
+## [x] 9. Notification renderers and routing
 
 Add a message renderer per new event type, and sample routing entries in the notifications
 configuration documentation. Decided while modelling task 3: renderers land with each monitor, so
