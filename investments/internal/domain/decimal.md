@@ -25,6 +25,15 @@ A calendar date, a time.Time at midnight UTC. Rendered as "YYYY-MM-DD" at the AP
 
 Return -1, 0 or 1 by exact value, using math/big rationals, so 1.0 equals 1. For validating settings, such as a minimum that may not exceed a maximum; money is never added or divided in Go. Text that is not a decimal compares as text.
 
+## Decimal.Normalized() Decimal
+
+1. Trim spaces and take off a leading minus sign.
+2. Drop the leading zeros of the whole part, leaving one zero when none is left.
+3. Drop the trailing zeros of the fraction, and the point with them when none is left.
+4. Put the minus sign back unless the number is zero, and return it.
+
+Text only, no arithmetic: equal numbers written differently, 232, 232.00 and 0232.0, read the same, so they make the same event subject.
+
 ## Decimal.Sign() int
 
 Return -1, 0 or 1 by inspecting the text: zero if every digit is zero, negative if it starts with a minus.

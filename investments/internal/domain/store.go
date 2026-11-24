@@ -63,6 +63,22 @@ type MonitorStore interface {
 	// Returns ErrInstrumentNotFound for an unregistered ticker and
 	// ErrInvalidInput for an ambiguous one or a threshold that is not positive.
 	GetPriceVolatility(ctx context.Context, ticker string, window, lookback duration.Duration, threshold Decimal) (*PriceVolatility, error)
+	// GetInstrumentDrawdownState is GetDrawdownState over the ticker's adjusted
+	// closes. The state holds closes where the portfolio's holds values.
+	// Returns ErrInstrumentNotFound for an unregistered ticker and
+	// ErrInvalidInput for an ambiguous one or an increment that is not positive.
+	GetInstrumentDrawdownState(ctx context.Context, ticker string, increment Decimal) (DrawdownState, error)
+	// GetInstrumentHighState is GetHighState over the ticker's adjusted closes,
+	// nil without prices. Errors as GetInstrumentDrawdownState does.
+	GetInstrumentHighState(ctx context.Context, ticker string) (*HighState, error)
+	// GetPriceTarget returns the ticker's unadjusted price range on the latest
+	// price date and whether price lies within it. Nil when the ticker has no
+	// price on that date. Returns ErrInstrumentNotFound for an unregistered
+	// ticker and ErrInvalidInput for an ambiguous one or a price that is not positive.
+	GetPriceTarget(ctx context.Context, ticker string, price Decimal) (*PriceTarget, error)
+	// ListHeldTickers returns the symbols of the instruments held on the latest
+	// snapshot date, ordered.
+	ListHeldTickers(ctx context.Context) ([]string, error)
 }
 
 // CashStore holds cash transactions and the balance.

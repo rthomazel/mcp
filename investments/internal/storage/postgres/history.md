@@ -9,6 +9,8 @@ highStateSQL = over dailySeriesSQL securities value, take the latest row and the
 marketMovesCTE = the movement of each instrument held on two consecutive snapshot dates, the earlier date's quantity times the change in close price, for the dates after $1, the window start. Consecutive means consecutive among the dates that have snapshot rows; instruments missing on either date contribute nothing.
 marketMovementSQL = from marketMovesCTE, take the base, the securities value on the last snapshot date on or before $1, and the latest, the value on the newest snapshot date; return their dates and values, the market total as the sum of movements, trades as the latest minus the base minus the market total, the market total as a percent of the base, and whether it is at or above $2 or at or below minus $2, by cross multiplication and false when the base is zero. No row when there is no base date.
 marketContributorsSQL = from marketMovesCTE, sum the movements by instrument symbol, largest first, symbol breaking ties.
+drawdownStateBody = the part of drawdownLevelsSQL after its series, over a relation daily(date, securities), so another series can reuse it; drawdownLevelsSQL is dailySeriesSQL followed by it.
+highStateBody = the part of highStateSQL after its series, over the same relation; highStateSQL is dailySeriesSQL followed by it.
 maxDrawdownLevels = 100, the most levels one state reports.
 drawdownLevelsSQL = over dailySeriesSQL securities value, take each row's percent below the running maximum of the values up to and including its date, zero when the maximum is zero; take the latest row and the all-time high, its date, the earliest date reaching the maximum, and its value; generate the levels, minus the increment times one up to the deepest multiple the latest drawdown reaches, at most maxDrawdownLevels; and for each level the crossing, the date of the first row after the most recent row whose percent is above the level. Percent values are in percent units, computed by Postgres with trim_scale, as in seriesSummarySQL.
 
@@ -59,7 +61,7 @@ Decimals are rendered with trim_scale, so a division does not leave trailing zer
 
 ## Monitors.GetHighState(ctx Context) (*domain.HighState, error)
 
-1. Select the state via highStateSQL.
+1. Read the state with Store.highState over highStateSQL.
 2. if there is no row, return nil.
 3. Return the state, with Previous and the increases only when there is a previous row.
 
@@ -99,7 +101,7 @@ Dates are snapshot dates, so a weekend has none and a window starting on one use
 ## Monitors.GetDrawdownState(ctx Context, increment domain.Decimal) (domain.DrawdownState, error)
 
 1. if increment is not positive, return domain.ErrInvalidInput.
-2. Select the state via drawdownLevelsSQL.
+2. Read the state with Store.drawdownState over drawdownLevelsSQL.
 3. if the series is empty, return an empty state.
 4. Return the state, its levels ordered shallowest first.
 
@@ -112,3 +114,31 @@ Dates are snapshot dates, so a weekend has none and a window starting on one use
 - **2.** if the query fails, return the wrapped error.
 
 It reads the same dailySeriesSQL as the value history, so an all-cash date counts with securities value zero and the figure agrees with GetValueHistory. The percent of a row is judged against the running maximum, so a new all-time high is zero and clears every level. At most maxDrawdownLevels levels are returned, so a tiny increment cannot produce an unbounded result; the deeper levels are not reported. Reads are independent selects on one handle, no transaction.
+
+## Store.drawdownState(ctx Context, query string, args ...any) (domain.DrawdownState, error)
+
+1. Run the query, a drawdown query over any series, with the arguments.
+2. Collect its rows into a state: the first row's date, value, percent and high, and a level for each row that has one, in order.
+3. Return the state, with no levels and a zero date when there are no rows.
+
+#### Errors
+
+- **1.** if the query fails, return the wrapped error.
+
+---
+
+- **2.** if scanning fails, return the wrapped error.
+
+Shared by the portfolio's and the instruments' drawdown reads.
+
+## Store.highState(ctx Context, query string, args ...any) (*domain.HighState, error)
+
+1. Run the query, a high state query over any series, with the arguments.
+2. if there is no row, return nil.
+3. Return the state, with Previous and the increases only when there is a previous row.
+
+#### Errors
+
+- **1.** if the query fails, return the wrapped error.
+
+Shared by the portfolio's and the instruments' high reads.

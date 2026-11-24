@@ -68,6 +68,9 @@ func run() error {
 		monitor.NewPortfolioMovement(stores.Monitors, stores.Events),
 		monitor.NewAllocationDrift(stores.Monitors, stores.Events),
 		monitor.NewPriceVolatility(stores.Monitors, stores.Events),
+		monitor.NewPriceTarget(stores.Monitors, stores.Events),
+		monitor.NewInstrumentDrawdown(stores.Monitors, stores.Events),
+		monitor.NewInstrumentATH(stores.Monitors, stores.Events),
 	}
 	monitorsConfig := monitor.NewConfigLoader(cfg.MonitorsConfigFile, monitors)
 

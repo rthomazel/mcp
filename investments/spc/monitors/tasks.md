@@ -48,11 +48,11 @@ allocation drift spec.
 Add the window move and volatility calculation over adjusted closes, the window and interval settings, and the monitor. See the
 price volatility spec.
 
-## [ ] 7. Price target
+## [x] 7. Price target
 
 Add the monitor over the latest daily range. See the price target spec.
 
-## [ ] 8. Instrument drawdown and instrument all-time high
+## [x] 8. Instrument drawdown and instrument all-time high
 
 Add the per-instrument series, levels, crossings and interval, sharing code with the portfolio
 monitors where the models allow. Depends on tasks 2 and 3, whose settings and extremes engine it reuses. See the instrument extremes spec.

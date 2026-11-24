@@ -27,6 +27,9 @@ type EventTypes struct {
 	PortfolioMovement  string
 	AllocationDrift    string
 	PriceVolatility    string
+	PriceTarget        string
+	InstrumentDrawdown string
+	InstrumentATH      string
 }
 
 // Events holds the event type names, dot-separated lowercase words.
@@ -38,6 +41,9 @@ var Events = EventTypes{
 	PortfolioMovement:  "notification.portfolio.movement",
 	AllocationDrift:    "notification.allocation.drift",
 	PriceVolatility:    "notification.price.volatility",
+	PriceTarget:        "notification.price.target",
+	InstrumentDrawdown: "notification.instrument.drawdown",
+	InstrumentATH:      "notification.instrument.ath",
 }
 
 // NotificationPrefix starts the type of every event that produces a notification.
@@ -153,6 +159,43 @@ type PriceVolatilityData struct {
 	Threshold         Decimal `json:"threshold"`
 	VolatilityPercent Decimal `json:"volatility_percent"`
 	Moves             int     `json:"moves"`
+}
+
+// PriceTargetData is the payload of Events.PriceTarget. The subject of the
+// event is the ticker and the target price, joined by an at sign. Prices are unadjusted.
+type PriceTargetData struct {
+	Instrument string  `json:"instrument"`
+	Price      Decimal `json:"price"`
+	Date       Date    `json:"date"`
+	Low        Decimal `json:"low"`
+	High       Decimal `json:"high"`
+	Close      Decimal `json:"close"`
+}
+
+// InstrumentDrawdownData is the payload of Events.InstrumentDrawdown. The
+// subject of the event is the ticker, the level and the crossing date, joined
+// by at signs. Closes are adjusted.
+type InstrumentDrawdownData struct {
+	Instrument      string  `json:"instrument"`
+	Level           Decimal `json:"level"`
+	CrossedOn       Date    `json:"crossed_on"`
+	Date            Date    `json:"date"`
+	DrawdownPercent Decimal `json:"drawdown_percent"`
+	Close           Decimal `json:"close"`
+	HighDate        Date    `json:"high_date"`
+	HighClose       Decimal `json:"high_close"`
+}
+
+// InstrumentATHData is the payload of Events.InstrumentATH. The subject of the
+// event is the ticker and the date of the high, joined by an at sign. Closes are adjusted.
+type InstrumentATHData struct {
+	Instrument        string  `json:"instrument"`
+	Date              Date    `json:"date"`
+	Close             Decimal `json:"close"`
+	PreviousHighDate  Date    `json:"previous_high_date"`
+	PreviousHigh      Decimal `json:"previous_high"`
+	IncreasePercent   Decimal `json:"increase_percent"`
+	LastAnnouncedDate *Date   `json:"last_announced_date,omitempty"`
 }
 
 // NotificationFailedData is the payload of Events.NotificationFailed. It

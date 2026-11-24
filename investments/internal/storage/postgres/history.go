@@ -88,7 +88,10 @@ FROM latest, high, baseline, range_high, range_low, worst`
 	// drawdownStateSQL takes $1, the increment, and $2, the most levels. A row is shallower than a
 	// level when its drawdown is above it, compared by cross multiplication so no division rounds it.
 	// The crossing is the first date after the latest shallower one; a zero peak is shallower than every level.
-	drawdownStateSQL = `WITH ` + dailySeriesSQL + `, running AS (
+	drawdownStateSQL = `WITH ` + dailySeriesSQL + drawdownStateBody
+
+	// drawdownStateBody continues a query that defined daily(date, securities).
+	drawdownStateBody = `, running AS (
     SELECT date, securities AS value, MAX(securities) OVER (ORDER BY date) AS peak FROM daily
 ), latest AS (
     SELECT * FROM running ORDER BY date DESC LIMIT 1
@@ -114,7 +117,10 @@ LEFT JOIN LATERAL (
 ORDER BY lv.k`
 
 	// highStateSQL compares the latest securities value with the highest earlier one, the earliest date winning a tie.
-	highStateSQL = `WITH ` + dailySeriesSQL + `, latest AS (
+	highStateSQL = `WITH ` + dailySeriesSQL + highStateBody
+
+	// highStateBody continues a query that defined daily(date, securities).
+	highStateBody = `, latest AS (
     SELECT date, securities AS value FROM daily ORDER BY date DESC LIMIT 1
 ), previous AS (
     SELECT d.date, d.securities AS value FROM daily d, latest WHERE d.date < latest.date ORDER BY d.securities DESC, d.date LIMIT 1
@@ -300,7 +306,12 @@ func (s *Monitors) GetDrawdownState(ctx context.Context, increment domain.Decima
 		return domain.DrawdownState{}, fmt.Errorf("%w: the increment %q must be positive", domain.ErrInvalidInput, increment)
 	}
 
-	rows, err := s.db.QueryxContext(ctx, drawdownStateSQL, string(increment), maxDrawdownLevels)
+	return s.drawdownState(ctx, drawdownStateSQL, string(increment), maxDrawdownLevels)
+}
+
+// drawdownState runs a drawdown query, whichever series it reads, and collects its rows.
+func (s *Store) drawdownState(ctx context.Context, query string, args ...any) (domain.DrawdownState, error) {
+	rows, err := s.db.QueryxContext(ctx, query, args...)
 	if err != nil {
 		return domain.DrawdownState{}, fmt.Errorf("reading drawdown state: %w", err)
 	}
@@ -334,13 +345,18 @@ func (s *Monitors) GetDrawdownState(ctx context.Context, increment domain.Decima
 // GetHighState returns the latest securities value against the highest earlier
 // value. A change in value, not a return.
 func (s *Monitors) GetHighState(ctx context.Context) (*domain.HighState, error) {
+	return s.highState(ctx, highStateSQL)
+}
+
+// highState runs a high state query, whichever series it reads.
+func (s *Store) highState(ctx context.Context, query string, args ...any) (*domain.HighState, error) {
 	var (
 		state                                          domain.HighState
 		latestDate, previousDate                       sql.NullTime
 		previousValue, increaseUSD, increasePercentage sql.NullString
 	)
 
-	err := s.db.QueryRowxContext(ctx, highStateSQL).Scan(&latestDate, &state.ValueUSD,
+	err := s.db.QueryRowxContext(ctx, query, args...).Scan(&latestDate, &state.ValueUSD,
 		&previousDate, &previousValue, &state.NewHigh, &increaseUSD, &increasePercentage)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil //nolint:nilnil // no snapshots

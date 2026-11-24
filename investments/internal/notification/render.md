@@ -2,7 +2,7 @@
 
 ## Renderer
 
-1. Render(ctx Context, event domain.Event) (string, error)
+1. RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 Turns an event into plain, channel-neutral text, with no markup, so no handler is written for one service's formatting. A renderer may read current system state. Renderers are registered per event type and format; defaultFormat, plain, is the only format today.
 
@@ -32,6 +32,18 @@ No fields.
 
 No fields.
 
+## PriceTargetRenderer
+
+No fields.
+
+## InstrumentDrawdownRenderer
+
+No fields.
+
+## InstrumentATHRenderer
+
+No fields.
+
 ## NotificationFailedRenderer
 
 No fields.
@@ -42,7 +54,7 @@ No fields.
 
 Return the renderer for domain.Events.SnapshotIncomplete, domain.Events.PortfolioDrawdown, domain.Events.PortfolioATH, domain.Events.PortfolioMovement, domain.Events.AllocationDrift, domain.Events.PriceVolatility and domain.Events.NotificationFailed under defaultFormat.
 
-## SnapshotIncompleteRenderer.Render(ctx Context, event domain.Event) (string, error)
+## SnapshotIncompleteRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as SnapshotIncompleteData.
 2. List the incomplete snapshot runs through store.Updates.List.
@@ -60,10 +72,10 @@ Return the renderer for domain.Events.SnapshotIncomplete, domain.Events.Portfoli
 
 Only symbols, dates and counts reach the message. The no-run wording covers a price refresh job that never ran.
 
-## PortfolioDrawdownRenderer.Render(ctx Context, event domain.Event) (string, error)
+## PortfolioDrawdownRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as PortfolioDrawdownData.
-2. Round the drawdown to one decimal place, halves away from zero.
+2. Round the drawdown to one decimal place, halves away from zero, and the two securities values to the whole dollar with wholeDollars.
 3. Return a message naming the level crossed, the rounded drawdown without its sign, the date of the high with its securities value, the current securities value and the crossing date, and saying that this value change is affected by sales and withdrawals.
 
 #### Errors
@@ -76,7 +88,7 @@ Only symbols, dates and counts reach the message. The no-run wording covers a pr
 
 The message is built from the payload alone. Only the message is rounded; the payload keeps the exact figure, which stays equal to the value history's.
 
-## NotificationFailedRenderer.Render(ctx Context, event domain.Event) (string, error)
+## NotificationFailedRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as NotificationFailedData.
 2. Return a message naming the failed event's type, when it was recorded and the number of failed attempts, and saying that its delivery was given up on.
@@ -87,7 +99,7 @@ The message is built from the payload alone. Only the message is rounded; the pa
 
 It never repeats the failed event's payload.
 
-## PortfolioATHRenderer.Render(ctx Context, event domain.Event) (string, error)
+## PortfolioATHRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as PortfolioATHData.
 2. Round the increase percent with roundedPercent.
@@ -101,7 +113,7 @@ It never repeats the failed event's payload.
 
 - **2.** if the percent is not a decimal number, return an error naming it.
 
-## PortfolioMovementRenderer.Render(ctx Context, event domain.Event) (string, error)
+## PortfolioMovementRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as PortfolioMovementData.
 2. Round the market percent with roundedPercent.
@@ -118,7 +130,7 @@ It never repeats the failed event's payload.
 
 - **2.** if the percent is not a decimal number, return an error naming it.
 
-## AllocationDriftRenderer.Render(ctx Context, event domain.Event) (string, error)
+## AllocationDriftRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as AllocationDriftData.
 2. Take the bound that was crossed, the maximum for above and the minimum for below.
@@ -137,11 +149,53 @@ It never repeats the failed event's payload.
 
 - **3.** if a percent is not a decimal number, return an error naming it.
 
-## PriceVolatilityRenderer.Render(ctx Context, event domain.Event) (string, error)
+## PriceVolatilityRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as PriceVolatilityData.
 2. Round the move, the variation, the threshold and the volatility with roundedPercent.
 3. Return a message naming the instrument, rose or fell with the move without its sign, the window and its dates, the variation in standard deviations against the threshold, the usual move and how many moves and what look-back it comes from, and saying that moves use adjusted closes.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if a figure is not a decimal number, return an error naming it.
+
+## PriceTargetRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as PriceTargetData.
+2. Round the target, the low, the high and the close to cents with dollars.
+3. Return a message naming the instrument, the target and the date, the day's low, high and close, and saying the prices are not adjusted.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if an amount is not a decimal number, return an error naming it.
+
+## InstrumentDrawdownRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as InstrumentDrawdownData.
+2. Round the drawdown with roundedPercent and the two closes to cents with dollars.
+3. Return a message naming the instrument, the level crossed, the rounded drawdown without its sign, the crossing date, the adjusted close on the date and the high with its date.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if a figure is not a decimal number, return an error naming it.
+
+## InstrumentATHRenderer.RenderPlainText(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as InstrumentATHData.
+2. Round the increase with roundedPercent and the two closes to cents with dollars.
+3. Return a message naming the instrument, the date and the new adjusted close, the rounded percent above the previous high with its close and date, and the date of the last announced high or none.
 
 #### Errors
 
@@ -159,6 +213,14 @@ Round both to one decimal with roundedPercent; when the two texts are equal, whi
 
 Round to cents, halves away from zero, with math/big, and never return a negative zero: an amount that rounds to zero is 0.00.
 
+## roundedWholeDollars(amount Decimal) (string, error)
+
+The same rounding to the dollar: 96499.5 is 96500, and an amount that rounds to zero is 0.
+
+## wholeDollars(amounts ...Decimal) ([]string, error)
+
+Round each amount with roundedWholeDollars, in order, naming the failure. Used by the portfolio drawdown message, whose figures are large.
+
 ## dollars(amounts ...Decimal) ([]string, error)
 
 Round each amount with roundedDollars, in order, naming the failure.
@@ -175,4 +237,4 @@ Round the amount to cents, then write it with its sign before the dollar sign: +
 
 Join each symbol and its signed dollars with commas.
 
-Every percent is rounded to one decimal and every dollar amount to cents in the renderer, never earlier: events keep the exact figures from the database, and a message never shows more digits than a reader can use. A renderer for a new event type uses roundedPercent and roundedDollars for each number it prints.
+Every percent is rounded to one decimal and every dollar amount to cents in the renderer, except the portfolio drawdown message, whose figures are large and are rounded to the dollar, never earlier: events keep the exact figures from the database, and a message never shows more digits than a reader can use. A renderer for a new event type uses roundedPercent and roundedDollars for each number it prints.

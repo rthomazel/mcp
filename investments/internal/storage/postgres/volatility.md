@@ -7,8 +7,7 @@ priceVolatilitySQL = for one instrument id, with the window and the look-back as
 ## Monitors.GetPriceVolatility(ctx Context, ticker string, window duration.Duration, lookback duration.Duration, threshold domain.Decimal) (*domain.PriceVolatility, error)
 
 1. if threshold is not positive, return domain.ErrInvalidInput.
-2. Resolve the ticker with resolveTickers.
-3. if it is not registered, return domain.ErrInstrumentNotFound naming it.
+2. Resolve the ticker with resolveTicker.
 4. Select through priceVolatilitySQL with the instrument id, the window and look-back months and days, and the threshold.
 5. if there is no row, return nil.
 6. Return the result, with the volatility and variation only when they exist.
@@ -19,7 +18,7 @@ priceVolatilitySQL = for one instrument id, with the window and the look-back as
 
 ---
 
-- **2.** return the error of resolveTickers, domain.ErrInvalidInput for a ticker on several instruments.
+- **2.** return the error of resolveTicker, domain.ErrInstrumentNotFound for an unregistered ticker and domain.ErrInvalidInput for one on several instruments.
 
 ---
 

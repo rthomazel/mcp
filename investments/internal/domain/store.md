@@ -46,6 +46,20 @@ Reports freshness and health as of today in the market timezone: per held instru
 
 Returns the securities value, and cash and account equity where cash snapshots exist, over the range with one point per window of days, with summary measures: latest value, all-time high, drawdown from it, change from the baseline, range high and low and maximum drawdown. Returns ErrInvalidInput for a negative window, an inverted range or a series over the point limit. Changes in value, not returns.
 
+## MonitorStore
+
+1. GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
+2. GetHighState(ctx Context) (*HighState, error)
+3. GetMarketMovement(ctx Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
+4. GetAllocationDrift(ctx Context, groups []AllocationGroup) (*AllocationDrift, error)
+5. GetPriceVolatility(ctx Context, ticker string, window duration.Duration, lookback duration.Duration, threshold Decimal) (*PriceVolatility, error)
+6. GetInstrumentDrawdownState(ctx Context, ticker string, increment Decimal) (DrawdownState, error)
+7. GetInstrumentHighState(ctx Context, ticker string) (*HighState, error)
+8. GetPriceTarget(ctx Context, ticker string, price Decimal) (*PriceTarget, error)
+9. ListHeldTickers(ctx Context) ([]string, error)
+
+The read models the monitors judge, each computed in the database and answering one question about the portfolio or an instrument. Implemented by internal/storage/postgres.
+
 ### GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
 
 Returns the drawdown of the latest securities value from the all-time high, and for each multiple of increment the drawdown is at or below the date its current stay at that level began, over the series GetValueHistory uses. The all-time high is over every stored date, whatever the range. Returns ErrInvalidInput for an increment that is not positive, and an empty state, no date and no levels, when there are no snapshots. Changes in value, not returns.
@@ -66,15 +80,21 @@ Returns each group's share of the securities value on the latest date of the ser
 
 Returns the move of the ticker's adjusted close on the latest price date in the store over window, the volatility of its moves of the same length over lookback, the variation and whether it reaches threshold in either direction. Nil when the ticker has no price on the latest date or none on or before the window start. Returns ErrInstrumentNotFound for an unregistered ticker and ErrInvalidInput for one matching several instruments or a threshold that is not positive.
 
-## MonitorStore
+### GetInstrumentDrawdownState(ctx Context, ticker string, increment Decimal) (DrawdownState, error)
 
-1. GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
-2. GetHighState(ctx Context) (*HighState, error)
-3. GetMarketMovement(ctx Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
-4. GetAllocationDrift(ctx Context, groups []AllocationGroup) (*AllocationDrift, error)
-5. GetPriceVolatility(ctx Context, ticker string, window duration.Duration, lookback duration.Duration, threshold Decimal) (*PriceVolatility, error)
+GetDrawdownState over the ticker's adjusted closes: every stored price from the first, so the high is the all-time one, and Levels, crossings and drawdown as for the portfolio. The state's ValueUSD and HighValueUSD hold adjusted closes. An empty state, as without snapshots, when the ticker has no price on the latest price date of the store. Returns ErrInstrumentNotFound for an unregistered ticker and ErrInvalidInput for a ticker on several instruments or an increment that is not positive.
 
-The read models the monitors judge, each computed in the database and answering one question about the portfolio or an instrument. Implemented by internal/storage/postgres.
+### GetInstrumentHighState(ctx Context, ticker string) (*HighState, error)
+
+GetHighState over the ticker's adjusted closes, nil when it has no price on the latest price date of the store. Same errors as GetInstrumentDrawdownState.
+
+### GetPriceTarget(ctx Context, ticker string, price Decimal) (*PriceTarget, error)
+
+Returns the ticker's unadjusted low, high and close on the latest price date of the store and whether price is within the low to high range, ends included, decided in the database without rounding. Nil when the ticker has no price on that date. Returns ErrInstrumentNotFound for an unregistered ticker and ErrInvalidInput for a ticker on several instruments or a price that is not positive.
+
+### ListHeldTickers(ctx Context) ([]string, error)
+
+Returns the symbols of the instruments with a snapshot on the latest snapshot date, ordered, empty without snapshots.
 
 ## CashStore
 

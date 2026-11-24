@@ -213,28 +213,28 @@ func TestRenderers(t *testing.T) {
 		{DateFrom: &day, DateTo: &day, ErrorMessage: "VOO missing price"},
 	}})
 
-	text, err := renderers[domain.Events.SnapshotIncomplete][defaultFormat].Render(context.Background(), event)
+	text, err := renderers[domain.Events.SnapshotIncomplete][defaultFormat].RenderPlainText(context.Background(), event)
 	require.NoError(t, err)
 	assert.Contains(t, text, "2026-01-05")
 	assert.Contains(t, text, "VOO missing price")
 	assert.NotContains(t, text, "wrong day")
 
 	empty := NewRenderers(&fakeUpdates{})
-	text, err = empty[domain.Events.SnapshotIncomplete][defaultFormat].Render(context.Background(), event)
+	text, err = empty[domain.Events.SnapshotIncomplete][defaultFormat].RenderPlainText(context.Background(), event)
 	require.NoError(t, err)
 	assert.Contains(t, text, "no run was recorded")
 
 	failing := NewRenderers(&fakeUpdates{err: errors.New("db")})
-	_, err = failing[domain.Events.SnapshotIncomplete][defaultFormat].Render(context.Background(), event)
+	_, err = failing[domain.Events.SnapshotIncomplete][defaultFormat].RenderPlainText(context.Background(), event)
 	assert.Error(t, err)
 
-	_, err = empty[domain.Events.SnapshotIncomplete][defaultFormat].Render(context.Background(), domain.Event{Data: []byte("[")})
+	_, err = empty[domain.Events.SnapshotIncomplete][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: []byte("[")})
 	assert.Error(t, err)
 
 	failed, err := json.Marshal(domain.NotificationFailedData{EventID: 1, EventType: "notification.snapshot.incomplete", RecordedAt: day, Failures: 10})
 	require.NoError(t, err)
 
-	text, err = renderers[domain.Events.NotificationFailed][defaultFormat].Render(context.Background(), domain.Event{Data: failed})
+	text, err = renderers[domain.Events.NotificationFailed][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: failed})
 	require.NoError(t, err)
 	assert.Contains(t, text, "notification.snapshot.incomplete")
 	assert.Contains(t, text, "10")
@@ -312,15 +312,16 @@ func TestPortfolioDrawdownRenderer(t *testing.T) {
 
 	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioDrawdown][defaultFormat]
 
-	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err := renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "down 7.2%")
 	assert.Contains(t, text, "-6% level on 2026-11-18")
-	assert.Contains(t, text, "$92800.00")
-	assert.Contains(t, text, "2026-11-01: $100000.00")
+	assert.Contains(t, text, "$92800.")
+	assert.NotContains(t, text, "$92800.00")
+	assert.Contains(t, text, "2026-11-01: $100000.")
 	assert.Contains(t, text, "This value change is affected by sales and withdrawals.")
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: []byte("[")})
 	assert.Error(t, err)
 }
 
@@ -335,7 +336,7 @@ func TestPortfolioATHRenderer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err := renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "new all-time high on 2026-11-20: $110000.00")
 	assert.Contains(t, text, "$2000.00 (1.9%) above the previous high of $108000.00 on 2026-11-17")
@@ -347,11 +348,11 @@ func TestPortfolioATHRenderer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "Last announced high: none.")
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: []byte("[")})
 	assert.Error(t, err)
 }
 
@@ -367,7 +368,7 @@ func TestPortfolioMovementRenderer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err := renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "fell 3.5% (-$3456.00) over 3d, from 2026-11-17 to 2026-11-20")
 	assert.Contains(t, text, "from $100000.00 to $96000.00: market -$3456.00, trades -$544.00")
@@ -380,12 +381,12 @@ func TestPortfolioMovementRenderer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "rose 0.5% (+$10.00)")
 	assert.NotContains(t, text, "Largest")
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: []byte("[")})
 	assert.Error(t, err)
 }
 
@@ -398,7 +399,7 @@ func TestRenderersRoundDollarsToCents(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err := renderers[domain.Events.PortfolioATH][defaultFormat].Render(context.Background(), domain.Event{Data: ath})
+	text, err := renderers[domain.Events.PortfolioATH][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: ath})
 	require.NoError(t, err)
 	assert.Contains(t, text, "$1296.30.")
 	assert.Contains(t, text, "$1.29 (0.1%) above the previous high of $1295.00")
@@ -409,13 +410,13 @@ func TestRenderersRoundDollarsToCents(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err = renderers[domain.Events.PortfolioMovement][defaultFormat].Render(context.Background(), domain.Event{Data: movement})
+	text, err = renderers[domain.Events.PortfolioMovement][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: movement})
 	require.NoError(t, err)
 	assert.Contains(t, text, "rose 0.0% (+$0.00)", "a sub-cent amount is not negative or signed zero")
 	assert.Contains(t, text, "from $1000.00 to $1034.50: market +$0.00, trades -$0.01")
 	assert.Contains(t, text, "VOO +$34.56.", "halves round away from zero")
 
-	_, err = renderers[domain.Events.PortfolioMovement][defaultFormat].Render(context.Background(),
+	_, err = renderers[domain.Events.PortfolioMovement][defaultFormat].RenderPlainText(context.Background(),
 		domain.Event{Data: []byte(`{"market_percent":"1","market_usd":"abc"}`)})
 	assert.Error(t, err)
 }
@@ -432,7 +433,7 @@ func TestPortfolioDrawdownRendererRounding(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+		text, err := renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 		require.NoError(t, err)
 		assert.Contains(t, text, want, percent)
 	}
@@ -440,7 +441,7 @@ func TestPortfolioDrawdownRendererRounding(t *testing.T) {
 	data, err := json.Marshal(domain.PortfolioDrawdownData{Level: "-3", DrawdownPercent: "abc"})
 	require.NoError(t, err)
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	assert.Error(t, err)
 }
 
@@ -455,7 +456,7 @@ func TestAllocationDriftRenderer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err := renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "Allocation of us-core is above its maximum: 17.5% of the securities value against 15.0%")
 	assert.Contains(t, text, "since 2026-11-17 (as of 2026-11-20)")
@@ -465,7 +466,7 @@ func TestAllocationDriftRenderer(t *testing.T) {
 	data, err = json.Marshal(domain.AllocationDriftData{Group: "gold", Side: "below", Date: day, StayStart: day, AllocationPercent: "4.96", MinPercent: &minimum})
 	require.NoError(t, err)
 
-	text, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "is below its minimum: 4.96% of the securities value against 5.00%",
 		"a rounding that would show the bound reached keeps two decimals")
@@ -473,10 +474,10 @@ func TestAllocationDriftRenderer(t *testing.T) {
 	data, err = json.Marshal(domain.AllocationDriftData{Group: "gold", Side: "below", AllocationPercent: "4"})
 	require.NoError(t, err)
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	assert.Error(t, err, "a side without its bound")
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: []byte("[")})
 	assert.Error(t, err)
 }
 
@@ -490,7 +491,7 @@ func TestPriceVolatilityRenderer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	text, err := renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	require.NoError(t, err)
 	assert.Contains(t, text, "QQQ fell 4.3% over 5d, from 2026-11-15 to 2026-11-20: 2.4 standard deviations against a threshold of 2.0.")
 	assert.Contains(t, text, "Its usual move over 5d is 1.8%, the standard deviation of 61 moves in the last 3mo.")
@@ -499,9 +500,76 @@ func TestPriceVolatilityRenderer(t *testing.T) {
 	data, err = json.Marshal(domain.PriceVolatilityData{Instrument: "QQQ", Direction: "up", MovePercent: "x"})
 	require.NoError(t, err)
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
 	assert.Error(t, err)
 
-	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	_, err = renderer.RenderPlainText(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
+}
+
+func TestPortfolioDrawdownRendererWholeDollars(t *testing.T) {
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioDrawdown][defaultFormat]
+
+	data, err := json.Marshal(domain.PortfolioDrawdownData{
+		Level: "-3", DrawdownPercent: "-3.5", ValueUSD: "96499.5", HighValueUSD: "100000.49",
+	})
+	require.NoError(t, err)
+
+	text, err := renderer.RenderPlainText(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "$96500.")
+	assert.Contains(t, text, "$100000.")
+	assert.NotContains(t, text, "96499")
+	assert.NotContains(t, text, "100000.49")
+}
+
+func TestInstrumentRenderers(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	last := day.AddDate(0, 0, -20)
+	renderers := NewRenderers(&fakeUpdates{})
+
+	target, err := json.Marshal(domain.PriceTargetData{
+		Instrument: "QQQ", Price: "232", Date: day, Low: "230.004", High: "236.995", Close: "234.5",
+	})
+	require.NoError(t, err)
+
+	text, err := renderers[domain.Events.PriceTarget][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: target})
+	require.NoError(t, err)
+	assert.Contains(t, text, "QQQ reached its target price of $232.00 on 2026-11-20")
+	assert.Contains(t, text, "Low $230.00, high $237.00, close $234.50")
+
+	drawdown, err := json.Marshal(domain.InstrumentDrawdownData{
+		Instrument: "QQQ", Level: "-5", CrossedOn: day.AddDate(0, 0, -2), Date: day, DrawdownPercent: "-7.2499",
+		Close: "400.125", HighDate: day.AddDate(0, 0, -30), HighClose: "431.239",
+	})
+	require.NoError(t, err)
+
+	text, err = renderers[domain.Events.InstrumentDrawdown][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: drawdown})
+	require.NoError(t, err)
+	assert.Contains(t, text, "QQQ is down 7.2% from its high, crossing the -5% level on 2026-11-18")
+	assert.Contains(t, text, "$400.13")
+	assert.Contains(t, text, "2026-10-21: $431.24")
+
+	high, err := json.Marshal(domain.InstrumentATHData{
+		Instrument: "QQQ", Date: day, Close: "450.999", PreviousHighDate: day.AddDate(0, 0, -3), PreviousHigh: "447.001",
+		IncreasePercent: "0.8948", LastAnnouncedDate: &last,
+	})
+	require.NoError(t, err)
+
+	text, err = renderers[domain.Events.InstrumentATH][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: high})
+	require.NoError(t, err)
+	assert.Contains(t, text, "QQQ reached a new all-time high on 2026-11-20: $451.00")
+	assert.Contains(t, text, "0.9% above the previous high of $447.00 on 2026-11-17")
+	assert.Contains(t, text, "Last announced high: 2026-10-31")
+
+	for eventType := range map[string]bool{domain.Events.PriceTarget: true, domain.Events.InstrumentDrawdown: true, domain.Events.InstrumentATH: true} {
+		_, err = renderers[eventType][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: []byte("[")})
+		assert.Error(t, err, eventType)
+	}
+
+	bad, err := json.Marshal(domain.InstrumentDrawdownData{Instrument: "QQQ", DrawdownPercent: "abc"})
+	require.NoError(t, err)
+
+	_, err = renderers[domain.Events.InstrumentDrawdown][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: bad})
 	assert.Error(t, err)
 }

@@ -24,6 +24,9 @@ How the outbox retries, expires and retains events. The values are server config
 5. Events.PortfolioMovement = "notification.portfolio.movement"
 6. Events.AllocationDrift = "notification.allocation.drift"
 7. Events.PriceVolatility = "notification.price.volatility"
+8. Events.PriceTarget = "notification.price.target"
+9. Events.InstrumentDrawdown = "notification.instrument.drawdown"
+10. Events.InstrumentATH = "notification.instrument.ath"
 
 Event types are dot-separated words, named here and nowhere else.
 
@@ -139,6 +142,42 @@ Payload of Events.AllocationDrift. The subject of the event is the group name, t
 11. Moves int, how many moves the volatility is taken from
 
 Payload of Events.PriceVolatility. The subject of the event is the ticker, Date and Direction, joined by at signs, for example QQQ@2026-11-20@up. Date is also what the instrument's interval is measured from.
+
+## PriceTargetData
+
+1. Instrument string, the ticker
+2. Price Decimal, the target, normalized
+3. Date Date, the latest price date
+4. Low Decimal, the day's low
+5. High Decimal, the day's high
+6. Close Decimal, the day's close
+
+Payload of Events.PriceTarget. The subject of the event is the ticker and Price joined by an at sign, for example QQQ@232. Prices are unadjusted. The subject carries no date, so a target is announced once until the event is deleted, which the outbox does a year after it was handled.
+
+## InstrumentDrawdownData
+
+1. Instrument string, the ticker
+2. Level Decimal, the level crossed
+3. CrossedOn Date, the first date of the stay at or below the level
+4. Date Date, the latest price date
+5. DrawdownPercent Decimal, zero or negative
+6. Close Decimal, the adjusted close on Date
+7. HighDate Date, the date of the all-time high
+8. HighClose Decimal, the adjusted close at the high
+
+Payload of Events.InstrumentDrawdown. The subject of the event is the ticker, Level and CrossedOn joined by at signs, for example QQQ@-5@2026-11-05.
+
+## InstrumentATHData
+
+1. Instrument string, the ticker
+2. Date Date, the date of the new high
+3. Close Decimal, the adjusted close on Date
+4. PreviousHighDate Date, the date of the highest earlier close
+5. PreviousHigh Decimal, that close
+6. IncreasePercent Decimal, the increase over it
+7. LastAnnouncedDate *Date, the date of the instrument's last announced high, omitted when none
+
+Payload of Events.InstrumentATH. The subject of the event is the ticker and Date joined by an at sign, for example QQQ@2026-11-20. Date is also what the instrument's interval is measured from.
 
 ## NotificationFailedData
 

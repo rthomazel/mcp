@@ -63,3 +63,15 @@ Select through allocationMemberSharesSQL and append each row to its group's Memb
 ## boundText(bound *domain.Decimal) string
 
 Return the bound as text, empty for nil.
+
+## Store.resolveTicker(ctx Context, ticker string) (int, error)
+
+1. Resolve the ticker with resolveTickers.
+2. if it is not registered, return domain.ErrInstrumentNotFound naming it.
+3. Return its instrument id.
+
+#### Errors
+
+- **1.** return the error of resolveTickers, domain.ErrInvalidInput for a ticker on several instruments.
+
+Shared by the monitor reads of one instrument.
