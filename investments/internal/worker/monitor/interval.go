@@ -10,9 +10,9 @@ import (
 )
 
 // lastEventDate is the date field of the payload of the latest event of the
-// type, nil when there is none.
-func lastEventDate(ctx context.Context, events domain.EventStore, eventType string) (*domain.Date, error) {
-	event, err := events.Latest(ctx, eventType)
+// type whose subject starts with the prefix, nil when there is none.
+func lastEventDate(ctx context.Context, events domain.EventStore, eventType, subjectPrefix string) (*domain.Date, error) {
+	event, err := events.Latest(ctx, eventType, subjectPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("reading latest %s event: %w", eventType, err)
 	}

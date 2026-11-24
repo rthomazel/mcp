@@ -7,7 +7,7 @@ movementDefaultSpan = "1d", the default window and interval.
 
 ## PortfolioMovement
 
-1. store domain.GenericStore, for the market movement
+1. store domain.MonitorStore, for the market movement
 2. events domain.EventStore, where the events are recorded and the last one is read
 
 The monitor for the securities value moving over a window because of prices alone.
@@ -21,7 +21,7 @@ The monitor for the securities value moving over a window because of prices alon
 
 # Functions
 
-## NewPortfolioMovement(store domain.GenericStore, events domain.EventStore) *PortfolioMovement
+## NewPortfolioMovement(store domain.MonitorStore, events domain.EventStore) *PortfolioMovement
 
 Build the monitor.
 

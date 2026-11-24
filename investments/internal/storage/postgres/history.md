@@ -57,7 +57,7 @@ Percent values are in percent units, such as -12.5, computed by Postgres. A zero
 Reads are independent selects on one handle, no transaction, as in GetStatus.
 Decimals are rendered with trim_scale, so a division does not leave trailing zeros. The summary SQL is one template over the value column, securities or equity, so both series use the same definitions.
 
-## Store.GetHighState(ctx Context) (*domain.HighState, error)
+## Monitors.GetHighState(ctx Context) (*domain.HighState, error)
 
 1. Select the state via highStateSQL.
 2. if there is no row, return nil.
@@ -67,7 +67,7 @@ Decimals are rendered with trim_scale, so a division does not leave trailing zer
 
 - **1.** if the query fails, return the wrapped error.
 
-## Store.GetMarketMovement(ctx Context, window duration.Duration, threshold domain.Decimal) (*domain.MarketMovement, error)
+## Monitors.GetMarketMovement(ctx Context, window duration.Duration, threshold domain.Decimal) (*domain.MarketMovement, error)
 
 1. if threshold is not positive, return domain.ErrInvalidInput.
 2. Read the latest snapshot date.
@@ -96,7 +96,7 @@ Decimals are rendered with trim_scale, so a division does not leave trailing zer
 
 Dates are snapshot dates, so a weekend has none and a window starting on one uses the Friday before it as its base. Instruments are matched by id, so a position that is sold and bought back contributes on the days it was held on both dates. Reads are independent selects on one handle, no transaction.
 
-## Store.GetDrawdownState(ctx Context, increment domain.Decimal) (domain.DrawdownState, error)
+## Monitors.GetDrawdownState(ctx Context, increment domain.Decimal) (domain.DrawdownState, error)
 
 1. if increment is not positive, return domain.ErrInvalidInput.
 2. Select the state via drawdownLevelsSQL.

@@ -29,6 +29,16 @@ type GenericStore interface {
 	// with summary measures. Returns ErrInvalidInput, including for a series
 	// over the configured maximum number of points.
 	GetValueHistory(ctx context.Context, filter HistoryFilter) (ValueHistory, error)
+	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
+	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
+	// GetPortfolio values active positions at real closes as of date, or today
+	// in the market timezone when nil, with average-cost P&L and cash.
+	GetPortfolio(ctx context.Context, date *Date) (Portfolio, error)
+}
+
+// MonitorStore holds the read models the monitors judge: each answers one
+// question about the portfolio or an instrument, computed in the database.
+type MonitorStore interface {
 	// GetDrawdownState returns the drawdown of the latest securities value from
 	// the all-time high and, for each multiple of increment it is at or below,
 	// when its current stay there began. Returns ErrInvalidInput for an
@@ -42,11 +52,17 @@ type GenericStore interface {
 	// snapshot on or before the window's start. Returns ErrInvalidInput for a
 	// threshold that is not positive.
 	GetMarketMovement(ctx context.Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
-	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
-	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
-	// GetPortfolio values active positions at real closes as of date, or today
-	// in the market timezone when nil, with average-cost P&L and cash.
-	GetPortfolio(ctx context.Context, date *Date) (Portfolio, error)
+	// GetAllocationDrift returns each group's allocation of the securities value
+	// on the latest date and, for a group outside its band, when the stay began.
+	// Nil without snapshots or when the latest date holds no securities. A
+	// ticker matching several instruments is ErrInvalidInput.
+	GetAllocationDrift(ctx context.Context, groups []AllocationGroup) (*AllocationDrift, error)
+	// GetPriceVolatility returns the move of the ticker's adjusted close over
+	// window on the latest price date and its variation against the volatility
+	// over lookback. Nil when the ticker has no price on the latest date.
+	// Returns ErrInstrumentNotFound for an unregistered ticker and
+	// ErrInvalidInput for an ambiguous one or a threshold that is not positive.
+	GetPriceVolatility(ctx context.Context, ticker string, window, lookback duration.Duration, threshold Decimal) (*PriceVolatility, error)
 }
 
 // CashStore holds cash transactions and the balance.
@@ -116,9 +132,9 @@ type EventStore interface {
 	// and gives up at the configured maximum failures (error log,
 	// notification.failed event). Returns ErrInvalidInput or ErrEventNotFound.
 	SaveOutcome(ctx context.Context, id int64, outcome EventOutcome) error
-	// Latest returns the most recently recorded event of the type, nil when
-	// there is none.
-	Latest(ctx context.Context, eventType string) (*Event, error)
+	// Latest returns the most recently recorded event of the type whose
+	// subject starts with subjectPrefix, empty for any, nil when there is none.
+	Latest(ctx context.Context, eventType, subjectPrefix string) (*Event, error)
 	// Remove deletes an event given up on or expired. Returns
 	// ErrEventNotFound or ErrEventNotRemovable.
 	Remove(ctx context.Context, id int64) error
@@ -136,4 +152,5 @@ type Stores struct {
 	Snapshots SnapshotStore
 	Updates   UpdateStore
 	Events    EventStore
+	Monitors  MonitorStore
 }

@@ -30,6 +30,12 @@ type PortfolioATHRenderer struct{}
 // PortfolioMovementRenderer announces a market movement over a window.
 type PortfolioMovementRenderer struct{}
 
+// AllocationDriftRenderer announces a group outside its allocation band.
+type AllocationDriftRenderer struct{}
+
+// PriceVolatilityRenderer announces an unusual price move.
+type PriceVolatilityRenderer struct{}
+
 // NotificationFailedRenderer announces an event whose delivery was given up on.
 type NotificationFailedRenderer struct{}
 
@@ -40,6 +46,8 @@ func NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer {
 		domain.Events.PortfolioDrawdown:  {defaultFormat: &PortfolioDrawdownRenderer{}},
 		domain.Events.PortfolioATH:       {defaultFormat: &PortfolioATHRenderer{}},
 		domain.Events.PortfolioMovement:  {defaultFormat: &PortfolioMovementRenderer{}},
+		domain.Events.AllocationDrift:    {defaultFormat: &AllocationDriftRenderer{}},
+		domain.Events.PriceVolatility:    {defaultFormat: &PriceVolatilityRenderer{}},
 		domain.Events.NotificationFailed: {defaultFormat: &NotificationFailedRenderer{}},
 	}
 }
@@ -177,6 +185,113 @@ func (r *PortfolioMovementRenderer) Render(_ context.Context, event domain.Event
 	}
 
 	return text + "\nThis value change is affected by sales and withdrawals.", nil
+}
+
+// Render names the group, the side and the bound crossed, the allocation, the start of the stay and the members.
+func (r *AllocationDriftRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+	var data domain.AllocationDriftData
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		return "", fmt.Errorf("decoding allocation drift data: %w", err)
+	}
+
+	bound, name := data.MaxPercent, "maximum"
+	if data.Side == domain.SideBelow {
+		bound, name = data.MinPercent, "minimum"
+	}
+
+	if bound == nil {
+		return "", fmt.Errorf("allocation drift event has no %s to compare with", name)
+	}
+
+	allocation, limit, err := percentsAgainst(data.AllocationPercent, *bound)
+	if err != nil {
+		return "", fmt.Errorf("rounding allocation: %w", err)
+	}
+
+	members := make([]string, len(data.Members))
+
+	for i, member := range data.Members {
+		share, err := roundedPercent(member.AllocationPercent)
+		if err != nil {
+			return "", fmt.Errorf("rounding allocation of %s: %w", member.Symbol, err)
+		}
+
+		members[i] = member.Symbol + " " + share + "%"
+	}
+
+	return fmt.Sprintf("Allocation of %s is %s its %s: %s%% of the securities value against %s%%, since %s (as of %s).\n"+
+		"Instruments: %s.\n"+
+		"This allocation changes with trades as well as with prices.",
+		data.Group, data.Side, name, allocation, limit, data.StayStart.Format(time.DateOnly), data.Date.Format(time.DateOnly),
+		strings.Join(members, ", ")), nil
+}
+
+// Render names the instrument, the move over the window, the variation against the threshold and the baseline.
+func (r *PriceVolatilityRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+	var data domain.PriceVolatilityData
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		return "", fmt.Errorf("decoding price volatility data: %w", err)
+	}
+
+	move, err := roundedPercent(data.MovePercent)
+	if err != nil {
+		return "", fmt.Errorf("rounding move percent: %w", err)
+	}
+
+	variation, err := roundedPercent(data.Variation)
+	if err != nil {
+		return "", fmt.Errorf("rounding variation: %w", err)
+	}
+
+	threshold, err := roundedPercent(data.Threshold)
+	if err != nil {
+		return "", fmt.Errorf("rounding threshold: %w", err)
+	}
+
+	volatility, err := roundedPercent(data.VolatilityPercent)
+	if err != nil {
+		return "", fmt.Errorf("rounding volatility: %w", err)
+	}
+
+	verb := "rose"
+	if data.Direction == "down" {
+		verb = "fell"
+	}
+
+	return fmt.Sprintf("%s %s %s%% over %s, from %s to %s: %s standard deviations against a threshold of %s.\n"+
+		"Its usual move over %s is %s%%, the standard deviation of %d moves in the last %s.\n"+
+		"Moves use adjusted closes.",
+		data.Instrument, verb, strings.TrimPrefix(move, "-"), data.Window, data.StartDate.Format(time.DateOnly),
+		data.Date.Format(time.DateOnly), strings.TrimPrefix(variation, "-"), threshold,
+		data.Window, volatility, data.Moves, data.Lookback), nil
+}
+
+// percentsAgainst rounds an allocation and the bound it is compared with to one decimal, and to two when
+// that would show them equal, so a group outside its band never reads as exactly at the bound.
+func percentsAgainst(allocation, bound domain.Decimal) (allocationText, boundText string, err error) {
+	allocationText, err = roundedPercent(allocation)
+	if err != nil {
+		return "", "", err
+	}
+
+	boundText, err = roundedPercent(bound)
+	if err != nil {
+		return "", "", err
+	}
+
+	if allocationText != boundText {
+		return allocationText, boundText, nil
+	}
+
+	for _, value := range []struct {
+		percent domain.Decimal
+		text    *string
+	}{{allocation, &allocationText}, {bound, &boundText}} {
+		rat, _ := new(big.Rat).SetString(string(value.percent))
+		*value.text = rat.FloatString(2)
+	}
+
+	return allocationText, boundText, nil
 }
 
 // roundedPercent rounds a percent to one decimal place, halves away from zero.

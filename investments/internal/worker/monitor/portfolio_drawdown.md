@@ -6,14 +6,14 @@ incrementKey = "increment_pct", the one setting.
 
 ## PortfolioDrawdown
 
-1. store domain.GenericStore, for the drawdown state
+1. store domain.MonitorStore, for the drawdown state
 2. events domain.EventStore, where the events are recorded
 
 The monitor for the securities value falling to a multiple of the increment below its all-time high.
 
 # Functions
 
-## NewPortfolioDrawdown(store domain.GenericStore, events domain.EventStore) *PortfolioDrawdown
+## NewPortfolioDrawdown(store domain.MonitorStore, events domain.EventStore) *PortfolioDrawdown
 
 Build the monitor.
 

@@ -28,11 +28,11 @@ The store's tunables, all from the server configuration; the store holds no defa
 
 The generic store, implementing domain.GenericStore, and the core every other store shares: the connection and the settings. Its methods are spread across instrument.go, transaction.go, positions.go, valuation.go, history.go and status.go by concern.
 
-## Cash, Prices, Snapshots, Updates, Events
+## Cash, Prices, Snapshots, Updates, Events, Monitors
 
 1. Store *Store, embedded
 
-One small type per narrower store, each implementing the domain interface of the same name with a compile-time assertion. They share the Store's connection and settings through the embedded pointer, so a method that needs a shared helper, such as a transaction or the reference date, calls it directly. The embedding means the narrower types also carry the generic store's methods; consumers hold the domain interfaces, which hide them. The methods are in cash.go, price.go, snapshot.go, event.go; the updates log lives in snapshot.go.
+One small type per narrower store, each implementing the domain interface of the same name with a compile-time assertion. They share the Store's connection and settings through the embedded pointer, so a method that needs a shared helper, such as a transaction or the reference date, calls it directly. The embedding means the narrower types also carry the generic store's methods; consumers hold the domain interfaces, which hide them. The methods are in cash.go, price.go, snapshot.go, event.go; the updates log lives in snapshot.go. Monitors is in history.go, allocation.go and volatility.go.
 
 ## Stores
 
@@ -42,6 +42,7 @@ One small type per narrower store, each implementing the domain interface of the
 4. Snapshots *Snapshots
 5. Updates *Updates
 6. Events *Events
+7. Monitors *Monitors
 
 Every store over one connection, built by Open.
 

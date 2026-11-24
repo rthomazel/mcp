@@ -295,3 +295,14 @@ func TestHistoryFilterNormalize(t *testing.T) {
 }
 
 func ptr(value string) *string { return &value }
+
+func TestDecimalCompare(t *testing.T) {
+	for _, tc := range []struct {
+		left, right Decimal
+		want        int
+	}{
+		{"1", "2", -1}, {"2", "1", 1}, {"1.0", "1", 0}, {"10", "9.99", 1}, {"-1", "1", -1}, {"0.10", "0.1", 0}, {"100", "100.5", -1},
+	} {
+		assert.Equal(t, tc.want, tc.left.Compare(tc.right), "%s against %s", tc.left, tc.right)
+	}
+}

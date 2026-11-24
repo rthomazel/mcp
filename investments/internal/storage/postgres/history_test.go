@@ -205,7 +205,7 @@ func TestValueHistoryFlatSeriesHasZeroDrawdown(t *testing.T) {
 func drawdownState(t *testing.T, store *Stores, increment string) domain.DrawdownState {
 	t.Helper()
 
-	state, err := store.GetDrawdownState(context.Background(), domain.Decimal(increment))
+	state, err := store.Monitors.GetDrawdownState(context.Background(), domain.Decimal(increment))
 	require.NoError(t, err)
 
 	return state
@@ -233,7 +233,7 @@ func TestDrawdownStateRejectsANonPositiveIncrement(t *testing.T) {
 	store := newTestStore(t)
 
 	for _, increment := range []string{"0", "-3", "0.0"} {
-		_, err := store.GetDrawdownState(context.Background(), domain.Decimal(increment))
+		_, err := store.Monitors.GetDrawdownState(context.Background(), domain.Decimal(increment))
 		assert.ErrorIs(t, err, domain.ErrInvalidInput, increment)
 	}
 }

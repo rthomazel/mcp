@@ -1,8 +1,8 @@
 # Functions
 
-## lastEventDate(ctx Context, events domain.EventStore, eventType string) (*domain.Date, error)
+## lastEventDate(ctx Context, events domain.EventStore, eventType string, subjectPrefix string) (*domain.Date, error)
 
-1. Read the latest event of the type through events.Latest.
+1. Read the latest event of the type and subject prefix through events.Latest.
 2. if there is none, return nil.
 3. Decode the date field of its payload and return it.
 

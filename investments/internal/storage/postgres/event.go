@@ -34,7 +34,8 @@ ORDER BY created_at, id
 LIMIT $3`
 
 	latestEventSQL = `
-SELECT ` + eventColumns + ` FROM events WHERE type = $1 ORDER BY created_at DESC, id DESC LIMIT 1`
+SELECT ` + eventColumns + ` FROM events WHERE type = $1 AND ($2 = '' OR starts_with(subject, $2))
+ORDER BY created_at DESC, id DESC LIMIT 1`
 
 	lockEventSQL = `SELECT ` + eventColumns + ` FROM events WHERE id = $1 FOR UPDATE`
 
@@ -118,9 +119,10 @@ func (s *Events) ListDue(ctx context.Context, typePrefix string, limit int) ([]d
 	return s.queryEvents(ctx, s.db, dueEventsSQL, s.clock(), typePrefix, limit)
 }
 
-// Latest returns the most recently recorded event of the type, nil when there is none.
-func (s *Events) Latest(ctx context.Context, eventType string) (*domain.Event, error) {
-	events, err := s.queryEvents(ctx, s.db, latestEventSQL, eventType)
+// Latest returns the most recently recorded event of the type whose subject
+// starts with subjectPrefix, nil when there is none.
+func (s *Events) Latest(ctx context.Context, eventType, subjectPrefix string) (*domain.Event, error) {
+	events, err := s.queryEvents(ctx, s.db, latestEventSQL, eventType, subjectPrefix)
 	if err != nil {
 		return nil, err
 	}

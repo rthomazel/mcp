@@ -443,3 +443,65 @@ func TestPortfolioDrawdownRendererRounding(t *testing.T) {
 	_, err = renderer.Render(context.Background(), domain.Event{Data: data})
 	assert.Error(t, err)
 }
+
+func TestAllocationDriftRenderer(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.AllocationDrift][defaultFormat]
+	maximum, minimum := domain.Decimal("15"), domain.Decimal("5")
+
+	data, err := json.Marshal(domain.AllocationDriftData{
+		Group: "us-core", Side: "above", Date: day, StayStart: day.AddDate(0, 0, -3), AllocationPercent: "17.456789",
+		MaxPercent: &maximum, Members: []domain.MemberAllocation{{Symbol: "VOO", AllocationPercent: "10.04"}, {Symbol: "VTI", AllocationPercent: "7.416789"}},
+	})
+	require.NoError(t, err)
+
+	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Allocation of us-core is above its maximum: 17.5% of the securities value against 15.0%")
+	assert.Contains(t, text, "since 2026-11-17 (as of 2026-11-20)")
+	assert.Contains(t, text, "Instruments: VOO 10.0%, VTI 7.4%.")
+	assert.Contains(t, text, "trades as well as with prices")
+
+	data, err = json.Marshal(domain.AllocationDriftData{Group: "gold", Side: "below", Date: day, StayStart: day, AllocationPercent: "4.96", MinPercent: &minimum})
+	require.NoError(t, err)
+
+	text, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "is below its minimum: 4.96% of the securities value against 5.00%",
+		"a rounding that would show the bound reached keeps two decimals")
+
+	data, err = json.Marshal(domain.AllocationDriftData{Group: "gold", Side: "below", AllocationPercent: "4"})
+	require.NoError(t, err)
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	assert.Error(t, err, "a side without its bound")
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
+}
+
+func TestPriceVolatilityRenderer(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PriceVolatility][defaultFormat]
+
+	data, err := json.Marshal(domain.PriceVolatilityData{
+		Instrument: "QQQ", Date: day, Direction: "down", Window: "5d", Lookback: "3mo", StartDate: day.AddDate(0, 0, -5),
+		MovePercent: "-4.3456789", Variation: "-2.449", Threshold: "2", VolatilityPercent: "1.7742", Moves: 61,
+	})
+	require.NoError(t, err)
+
+	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "QQQ fell 4.3% over 5d, from 2026-11-15 to 2026-11-20: 2.4 standard deviations against a threshold of 2.0.")
+	assert.Contains(t, text, "Its usual move over 5d is 1.8%, the standard deviation of 61 moves in the last 3mo.")
+	assert.Contains(t, text, "adjusted closes")
+
+	data, err = json.Marshal(domain.PriceVolatilityData{Instrument: "QQQ", Direction: "up", MovePercent: "x"})
+	require.NoError(t, err)
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: data})
+	assert.Error(t, err)
+
+	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
+}

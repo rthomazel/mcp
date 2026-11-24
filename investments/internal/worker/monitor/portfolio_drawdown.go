@@ -16,12 +16,12 @@ const incrementKey = "increment_pct"
 // PortfolioDrawdown watches the securities value falling to multiples of an
 // increment below its all-time high.
 type PortfolioDrawdown struct {
-	store  domain.GenericStore
+	store  domain.MonitorStore
 	events domain.EventStore
 }
 
 // NewPortfolioDrawdown builds the monitor.
-func NewPortfolioDrawdown(store domain.GenericStore, events domain.EventStore) *PortfolioDrawdown {
+func NewPortfolioDrawdown(store domain.MonitorStore, events domain.EventStore) *PortfolioDrawdown {
 	return &PortfolioDrawdown{store: store, events: events}
 }
 

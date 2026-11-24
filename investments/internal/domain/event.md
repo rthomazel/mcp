@@ -22,6 +22,8 @@ How the outbox retries, expires and retains events. The values are server config
 3. Events.PortfolioDrawdown = "notification.portfolio.drawdown"
 4. Events.PortfolioATH = "notification.portfolio.ath"
 5. Events.PortfolioMovement = "notification.portfolio.movement"
+6. Events.AllocationDrift = "notification.allocation.drift"
+7. Events.PriceVolatility = "notification.price.volatility"
 
 Event types are dot-separated words, named here and nowhere else.
 
@@ -108,6 +110,35 @@ Payload of Events.PortfolioATH. The subject of the event is Date, formatted YYYY
 11. Losers []Contributor
 
 Payload of Events.PortfolioMovement. The subject of the event is Date, an at sign and Direction, for example 2026-11-20@up. Date is also what the monitor's interval is measured from.
+
+## AllocationDriftData
+
+1. Group string
+2. Side string, above or below
+3. Date Date, the latest snapshot date
+4. StayStart Date, the first date of the stay outside the band
+5. AllocationPercent Decimal, the group's share of the securities value on Date
+6. MinPercent *Decimal, the configured minimum, nil when none
+7. MaxPercent *Decimal, the configured maximum, nil when none
+8. Members []MemberAllocation
+
+Payload of Events.AllocationDrift. The subject of the event is the group name, the side and StayStart, joined by at signs, for example us-core@above@2026-11-17. The bounds are the ones configured when it was recorded, so the message still reads right after a retune.
+
+## PriceVolatilityData
+
+1. Instrument string, the ticker
+2. Date Date, the latest price date
+3. Direction string, up or down
+4. Window string, as the operator wrote it
+5. Lookback string, as the operator wrote it, or the default that applied
+6. StartDate Date, the last price date on or before the window start
+7. MovePercent Decimal, the adjusted close change over the window
+8. Variation Decimal, the move in standard deviations, signed
+9. Threshold Decimal, the configured number of standard deviations
+10. VolatilityPercent Decimal, the standard deviation of the baseline moves
+11. Moves int, how many moves the volatility is taken from
+
+Payload of Events.PriceVolatility. The subject of the event is the ticker, Date and Direction, joined by at signs, for example QQQ@2026-11-20@up. Date is also what the instrument's interval is measured from.
 
 ## NotificationFailedData
 

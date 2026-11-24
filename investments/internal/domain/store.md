@@ -10,9 +10,6 @@
 6. GetPortfolio(ctx Context, date *Date) (Portfolio, error)
 7. GetStatus(ctx Context) (Status, error)
 8. GetValueHistory(ctx Context, filter HistoryFilter) (ValueHistory, error)
-9. GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
-10. GetHighState(ctx Context) (*HighState, error)
-11. GetMarketMovement(ctx Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
 
 The generic store, for everything that has no narrower store: instruments, the ledger and the read-only reports. Groups of related methods have their own stores below. Tests mock each store with mockery. Implemented by internal/storage/postgres.
 Each method of every store is a self-contained unit of work in its own transaction; composing several store calls into one transaction is not supported.
@@ -60,6 +57,24 @@ Returns the latest securities value against the highest earlier value, over the 
 ### GetMarketMovement(ctx Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
 
 Returns the securities value change over window ending at the latest snapshot date that prices explain, with the part trades explain, the largest gainers and losers by symbol, and whether the percent reaches the threshold in either direction. The window start is the window counted back from the latest date by duration arithmetic. Nil when there are no snapshots or none on or before the window start. Returns ErrInvalidInput for a threshold that is not positive. Changes in value, not returns.
+
+### GetAllocationDrift(ctx Context, groups []AllocationGroup) (*AllocationDrift, error)
+
+Returns each group's share of the securities value on the latest date of the series GetValueHistory uses, in the order given, and for a group outside its band the side and the first date of the stay, with every registered member's share. A date without securities has no allocation and is inside every band; being exactly at a bound is inside. Tickers that are not registered are listed and count as zero. Nil when there are no snapshots or the latest date holds no securities. A ticker matching several instruments returns ErrInvalidInput. A share of the value, changed by trades as well as by prices.
+
+### GetPriceVolatility(ctx Context, ticker string, window duration.Duration, lookback duration.Duration, threshold Decimal) (*PriceVolatility, error)
+
+Returns the move of the ticker's adjusted close on the latest price date in the store over window, the volatility of its moves of the same length over lookback, the variation and whether it reaches threshold in either direction. Nil when the ticker has no price on the latest date or none on or before the window start. Returns ErrInstrumentNotFound for an unregistered ticker and ErrInvalidInput for one matching several instruments or a threshold that is not positive.
+
+## MonitorStore
+
+1. GetDrawdownState(ctx Context, increment Decimal) (DrawdownState, error)
+2. GetHighState(ctx Context) (*HighState, error)
+3. GetMarketMovement(ctx Context, window duration.Duration, threshold Decimal) (*MarketMovement, error)
+4. GetAllocationDrift(ctx Context, groups []AllocationGroup) (*AllocationDrift, error)
+5. GetPriceVolatility(ctx Context, ticker string, window duration.Duration, lookback duration.Duration, threshold Decimal) (*PriceVolatility, error)
+
+The read models the monitors judge, each computed in the database and answering one question about the portfolio or an instrument. Implemented by internal/storage/postgres.
 
 ## CashStore
 
@@ -148,7 +163,7 @@ Returns updates log rows matching filter, newest first by start time, limited. R
 3. SaveOutcome(ctx Context, id int64, outcome EventOutcome) error
 4. Remove(ctx Context, id int64) error
 5. Prune(ctx Context) (int, error)
-6. Latest(ctx Context, eventType string) (*Event, error)
+6. Latest(ctx Context, eventType string, subjectPrefix string) (*Event, error)
 
 The events outbox. Consumed by the events worker, the monitors and the remove_event tool.
 
@@ -168,9 +183,9 @@ Applies the outcome of one handling pass in one transaction: adds the succeeded 
 
 Deletes an event that was given up on or has expired. Returns ErrEventNotFound for an unknown id, and ErrEventNotRemovable for an event that is pending, backing off or fully handled; nothing is deleted then.
 
-### Latest(ctx Context, eventType string) (*Event, error)
+### Latest(ctx Context, eventType string, subjectPrefix string) (*Event, error)
 
-Returns the most recently recorded event of the type, handled or not, newest by recorded time then id; nil when there is none, which includes events deleted by pruning. Monitors read the date in its payload to space their announcements.
+Returns the most recently recorded event of the type whose subject starts with subjectPrefix, empty for any, handled or not, newest by recorded time then id; nil when there is none, which includes events deleted by pruning. Monitors read the date in its payload to space their announcements.
 
 ### Prune(ctx Context) (int, error)
 
@@ -186,5 +201,6 @@ Deletes fully handled events whose handling finished the policy's retention or l
 4. Snapshots SnapshotStore
 5. Updates UpdateStore
 6. Events EventStore
+7. Monitors MonitorStore
 
 Not an interface: the bundle of every store, for the consumers that need several, such as the tool handlers. A consumer that needs one takes that one store, so its tests fake only what it uses.

@@ -34,13 +34,13 @@ func TestHighStateNewHighAndPrevious(t *testing.T) {
 	voo := registerETF(t, store, "VOO")
 	ctx := context.Background()
 
-	state, err := store.GetHighState(ctx)
+	state, err := store.Monitors.GetHighState(ctx)
 	require.NoError(t, err)
 	assert.Nil(t, state, "no snapshots")
 
 	seedSeries(t, store, voo.ID, date(2026, 1, 1), 100)
 
-	state, err = store.GetHighState(ctx)
+	state, err = store.Monitors.GetHighState(ctx)
 	require.NoError(t, err)
 	assert.False(t, state.NewHigh, "the first snapshot has nothing before it")
 	assert.Nil(t, state.Previous)
@@ -48,14 +48,14 @@ func TestHighStateNewHighAndPrevious(t *testing.T) {
 	// 100 150 120 150 160: the repeated 150 is not a new high, 160 is.
 	seedSeries(t, store, voo.ID, date(2026, 1, 1), 0, 150, 120, 150)
 
-	state, err = store.GetHighState(ctx)
+	state, err = store.Monitors.GetHighState(ctx)
 	require.NoError(t, err)
 	assert.False(t, state.NewHigh, "equal to the previous high")
 	assert.Equal(t, date(2026, 1, 2), state.Previous.Date, "earliest date wins a tie")
 
 	seedSeries(t, store, voo.ID, date(2026, 1, 1), 0, 0, 0, 0, 160)
 
-	state, err = store.GetHighState(ctx)
+	state, err = store.Monitors.GetHighState(ctx)
 	require.NoError(t, err)
 	assert.True(t, state.NewHigh)
 	assert.Equal(t, date(2026, 1, 5), state.Date)
@@ -80,7 +80,7 @@ func TestMarketMovementIgnoresTrades(t *testing.T) {
 	seedPosition(t, store, qqq.ID, date(2026, 1, 2), "5", "196")
 	seedPosition(t, store, gld.ID, date(2026, 1, 2), "2", "50")
 
-	movement, err := store.GetMarketMovement(ctx, window(t, "1d"), "1")
+	movement, err := store.Monitors.GetMarketMovement(ctx, window(t, "1d"), "1")
 	require.NoError(t, err)
 	require.NotNil(t, movement)
 
@@ -96,7 +96,7 @@ func TestMarketMovementIgnoresTrades(t *testing.T) {
 	assert.Equal(t, []domain.Contributor{{Symbol: "VOO", MovementUSD: "30"}}, movement.Gainers)
 	assert.Equal(t, []domain.Contributor{{Symbol: "QQQ", MovementUSD: "-20"}}, movement.Losers)
 
-	movement, err = store.GetMarketMovement(ctx, window(t, "1d"), "0.5")
+	movement, err = store.Monitors.GetMarketMovement(ctx, window(t, "1d"), "0.5")
 	require.NoError(t, err)
 	assert.True(t, movement.AtLeastUp, "the threshold is inclusive")
 }
@@ -115,7 +115,7 @@ func TestMarketMovementOverAWindow(t *testing.T) {
 	}
 
 	// Three days back from Jan 5 is Jan 2: the base, and the dates after it, are summed.
-	movement, err := store.GetMarketMovement(ctx, window(t, "3d"), "3")
+	movement, err := store.Monitors.GetMarketMovement(ctx, window(t, "3d"), "3")
 	require.NoError(t, err)
 	require.NotNil(t, movement)
 	assert.Equal(t, date(2026, 1, 2), movement.StartDate)
@@ -128,17 +128,17 @@ func TestMarketMovementNeedsASnapshotBeforeTheWindow(t *testing.T) {
 	voo := registerETF(t, store, "VOO")
 	ctx := context.Background()
 
-	movement, err := store.GetMarketMovement(ctx, window(t, "1d"), "1")
+	movement, err := store.Monitors.GetMarketMovement(ctx, window(t, "1d"), "1")
 	require.NoError(t, err)
 	assert.Nil(t, movement)
 
 	seedPosition(t, store, voo.ID, date(2026, 1, 5), "10", "100")
 
-	movement, err = store.GetMarketMovement(ctx, window(t, "3d"), "1")
+	movement, err = store.Monitors.GetMarketMovement(ctx, window(t, "3d"), "1")
 	require.NoError(t, err)
 	assert.Nil(t, movement, "the window starts before the first snapshot")
 
-	_, err = store.GetMarketMovement(ctx, window(t, "1d"), "0")
+	_, err = store.Monitors.GetMarketMovement(ctx, window(t, "1d"), "0")
 	require.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
@@ -153,7 +153,7 @@ func TestMarketMovementDownAndClosedPositions(t *testing.T) {
 	// QQQ is sold on day 2 and contributes nothing; VOO falls 5 percent.
 	seedPosition(t, store, voo.ID, date(2026, 1, 2), "10", "95")
 
-	movement, err := store.GetMarketMovement(ctx, window(t, "1d"), "3")
+	movement, err := store.Monitors.GetMarketMovement(ctx, window(t, "1d"), "3")
 	require.NoError(t, err)
 	assert.Equal(t, "-50", string(movement.MarketUSD))
 	assert.True(t, movement.AtLeastDown)
@@ -165,7 +165,7 @@ func TestLatestEvent(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	latest, err := store.Events.Latest(ctx, "a.b")
+	latest, err := store.Events.Latest(ctx, "a.b", "")
 	require.NoError(t, err)
 	assert.Nil(t, latest)
 
@@ -174,8 +174,16 @@ func TestLatestEvent(t *testing.T) {
 	recordDraft(t, store, "a.b", &second)
 	recordDraft(t, store, "a.c", &first)
 
-	latest, err = store.Events.Latest(ctx, "a.b")
+	latest, err = store.Events.Latest(ctx, "a.b", "")
 	require.NoError(t, err)
 	require.NotNil(t, latest)
 	assert.Equal(t, "two", *latest.Subject)
+
+	latest, err = store.Events.Latest(ctx, "a.b", "on")
+	require.NoError(t, err)
+	assert.Equal(t, "one", *latest.Subject, "subject prefix")
+
+	latest, err = store.Events.Latest(ctx, "a.b", "x")
+	require.NoError(t, err)
+	assert.Nil(t, latest)
 }

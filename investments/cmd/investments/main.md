@@ -18,7 +18,7 @@ Run run(); on error print the fatal message to stderr and exit with status 1.
 4. Apply pending migrations with migrate.
 5. Build the Tiingo client, the refresher over the generic and price stores and the price refresh job over the price, snapshot and updates stores, and log at info level that the price refresh job is enabled with its run times and provider.
 6. Build the notifications loader over the configured file, the notification handler source over it, the updates store and the Telegram bot token, and the events worker over the events store, the source and the worker settings from the configuration with the notification prefix as its type prefix, and start the worker in a goroutine that stops when the process shuts down.
-7. Build one domain.Scheduler in the configured market timezone over the price refresh task and the task of each monitor, snapshot-incomplete, portfolio drawdown, portfolio ATH and portfolio movement, over the generic store and the events store with the monitor timeout, and start it in a goroutine that stops when the process shuts down.
+7. Build one domain.Scheduler in the configured market timezone over the price refresh task and the task of each monitor, snapshot-incomplete, portfolio drawdown, portfolio ATH, portfolio movement, allocation drift and price volatility, over the generic store and the events store with the monitor timeout, and start it in a goroutine that stops when the process shuts down.
 8. Build the MCP server named "investments-mcp" with version.
 9. Build the handlers over the stores bundle, the refresher and the query timeout, and register the tools on the server.
 10. Serve over stdio.
