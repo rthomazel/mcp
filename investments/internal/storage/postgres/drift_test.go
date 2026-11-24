@@ -54,7 +54,7 @@ func TestAllocationDriftStayAndStayStart(t *testing.T) {
 	seedDay(t, store, ids, date(2026, 1, 2), map[string]string{"VOO": "40", "VTI": "30", "GLD": "30"})
 	seedDay(t, store, ids, date(2026, 1, 3), map[string]string{"VOO": "40", "VTI": "30", "GLD": "30"})
 
-	drift, err := store.GetAllocationDrift(ctx, groups)
+	drift, err := store.Monitors.GetAllocationDrift(ctx, groups)
 	require.NoError(t, err)
 	require.NotNil(t, drift)
 	assert.Equal(t, date(2026, 1, 3), drift.Date)
@@ -68,14 +68,14 @@ func TestAllocationDriftStayAndStayStart(t *testing.T) {
 
 	seedDay(t, store, ids, date(2026, 1, 4), map[string]string{"VOO": "35", "VTI": "25", "GLD": "40"})
 
-	drift, err = store.GetAllocationDrift(ctx, groups)
+	drift, err = store.Monitors.GetAllocationDrift(ctx, groups)
 	require.NoError(t, err)
 	assert.Empty(t, drift.Groups[0].Side, "exactly at the bound is inside")
 	assert.Empty(t, drift.Groups[1].Side, "exactly at 40 is inside")
 
 	seedDay(t, store, ids, date(2026, 1, 5), map[string]string{"VOO": "50", "VTI": "30", "GLD": "20"})
 
-	drift, err = store.GetAllocationDrift(ctx, groups)
+	drift, err = store.Monitors.GetAllocationDrift(ctx, groups)
 	require.NoError(t, err)
 	assert.Equal(t, date(2026, 1, 5), *drift.Groups[0].StayStart, "a new stay after returning inside")
 	assert.Equal(t, domain.SideAbove, drift.Groups[0].Side)
@@ -88,7 +88,7 @@ func TestAllocationDriftNeverInsideStartsAtTheFirstDate(t *testing.T) {
 	seedDay(t, store, ids, date(2026, 1, 1), map[string]string{"VOO": "90", "GLD": "10"})
 	seedDay(t, store, ids, date(2026, 1, 2), map[string]string{"VOO": "90", "GLD": "10"})
 
-	drift, err := store.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
+	drift, err := store.Monitors.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
 		{Name: "us", Tickers: []string{"VOO"}, MaxPercent: decimalOf("50")},
 	})
 	require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestAllocationDriftSideSwitchIsANewStay(t *testing.T) {
 	seedDay(t, store, ids, date(2026, 1, 1), map[string]string{"VOO": "50", "GLD": "50"})
 	seedDay(t, store, ids, date(2026, 1, 2), map[string]string{"VOO": "10", "GLD": "90"})
 
-	drift, err := store.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
+	drift, err := store.Monitors.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
 		{Name: "us", Tickers: []string{"VOO"}, MinPercent: decimalOf("30"), MaxPercent: decimalOf("40")},
 	})
 	require.NoError(t, err)
@@ -114,7 +114,7 @@ func TestAllocationDriftMissingHoldingsAndTickers(t *testing.T) {
 
 	seedDay(t, store, ids, date(2026, 1, 1), map[string]string{"VOO": "100"})
 
-	drift, err := store.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
+	drift, err := store.Monitors.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
 		{Name: "gold", Tickers: []string{"GLD", "NOPE"}, MinPercent: decimalOf("5")},
 	})
 	require.NoError(t, err)
@@ -129,14 +129,14 @@ func TestAllocationDriftWithoutSecuritiesRecordsNothing(t *testing.T) {
 	store, ids := driftFixture(t)
 	groups := []domain.AllocationGroup{{Name: "us", Tickers: []string{"VOO"}, MaxPercent: decimalOf("50")}}
 
-	drift, err := store.GetAllocationDrift(context.Background(), groups)
+	drift, err := store.Monitors.GetAllocationDrift(context.Background(), groups)
 	require.NoError(t, err)
 	assert.Nil(t, drift, "no snapshots")
 
 	seedDay(t, store, ids, date(2026, 1, 1), map[string]string{"VOO": "100"})
 	seedCashSnapshot(t, store, date(2026, 1, 2), "500")
 
-	drift, err = store.GetAllocationDrift(context.Background(), groups)
+	drift, err = store.Monitors.GetAllocationDrift(context.Background(), groups)
 	require.NoError(t, err)
 	assert.Nil(t, drift, "the latest date holds only cash")
 }
@@ -150,7 +150,7 @@ func TestAllocationDriftAmbiguousTicker(t *testing.T) {
 		`INSERT INTO instruments (symbol, exchange, name, currency, instrument_type) VALUES ('VOO', 'NASDAQ', 'VOO again', 'USD', 'ETF')`)
 	require.NoError(t, err)
 
-	_, err = store.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
+	_, err = store.Monitors.GetAllocationDrift(context.Background(), []domain.AllocationGroup{
 		{Name: "us", Tickers: []string{"VOO"}, MaxPercent: decimalOf("50")},
 	})
 	require.ErrorIs(t, err, domain.ErrInvalidInput)
@@ -199,7 +199,7 @@ func TestPriceVolatilityJudgesTheLatestMoveAgainstTheBaseline(t *testing.T) {
 	// 40 days alternating about +1 and -1 percent, then a day up 3 percent.
 	seedAlternating(t, store, qqq.ID, date(2026, 1, 1), 40, "1.03")
 
-	got, err := store.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
+	got, err := store.Monitors.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, date(2026, 2, 10), got.Date)
@@ -210,7 +210,7 @@ func TestPriceVolatilityJudgesTheLatestMoveAgainstTheBaseline(t *testing.T) {
 	assert.True(t, got.AtLeastUp, "about three standard deviations against a threshold of 2")
 	assert.False(t, got.AtLeastDown)
 
-	got, err = store.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "4")
+	got, err = store.Monitors.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "4")
 	require.NoError(t, err)
 	assert.False(t, got.AtLeastUp, "below a threshold of 4")
 }
@@ -221,12 +221,12 @@ func TestPriceVolatilityDownMoveAndShortLookback(t *testing.T) {
 
 	seedAlternating(t, store, qqq.ID, date(2026, 1, 1), 40, "0.96")
 
-	got, err := store.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
+	got, err := store.Monitors.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
 	require.NoError(t, err)
 	assert.True(t, got.AtLeastDown)
 	assert.False(t, got.AtLeastUp)
 
-	got, err = store.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "10d"), "2")
+	got, err = store.Monitors.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "10d"), "2")
 	require.NoError(t, err)
 	assert.Equal(t, 9, got.Moves, "only the dates after the look-back start")
 }
@@ -237,7 +237,7 @@ func TestPriceVolatilityOverAWindowUsesWindowMoves(t *testing.T) {
 
 	seedAlternating(t, store, qqq.ID, date(2026, 1, 1), 60, "1.05")
 
-	got, err := store.GetPriceVolatility(context.Background(), "QQQ", window(t, "5d"), lookbackOf(t, "3mo"), "2")
+	got, err := store.Monitors.GetPriceVolatility(context.Background(), "QQQ", window(t, "5d"), lookbackOf(t, "3mo"), "2")
 	require.NoError(t, err)
 	assert.Equal(t, date(2026, 2, 25), got.StartDate, "five calendar days before March 2")
 	assert.Equal(t, 55, got.Moves, "dates with a price five days before them")
@@ -251,7 +251,7 @@ func TestPriceVolatilityFlatPricesHaveNoVolatility(t *testing.T) {
 		insertAdjusted(t, store, qqq.ID, date(2026, 1, 1).AddDate(0, 0, day), "100")
 	}
 
-	got, err := store.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
+	got, err := store.Monitors.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
 	require.NoError(t, err)
 	assert.Nil(t, got.VolatilityPercent)
 	assert.Nil(t, got.Variation)
@@ -267,7 +267,7 @@ func TestPriceVolatilityIgnoresSplitsInTheClose(t *testing.T) {
 	_, err := store.DB().Exec(`UPDATE prices SET close = 50 WHERE instrument_id = $1 AND date = $2`, qqq.ID, date(2026, 2, 10))
 	require.NoError(t, err)
 
-	got, err := store.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
+	got, err := store.Monitors.GetPriceVolatility(context.Background(), "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
 	require.NoError(t, err)
 	assert.False(t, got.AtLeastUp || got.AtLeastDown)
 }
@@ -281,17 +281,17 @@ func TestPriceVolatilityEdges(t *testing.T) {
 	seedAlternating(t, store, qqq.ID, date(2026, 1, 1), 40, "1.03")
 	insertAdjusted(t, store, voo.ID, date(2026, 1, 1), "100")
 
-	got, err := store.GetPriceVolatility(ctx, "VOO", window(t, "1d"), lookbackOf(t, "3mo"), "2")
+	got, err := store.Monitors.GetPriceVolatility(ctx, "VOO", window(t, "1d"), lookbackOf(t, "3mo"), "2")
 	require.NoError(t, err)
 	assert.Nil(t, got, "no price on the latest date of the store")
 
-	_, err = store.GetPriceVolatility(ctx, "NOPE", window(t, "1d"), lookbackOf(t, "3mo"), "2")
+	_, err = store.Monitors.GetPriceVolatility(ctx, "NOPE", window(t, "1d"), lookbackOf(t, "3mo"), "2")
 	require.ErrorIs(t, err, domain.ErrInstrumentNotFound)
 
-	_, err = store.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "0")
+	_, err = store.Monitors.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "0")
 	require.ErrorIs(t, err, domain.ErrInvalidInput)
 
-	got, err = store.GetPriceVolatility(ctx, "QQQ", window(t, "2y"), lookbackOf(t, "3mo"), "2")
+	got, err = store.Monitors.GetPriceVolatility(ctx, "QQQ", window(t, "2y"), lookbackOf(t, "3mo"), "2")
 	require.NoError(t, err)
 	assert.Nil(t, got, "no price before the window start")
 
@@ -299,7 +299,7 @@ func TestPriceVolatilityEdges(t *testing.T) {
 		`INSERT INTO instruments (symbol, exchange, name, currency, instrument_type) VALUES ('QQQ', 'NASDAQ', 'QQQ again', 'USD', 'ETF')`)
 	require.NoError(t, err)
 
-	_, err = store.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
+	_, err = store.Monitors.GetPriceVolatility(ctx, "QQQ", window(t, "1d"), lookbackOf(t, "3mo"), "2")
 	require.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 

@@ -63,11 +63,11 @@ func run() error {
 
 	monitors := []monitor.Monitor{
 		monitor.NewSnapshotIncomplete(stores.Store, stores.Events),
-		monitor.NewPortfolioDrawdown(stores.Store, stores.Events),
-		monitor.NewPortfolioATH(stores.Store, stores.Events),
-		monitor.NewPortfolioMovement(stores.Store, stores.Events),
-		monitor.NewAllocationDrift(stores.Store, stores.Events),
-		monitor.NewPriceVolatility(stores.Store, stores.Events),
+		monitor.NewPortfolioDrawdown(stores.Monitors, stores.Events),
+		monitor.NewPortfolioATH(stores.Monitors, stores.Events),
+		monitor.NewPortfolioMovement(stores.Monitors, stores.Events),
+		monitor.NewAllocationDrift(stores.Monitors, stores.Events),
+		monitor.NewPriceVolatility(stores.Monitors, stores.Events),
 	}
 	monitorsConfig := monitor.NewConfigLoader(cfg.MonitorsConfigFile, monitors)
 

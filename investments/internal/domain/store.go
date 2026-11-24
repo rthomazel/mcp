@@ -29,6 +29,16 @@ type GenericStore interface {
 	// with summary measures. Returns ErrInvalidInput, including for a series
 	// over the configured maximum number of points.
 	GetValueHistory(ctx context.Context, filter HistoryFilter) (ValueHistory, error)
+	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
+	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
+	// GetPortfolio values active positions at real closes as of date, or today
+	// in the market timezone when nil, with average-cost P&L and cash.
+	GetPortfolio(ctx context.Context, date *Date) (Portfolio, error)
+}
+
+// MonitorStore holds the read models the monitors judge: each answers one
+// question about the portfolio or an instrument, computed in the database.
+type MonitorStore interface {
 	// GetDrawdownState returns the drawdown of the latest securities value from
 	// the all-time high and, for each multiple of increment it is at or below,
 	// when its current stay there began. Returns ErrInvalidInput for an
@@ -53,11 +63,6 @@ type GenericStore interface {
 	// Returns ErrInstrumentNotFound for an unregistered ticker and
 	// ErrInvalidInput for an ambiguous one or a threshold that is not positive.
 	GetPriceVolatility(ctx context.Context, ticker string, window, lookback duration.Duration, threshold Decimal) (*PriceVolatility, error)
-	// GetPositions reconstructs positions as of date, or the whole ledger when nil.
-	GetPositions(ctx context.Context, date *Date) (PositionsResult, error)
-	// GetPortfolio values active positions at real closes as of date, or today
-	// in the market timezone when nil, with average-cost P&L and cash.
-	GetPortfolio(ctx context.Context, date *Date) (Portfolio, error)
 }
 
 // CashStore holds cash transactions and the balance.
@@ -147,4 +152,5 @@ type Stores struct {
 	Snapshots SnapshotStore
 	Updates   UpdateStore
 	Events    EventStore
+	Monitors  MonitorStore
 }

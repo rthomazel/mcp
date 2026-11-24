@@ -32,6 +32,7 @@ var (
 	_ domain.SnapshotStore = (*Snapshots)(nil)
 	_ domain.UpdateStore   = (*Updates)(nil)
 	_ domain.EventStore    = (*Events)(nil)
+	_ domain.MonitorStore  = (*Monitors)(nil)
 )
 
 // Store implements domain.GenericStore and holds what every store shares: the
@@ -45,7 +46,7 @@ type Store struct {
 	clock            func() time.Time // replaceable in tests
 }
 
-// Cash, Prices, Snapshots, Updates and Events implement the narrower stores.
+// Cash, Prices, Snapshots, Updates, Events and Monitors implement the narrower stores.
 // Each shares the Store's connection and settings.
 type (
 	Cash      struct{ *Store }
@@ -53,6 +54,7 @@ type (
 	Snapshots struct{ *Store }
 	Updates   struct{ *Store }
 	Events    struct{ *Store }
+	Monitors  struct{ *Store }
 )
 
 // Stores is every store over one connection. The embedded Store is the generic
@@ -65,11 +67,12 @@ type Stores struct {
 	Snapshots *Snapshots
 	Updates   *Updates
 	Events    *Events
+	Monitors  *Monitors
 }
 
 // Domain returns the stores as the domain bundle.
 func (s *Stores) Domain() domain.Stores {
-	return domain.Stores{Generic: s.Store, Cash: s.Cash, Prices: s.Prices, Snapshots: s.Snapshots, Updates: s.Updates, Events: s.Events}
+	return domain.Stores{Generic: s.Store, Cash: s.Cash, Prices: s.Prices, Snapshots: s.Snapshots, Updates: s.Updates, Events: s.Events, Monitors: s.Monitors}
 }
 
 // Settings are the store's tunables, taken from the server configuration.
@@ -118,7 +121,7 @@ func Open(dsn string, settings Settings) (*Stores, func() error, error) {
 
 	return &Stores{
 		Store: store, Cash: &Cash{store}, Prices: &Prices{store}, Snapshots: &Snapshots{store},
-		Updates: &Updates{store}, Events: &Events{store},
+		Updates: &Updates{store}, Events: &Events{store}, Monitors: &Monitors{store},
 	}, handle.Close, nil
 }
 

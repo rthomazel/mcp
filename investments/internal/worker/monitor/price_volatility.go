@@ -25,7 +25,7 @@ const (
 
 // PriceVolatility watches an instrument's price move over a window against its usual moves.
 type PriceVolatility struct {
-	store  domain.GenericStore
+	store  domain.MonitorStore
 	events domain.EventStore
 }
 
@@ -41,7 +41,7 @@ type volatilitySettings struct {
 }
 
 // NewPriceVolatility builds the monitor.
-func NewPriceVolatility(store domain.GenericStore, events domain.EventStore) *PriceVolatility {
+func NewPriceVolatility(store domain.MonitorStore, events domain.EventStore) *PriceVolatility {
 	return &PriceVolatility{store: store, events: events}
 }
 

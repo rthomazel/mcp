@@ -8,6 +8,11 @@ packages:
           dir: internal/domain
           filename: mock_store.go
           pkgname: domain
+      MonitorStore:
+        config:
+          dir: internal/domain
+          filename: mock_monitor_store.go
+          pkgname: domain
       CashStore:
         config:
           dir: internal/domain

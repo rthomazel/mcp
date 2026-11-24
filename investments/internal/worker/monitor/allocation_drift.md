@@ -8,14 +8,14 @@ maxPercentBand = "100", the largest bound.
 
 ## AllocationDrift
 
-1. store domain.GenericStore, for the allocation of each group
+1. store domain.MonitorStore, for the allocation of each group
 2. events domain.EventStore, where the events are recorded
 
 The monitor for groups of instruments leaving their allocation band.
 
 # Functions
 
-## NewAllocationDrift(store domain.GenericStore, events domain.EventStore) *AllocationDrift
+## NewAllocationDrift(store domain.MonitorStore, events domain.EventStore) *AllocationDrift
 
 Build the monitor.
 

@@ -295,7 +295,7 @@ func (s *Store) seriesSummary(ctx context.Context, column string, from, to domai
 
 // GetDrawdownState returns the drawdown of the latest securities value from
 // the all-time high and the levels it is at or below. Changes in value, not returns.
-func (s *Store) GetDrawdownState(ctx context.Context, increment domain.Decimal) (domain.DrawdownState, error) {
+func (s *Monitors) GetDrawdownState(ctx context.Context, increment domain.Decimal) (domain.DrawdownState, error) {
 	if increment.Sign() <= 0 {
 		return domain.DrawdownState{}, fmt.Errorf("%w: the increment %q must be positive", domain.ErrInvalidInput, increment)
 	}
@@ -333,7 +333,7 @@ func (s *Store) GetDrawdownState(ctx context.Context, increment domain.Decimal) 
 
 // GetHighState returns the latest securities value against the highest earlier
 // value. A change in value, not a return.
-func (s *Store) GetHighState(ctx context.Context) (*domain.HighState, error) {
+func (s *Monitors) GetHighState(ctx context.Context) (*domain.HighState, error) {
 	var (
 		state                                          domain.HighState
 		latestDate, previousDate                       sql.NullTime
@@ -362,7 +362,7 @@ func (s *Store) GetHighState(ctx context.Context) (*domain.HighState, error) {
 
 // GetMarketMovement returns the market movement over window ending at the
 // latest snapshot date, and the instruments that contributed most.
-func (s *Store) GetMarketMovement(ctx context.Context, window duration.Duration, threshold domain.Decimal) (*domain.MarketMovement, error) {
+func (s *Monitors) GetMarketMovement(ctx context.Context, window duration.Duration, threshold domain.Decimal) (*domain.MarketMovement, error) {
 	if threshold.Sign() <= 0 {
 		return nil, fmt.Errorf("%w: the threshold %q must be positive", domain.ErrInvalidInput, threshold)
 	}

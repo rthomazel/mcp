@@ -4,7 +4,7 @@ priceVolatilitySQL = for one instrument id, with the window and the look-back as
 
 # Functions
 
-## Store.GetPriceVolatility(ctx Context, ticker string, window duration.Duration, lookback duration.Duration, threshold domain.Decimal) (*domain.PriceVolatility, error)
+## Monitors.GetPriceVolatility(ctx Context, ticker string, window duration.Duration, lookback duration.Duration, threshold domain.Decimal) (*domain.PriceVolatility, error)
 
 1. if threshold is not positive, return domain.ErrInvalidInput.
 2. Resolve the ticker with resolveTickers.

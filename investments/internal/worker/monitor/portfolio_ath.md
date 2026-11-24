@@ -7,14 +7,14 @@ athDefaultInterval = "15d", the default interval.
 
 ## PortfolioATH
 
-1. store domain.GenericStore, for the high state
+1. store domain.MonitorStore, for the high state
 2. events domain.EventStore, where the events are recorded and the last one is read
 
 The monitor for the securities value reaching a new all-time high, at most once in each interval.
 
 # Functions
 
-## NewPortfolioATH(store domain.GenericStore, events domain.EventStore) *PortfolioATH
+## NewPortfolioATH(store domain.MonitorStore, events domain.EventStore) *PortfolioATH
 
 Build the monitor.
 

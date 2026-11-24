@@ -19,7 +19,7 @@ The parameters of the allocation queries, built once and shared by both.
 
 # Functions
 
-## Store.GetAllocationDrift(ctx Context, groups []domain.AllocationGroup) (*domain.AllocationDrift, error)
+## Monitors.GetAllocationDrift(ctx Context, groups []domain.AllocationGroup) (*domain.AllocationDrift, error)
 
 1. Build the arguments with allocationArgs, resolving every ticker.
 2. Select the groups' state on the latest date through allocationDriftSQL.

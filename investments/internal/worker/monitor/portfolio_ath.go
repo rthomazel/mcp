@@ -19,12 +19,12 @@ const (
 
 // PortfolioATH watches the securities value reaching a new all-time high.
 type PortfolioATH struct {
-	store  domain.GenericStore
+	store  domain.MonitorStore
 	events domain.EventStore
 }
 
 // NewPortfolioATH builds the monitor.
-func NewPortfolioATH(store domain.GenericStore, events domain.EventStore) *PortfolioATH {
+func NewPortfolioATH(store domain.MonitorStore, events domain.EventStore) *PortfolioATH {
 	return &PortfolioATH{store: store, events: events}
 }
 

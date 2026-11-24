@@ -67,7 +67,7 @@ type allocationArgs struct {
 }
 
 // GetAllocationDrift judges every group against its band on the latest date.
-func (s *Store) GetAllocationDrift(ctx context.Context, groups []domain.AllocationGroup) (*domain.AllocationDrift, error) {
+func (s *Monitors) GetAllocationDrift(ctx context.Context, groups []domain.AllocationGroup) (*domain.AllocationDrift, error) {
 	args, unregistered, err := s.allocationArgs(ctx, groups)
 	if err != nil {
 		return nil, err

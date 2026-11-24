@@ -42,7 +42,7 @@ SELECT judged.date, judged.start_date, trim_scale(judged.move)::text, baseline.m
 FROM judged, baseline`
 
 // GetPriceVolatility returns the ticker's move over window on the latest price date against its volatility.
-func (s *Store) GetPriceVolatility(ctx context.Context, ticker string, window, lookback duration.Duration,
+func (s *Monitors) GetPriceVolatility(ctx context.Context, ticker string, window, lookback duration.Duration,
 	threshold domain.Decimal,
 ) (*domain.PriceVolatility, error) {
 	if threshold.Sign() <= 0 {

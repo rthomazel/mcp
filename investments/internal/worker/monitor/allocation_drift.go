@@ -22,12 +22,12 @@ const (
 
 // AllocationDrift watches groups of instruments leaving their allocation band.
 type AllocationDrift struct {
-	store  domain.GenericStore
+	store  domain.MonitorStore
 	events domain.EventStore
 }
 
 // NewAllocationDrift builds the monitor.
-func NewAllocationDrift(store domain.GenericStore, events domain.EventStore) *AllocationDrift {
+func NewAllocationDrift(store domain.MonitorStore, events domain.EventStore) *AllocationDrift {
 	return &AllocationDrift{store: store, events: events}
 }
 

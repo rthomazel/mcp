@@ -18,6 +18,7 @@ func newMonitor(store *fakeStore) *SnapshotIncomplete { return NewSnapshotIncomp
 
 type fakeStore struct {
 	domain.GenericStore
+	domain.MonitorStore
 	domain.EventStore
 
 	status    domain.Status

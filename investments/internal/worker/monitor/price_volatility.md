@@ -9,7 +9,7 @@ minVolatilityMoves = 20, the fewest baseline moves a variation is judged from.
 
 ## PriceVolatility
 
-1. store domain.GenericStore, for the price moves
+1. store domain.MonitorStore, for the price moves
 2. events domain.EventStore, where the events are recorded and the last one of an instrument is read
 
 The monitor for an instrument's price move over a window against its usual moves.
@@ -29,7 +29,7 @@ The monitor for an instrument's price move over a window against its usual moves
 
 # Functions
 
-## NewPriceVolatility(store domain.GenericStore, events domain.EventStore) *PriceVolatility
+## NewPriceVolatility(store domain.MonitorStore, events domain.EventStore) *PriceVolatility
 
 Build the monitor.
 

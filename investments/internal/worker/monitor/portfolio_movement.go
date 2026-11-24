@@ -20,7 +20,7 @@ const (
 // PortfolioMovement watches the securities value moving over a window because
 // of prices alone.
 type PortfolioMovement struct {
-	store  domain.GenericStore
+	store  domain.MonitorStore
 	events domain.EventStore
 }
 
@@ -32,7 +32,7 @@ type movementSettings struct {
 }
 
 // NewPortfolioMovement builds the monitor.
-func NewPortfolioMovement(store domain.GenericStore, events domain.EventStore) *PortfolioMovement {
+func NewPortfolioMovement(store domain.MonitorStore, events domain.EventStore) *PortfolioMovement {
 	return &PortfolioMovement{store: store, events: events}
 }
 
