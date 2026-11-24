@@ -101,7 +101,7 @@ func channelHandlerName(channel, category string) string {
 func (h *channelHandler) Name() string { return h.name }
 
 func (h *channelHandler) Handle(ctx context.Context, event domain.Event) error {
-	text, err := h.renderer.Render(ctx, event)
+	text, err := h.renderer.RenderPlainText(ctx, event)
 	if err != nil {
 		return fmt.Errorf("rendering %s: %w", event.Type, err)
 	}

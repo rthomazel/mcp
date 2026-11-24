@@ -13,7 +13,7 @@ import (
 
 // Renderer turns an event into plain, channel-neutral text.
 type Renderer interface {
-	Render(ctx context.Context, event domain.Event) (string, error)
+	RenderPlainText(ctx context.Context, event domain.Event) (string, error)
 }
 
 // SnapshotIncompleteRenderer describes the incomplete snapshot run for the event's date.
@@ -64,8 +64,8 @@ func NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer {
 	}
 }
 
-// Render names the date and the run's error message, or that no run was recorded.
-func (r *SnapshotIncompleteRenderer) Render(ctx context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the date and the run's error message, or that no run was recorded.
+func (r *SnapshotIncompleteRenderer) RenderPlainText(ctx context.Context, event domain.Event) (string, error) {
 	var data domain.SnapshotIncompleteData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding snapshot incomplete data: %w", err)
@@ -89,8 +89,8 @@ func (r *SnapshotIncompleteRenderer) Render(ctx context.Context, event domain.Ev
 	return fmt.Sprintf("Snapshot for %s is incomplete: no run was recorded for it.", date), nil
 }
 
-// Render names the level, the drawdown, the high, the current value and the crossing date.
-func (r *PortfolioDrawdownRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the level, the drawdown, the high, the current value and the crossing date.
+func (r *PortfolioDrawdownRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.PortfolioDrawdownData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding portfolio drawdown data: %w", err)
@@ -113,8 +113,8 @@ func (r *PortfolioDrawdownRenderer) Render(_ context.Context, event domain.Event
 		data.Date.Format(time.DateOnly), amounts[0], data.HighDate.Format(time.DateOnly), amounts[1]), nil
 }
 
-// Render names the date, the new value, the previous high and the last announced high.
-func (r *PortfolioATHRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the date, the new value, the previous high and the last announced high.
+func (r *PortfolioATHRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.PortfolioATHData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding portfolio ATH data: %w", err)
@@ -142,9 +142,9 @@ func (r *PortfolioATHRenderer) Render(_ context.Context, event domain.Event) (st
 		amounts[2], data.PreviousHighDate.Format(time.DateOnly), last), nil
 }
 
-// Render names the window, the market movement, the values, the split between
+// RenderPlainText names the window, the market movement, the values, the split between
 // market and trades and the largest contributors.
-func (r *PortfolioMovementRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+func (r *PortfolioMovementRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.PortfolioMovementData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding portfolio movement data: %w", err)
@@ -199,8 +199,8 @@ func (r *PortfolioMovementRenderer) Render(_ context.Context, event domain.Event
 	return text + "\nThis value change is affected by sales and withdrawals.", nil
 }
 
-// Render names the group, the side and the bound crossed, the allocation, the start of the stay and the members.
-func (r *AllocationDriftRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the group, the side and the bound crossed, the allocation, the start of the stay and the members.
+func (r *AllocationDriftRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.AllocationDriftData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding allocation drift data: %w", err)
@@ -238,8 +238,8 @@ func (r *AllocationDriftRenderer) Render(_ context.Context, event domain.Event) 
 		strings.Join(members, ", ")), nil
 }
 
-// Render names the instrument, the move over the window, the variation against the threshold and the baseline.
-func (r *PriceVolatilityRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the instrument, the move over the window, the variation against the threshold and the baseline.
+func (r *PriceVolatilityRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.PriceVolatilityData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding price volatility data: %w", err)
@@ -278,8 +278,8 @@ func (r *PriceVolatilityRenderer) Render(_ context.Context, event domain.Event) 
 		data.Window, volatility, data.Moves, data.Lookback), nil
 }
 
-// Render names the instrument, the target, the date and the day's low, high and close.
-func (r *PriceTargetRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the instrument, the target, the date and the day's low, high and close.
+func (r *PriceTargetRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.PriceTargetData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding price target data: %w", err)
@@ -295,8 +295,8 @@ func (r *PriceTargetRenderer) Render(_ context.Context, event domain.Event) (str
 		data.Instrument, amounts[0], data.Date.Format(time.DateOnly), amounts[1], amounts[2], amounts[3]), nil
 }
 
-// Render names the instrument, the level, the drawdown, the high, the current close and the crossing date.
-func (r *InstrumentDrawdownRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the instrument, the level, the drawdown, the high, the current close and the crossing date.
+func (r *InstrumentDrawdownRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.InstrumentDrawdownData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding instrument drawdown data: %w", err)
@@ -318,8 +318,8 @@ func (r *InstrumentDrawdownRenderer) Render(_ context.Context, event domain.Even
 		data.Date.Format(time.DateOnly), amounts[0], data.HighDate.Format(time.DateOnly), amounts[1]), nil
 }
 
-// Render names the instrument, the date, the new adjusted close, the previous high and the last announced high.
-func (r *InstrumentATHRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the instrument, the date, the new adjusted close, the previous high and the last announced high.
+func (r *InstrumentATHRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.InstrumentATHData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding instrument ATH data: %w", err)
@@ -469,8 +469,8 @@ func contributorList(contributors []domain.Contributor) (string, error) {
 	return strings.Join(parts, ", "), nil
 }
 
-// Render names the failed event's type, recorded time and attempts, never its payload.
-func (r *NotificationFailedRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+// RenderPlainText names the failed event's type, recorded time and attempts, never its payload.
+func (r *NotificationFailedRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.NotificationFailedData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
 		return "", fmt.Errorf("decoding notification failed data: %w", err)

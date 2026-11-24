@@ -63,7 +63,7 @@ Return the stored name.
 
 ## channelHandler.Handle(ctx Context, event domain.Event) error
 
-1. Render the event through the renderer.
+1. Render the event as plain text through the renderer.
 2. Send the text to the category through the channel.
 3. Return nil.
 
