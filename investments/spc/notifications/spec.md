@@ -294,6 +294,35 @@ notifications:
   the name, so events in flight at the time of the edit are delivered again to the new
   name.
 
+#### Sample routing for the monitors
+
+A complete file that routes every event type the server records. The categories are the
+operator's choice: here the portfolio events, the market events and the system events each
+have a chat, and removing an entry silences that type.
+
+```yaml
+version: 1
+
+channels:
+  telegram:
+    categories:
+      portfolio: {chat_id: "123"}
+      market:    {chat_id: "456"}
+      system:    {chat_id: "789"}
+
+notifications:
+  notification.portfolio.drawdown:  {format: plain, channels: {telegram: portfolio}}
+  notification.portfolio.ath:       {format: plain, channels: {telegram: portfolio}}
+  notification.portfolio.movement:  {format: plain, channels: {telegram: portfolio}}
+  notification.allocation.drift:    {format: plain, channels: {telegram: portfolio}}
+  notification.price.volatility:    {format: plain, channels: {telegram: market}}
+  notification.price.target:        {format: plain, channels: {telegram: market}}
+  notification.instrument.drawdown: {format: plain, channels: {telegram: market}}
+  notification.instrument.ath:      {format: plain, channels: {telegram: market}}
+  notification.snapshot.incomplete: {format: plain, channels: {telegram: system}}
+  notification.failed:              {format: plain, channels: {telegram: system}}
+```
+
 ### Telegram channel implementation
 
 The Telegram channel implementation sends through the Telegram Bot API from the operator's bot. Each
