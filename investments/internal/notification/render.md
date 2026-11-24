@@ -32,6 +32,18 @@ No fields.
 
 No fields.
 
+## PriceTargetRenderer
+
+No fields.
+
+## InstrumentDrawdownRenderer
+
+No fields.
+
+## InstrumentATHRenderer
+
+No fields.
+
 ## NotificationFailedRenderer
 
 No fields.
@@ -63,7 +75,7 @@ Only symbols, dates and counts reach the message. The no-run wording covers a pr
 ## PortfolioDrawdownRenderer.Render(ctx Context, event domain.Event) (string, error)
 
 1. Decode the event data as PortfolioDrawdownData.
-2. Round the drawdown to one decimal place, halves away from zero.
+2. Round the drawdown to one decimal place, halves away from zero, and the two securities values to the whole dollar with wholeDollars.
 3. Return a message naming the level crossed, the rounded drawdown without its sign, the date of the high with its securities value, the current securities value and the crossing date, and saying that this value change is affected by sales and withdrawals.
 
 #### Errors
@@ -151,6 +163,48 @@ It never repeats the failed event's payload.
 
 - **2.** if a figure is not a decimal number, return an error naming it.
 
+## PriceTargetRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as PriceTargetData.
+2. Round the target, the low, the high and the close to cents with dollars.
+3. Return a message naming the instrument, the target and the date, the day's low, high and close, and saying the prices are not adjusted.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if an amount is not a decimal number, return an error naming it.
+
+## InstrumentDrawdownRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as InstrumentDrawdownData.
+2. Round the drawdown with roundedPercent and the two closes to cents with dollars.
+3. Return a message naming the instrument, the level crossed, the rounded drawdown without its sign, the crossing date, the adjusted close on the date and the high with its date.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if a figure is not a decimal number, return an error naming it.
+
+## InstrumentATHRenderer.Render(ctx Context, event domain.Event) (string, error)
+
+1. Decode the event data as InstrumentATHData.
+2. Round the increase with roundedPercent and the two closes to cents with dollars.
+3. Return a message naming the instrument, the date and the new adjusted close, the rounded percent above the previous high with its close and date, and the date of the last announced high or none.
+
+#### Errors
+
+- **1.** if decoding fails, return the wrapped error.
+
+---
+
+- **2.** if a figure is not a decimal number, return an error naming it.
+
 ## percentsAgainst(allocation Decimal, bound Decimal) (allocationText string, boundText string, err error)
 
 Round both to one decimal with roundedPercent; when the two texts are equal, which would make a group outside its band read as exactly at the bound, round both to two decimals instead.
@@ -158,6 +212,14 @@ Round both to one decimal with roundedPercent; when the two texts are equal, whi
 ## roundedDollars(amount Decimal) (string, error)
 
 Round to cents, halves away from zero, with math/big, and never return a negative zero: an amount that rounds to zero is 0.00.
+
+## roundedWholeDollars(amount Decimal) (string, error)
+
+The same rounding to the dollar: 96499.5 is 96500, and an amount that rounds to zero is 0.
+
+## wholeDollars(amounts ...Decimal) ([]string, error)
+
+Round each amount with roundedWholeDollars, in order, naming the failure. Used by the portfolio drawdown message, whose figures are large.
 
 ## dollars(amounts ...Decimal) ([]string, error)
 
@@ -175,4 +237,4 @@ Round the amount to cents, then write it with its sign before the dollar sign: +
 
 Join each symbol and its signed dollars with commas.
 
-Every percent is rounded to one decimal and every dollar amount to cents in the renderer, never earlier: events keep the exact figures from the database, and a message never shows more digits than a reader can use. A renderer for a new event type uses roundedPercent and roundedDollars for each number it prints.
+Every percent is rounded to one decimal and every dollar amount to cents in the renderer, except the portfolio drawdown message, whose figures are large and are rounded to the dollar, never earlier: events keep the exact figures from the database, and a message never shows more digits than a reader can use. A renderer for a new event type uses roundedPercent and roundedDollars for each number it prints.

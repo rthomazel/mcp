@@ -36,6 +36,15 @@ type AllocationDriftRenderer struct{}
 // PriceVolatilityRenderer announces an unusual price move.
 type PriceVolatilityRenderer struct{}
 
+// PriceTargetRenderer announces a price target reached.
+type PriceTargetRenderer struct{}
+
+// InstrumentDrawdownRenderer announces a level of an instrument's drawdown crossed.
+type InstrumentDrawdownRenderer struct{}
+
+// InstrumentATHRenderer announces an instrument's new all-time high.
+type InstrumentATHRenderer struct{}
+
 // NotificationFailedRenderer announces an event whose delivery was given up on.
 type NotificationFailedRenderer struct{}
 
@@ -48,6 +57,9 @@ func NewRenderers(updates domain.UpdateStore) map[string]map[string]Renderer {
 		domain.Events.PortfolioMovement:  {defaultFormat: &PortfolioMovementRenderer{}},
 		domain.Events.AllocationDrift:    {defaultFormat: &AllocationDriftRenderer{}},
 		domain.Events.PriceVolatility:    {defaultFormat: &PriceVolatilityRenderer{}},
+		domain.Events.PriceTarget:        {defaultFormat: &PriceTargetRenderer{}},
+		domain.Events.InstrumentDrawdown: {defaultFormat: &InstrumentDrawdownRenderer{}},
+		domain.Events.InstrumentATH:      {defaultFormat: &InstrumentATHRenderer{}},
 		domain.Events.NotificationFailed: {defaultFormat: &NotificationFailedRenderer{}},
 	}
 }
@@ -89,7 +101,7 @@ func (r *PortfolioDrawdownRenderer) Render(_ context.Context, event domain.Event
 		return "", fmt.Errorf("rounding drawdown percent: %w", err)
 	}
 
-	amounts, err := dollars(data.ValueUSD, data.HighValueUSD)
+	amounts, err := wholeDollars(data.ValueUSD, data.HighValueUSD)
 	if err != nil {
 		return "", err
 	}
@@ -266,6 +278,74 @@ func (r *PriceVolatilityRenderer) Render(_ context.Context, event domain.Event) 
 		data.Window, volatility, data.Moves, data.Lookback), nil
 }
 
+// Render names the instrument, the target, the date and the day's low, high and close.
+func (r *PriceTargetRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+	var data domain.PriceTargetData
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		return "", fmt.Errorf("decoding price target data: %w", err)
+	}
+
+	amounts, err := dollars(data.Price, data.Low, data.High, data.Close)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s reached its target price of $%s on %s.\n"+
+		"Low $%s, high $%s, close $%s. Prices are not adjusted.",
+		data.Instrument, amounts[0], data.Date.Format(time.DateOnly), amounts[1], amounts[2], amounts[3]), nil
+}
+
+// Render names the instrument, the level, the drawdown, the high, the current close and the crossing date.
+func (r *InstrumentDrawdownRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+	var data domain.InstrumentDrawdownData
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		return "", fmt.Errorf("decoding instrument drawdown data: %w", err)
+	}
+
+	drawdown, err := roundedPercent(data.DrawdownPercent)
+	if err != nil {
+		return "", fmt.Errorf("rounding drawdown percent: %w", err)
+	}
+
+	amounts, err := dollars(data.Close, data.HighClose)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s is down %s%% from its high, crossing the %s%% level on %s.\n"+
+		"Adjusted close on %s: $%s. High on %s: $%s.",
+		data.Instrument, strings.TrimPrefix(drawdown, "-"), data.Level, data.CrossedOn.Format(time.DateOnly),
+		data.Date.Format(time.DateOnly), amounts[0], data.HighDate.Format(time.DateOnly), amounts[1]), nil
+}
+
+// Render names the instrument, the date, the new adjusted close, the previous high and the last announced high.
+func (r *InstrumentATHRenderer) Render(_ context.Context, event domain.Event) (string, error) {
+	var data domain.InstrumentATHData
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		return "", fmt.Errorf("decoding instrument ATH data: %w", err)
+	}
+
+	increase, err := roundedPercent(data.IncreasePercent)
+	if err != nil {
+		return "", fmt.Errorf("rounding increase percent: %w", err)
+	}
+
+	amounts, err := dollars(data.Close, data.PreviousHigh)
+	if err != nil {
+		return "", err
+	}
+
+	last := "none"
+	if data.LastAnnouncedDate != nil {
+		last = data.LastAnnouncedDate.Format(time.DateOnly)
+	}
+
+	return fmt.Sprintf("%s reached a new all-time high on %s: $%s adjusted close.\n"+
+		"That is %s%% above the previous high of $%s on %s. Last announced high: %s.",
+		data.Instrument, data.Date.Format(time.DateOnly), amounts[0], increase,
+		amounts[1], data.PreviousHighDate.Format(time.DateOnly), last), nil
+}
+
 // percentsAgainst rounds an allocation and the bound it is compared with to one decimal, and to two when
 // that would show them equal, so a group outside its band never reads as exactly at the bound.
 func percentsAgainst(allocation, bound domain.Decimal) (allocationText, boundText string, err error) {
@@ -306,14 +386,23 @@ func roundedPercent(percent domain.Decimal) (string, error) {
 
 // roundedDollars rounds an amount to cents, halves away from zero, never negative zero.
 func roundedDollars(amount domain.Decimal) (string, error) {
+	return roundedTo(amount, 2)
+}
+
+// roundedWholeDollars rounds an amount to the dollar, halves away from zero, never negative zero.
+func roundedWholeDollars(amount domain.Decimal) (string, error) {
+	return roundedTo(amount, 0)
+}
+
+func roundedTo(amount domain.Decimal, places int) (string, error) {
 	rat, ok := new(big.Rat).SetString(string(amount))
 	if !ok {
 		return "", fmt.Errorf("%q is not a decimal number", amount)
 	}
 
-	text := rat.FloatString(2)
+	text := rat.FloatString(places)
 	if strings.Trim(text, "-0.") == "" {
-		return "0.00", nil
+		return rat.SetInt64(0).FloatString(places), nil
 	}
 
 	return text, nil
@@ -339,6 +428,22 @@ func dollars(amounts ...domain.Decimal) ([]string, error) {
 
 	for i, amount := range amounts {
 		text, err := roundedDollars(amount)
+		if err != nil {
+			return nil, fmt.Errorf("rounding amount: %w", err)
+		}
+
+		rounded[i] = text
+	}
+
+	return rounded, nil
+}
+
+// wholeDollars rounds each amount to the dollar, in order.
+func wholeDollars(amounts ...domain.Decimal) ([]string, error) {
+	rounded := make([]string, len(amounts))
+
+	for i, amount := range amounts {
+		text, err := roundedWholeDollars(amount)
 		if err != nil {
 			return nil, fmt.Errorf("rounding amount: %w", err)
 		}

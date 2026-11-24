@@ -306,3 +306,12 @@ func TestDecimalCompare(t *testing.T) {
 		assert.Equal(t, tc.want, tc.left.Compare(tc.right), "%s against %s", tc.left, tc.right)
 	}
 }
+
+func TestDecimalNormalized(t *testing.T) {
+	for in, want := range map[string]Decimal{
+		"232": "232", "232.50": "232.5", "232.00": "232", "0232.5": "232.5", "0.50": "0.5", "0": "0", "0.0": "0",
+		"-0.0": "0", "-1.20": "-1.2", " 5 ": "5", "100": "100", "00": "0",
+	} {
+		assert.Equal(t, want, Decimal(in).Normalized(), in)
+	}
+}

@@ -49,14 +49,9 @@ func (s *Monitors) GetPriceVolatility(ctx context.Context, ticker string, window
 		return nil, fmt.Errorf("%w: the threshold %q must be positive", domain.ErrInvalidInput, threshold)
 	}
 
-	ids, err := s.resolveTickers(ctx, []string{ticker})
+	id, err := s.resolveTicker(ctx, ticker)
 	if err != nil {
 		return nil, err
-	}
-
-	id, ok := ids[ticker]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", domain.ErrInstrumentNotFound, ticker)
 	}
 
 	var (

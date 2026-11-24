@@ -316,8 +316,9 @@ func TestPortfolioDrawdownRenderer(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, text, "down 7.2%")
 	assert.Contains(t, text, "-6% level on 2026-11-18")
-	assert.Contains(t, text, "$92800.00")
-	assert.Contains(t, text, "2026-11-01: $100000.00")
+	assert.Contains(t, text, "$92800.")
+	assert.NotContains(t, text, "$92800.00")
+	assert.Contains(t, text, "2026-11-01: $100000.")
 	assert.Contains(t, text, "This value change is affected by sales and withdrawals.")
 
 	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
@@ -503,5 +504,72 @@ func TestPriceVolatilityRenderer(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = renderer.Render(context.Background(), domain.Event{Data: []byte("[")})
+	assert.Error(t, err)
+}
+
+func TestPortfolioDrawdownRendererWholeDollars(t *testing.T) {
+	renderer := NewRenderers(&fakeUpdates{})[domain.Events.PortfolioDrawdown][defaultFormat]
+
+	data, err := json.Marshal(domain.PortfolioDrawdownData{
+		Level: "-3", DrawdownPercent: "-3.5", ValueUSD: "96499.5", HighValueUSD: "100000.49",
+	})
+	require.NoError(t, err)
+
+	text, err := renderer.Render(context.Background(), domain.Event{Data: data})
+	require.NoError(t, err)
+	assert.Contains(t, text, "$96500.")
+	assert.Contains(t, text, "$100000.")
+	assert.NotContains(t, text, "96499")
+	assert.NotContains(t, text, "100000.49")
+}
+
+func TestInstrumentRenderers(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	last := day.AddDate(0, 0, -20)
+	renderers := NewRenderers(&fakeUpdates{})
+
+	target, err := json.Marshal(domain.PriceTargetData{
+		Instrument: "QQQ", Price: "232", Date: day, Low: "230.004", High: "236.995", Close: "234.5",
+	})
+	require.NoError(t, err)
+
+	text, err := renderers[domain.Events.PriceTarget][defaultFormat].Render(context.Background(), domain.Event{Data: target})
+	require.NoError(t, err)
+	assert.Contains(t, text, "QQQ reached its target price of $232.00 on 2026-11-20")
+	assert.Contains(t, text, "Low $230.00, high $237.00, close $234.50")
+
+	drawdown, err := json.Marshal(domain.InstrumentDrawdownData{
+		Instrument: "QQQ", Level: "-5", CrossedOn: day.AddDate(0, 0, -2), Date: day, DrawdownPercent: "-7.2499",
+		Close: "400.125", HighDate: day.AddDate(0, 0, -30), HighClose: "431.239",
+	})
+	require.NoError(t, err)
+
+	text, err = renderers[domain.Events.InstrumentDrawdown][defaultFormat].Render(context.Background(), domain.Event{Data: drawdown})
+	require.NoError(t, err)
+	assert.Contains(t, text, "QQQ is down 7.2% from its high, crossing the -5% level on 2026-11-18")
+	assert.Contains(t, text, "$400.13")
+	assert.Contains(t, text, "2026-10-21: $431.24")
+
+	high, err := json.Marshal(domain.InstrumentATHData{
+		Instrument: "QQQ", Date: day, Close: "450.999", PreviousHighDate: day.AddDate(0, 0, -3), PreviousHigh: "447.001",
+		IncreasePercent: "0.8948", LastAnnouncedDate: &last,
+	})
+	require.NoError(t, err)
+
+	text, err = renderers[domain.Events.InstrumentATH][defaultFormat].Render(context.Background(), domain.Event{Data: high})
+	require.NoError(t, err)
+	assert.Contains(t, text, "QQQ reached a new all-time high on 2026-11-20: $451.00")
+	assert.Contains(t, text, "0.9% above the previous high of $447.00 on 2026-11-17")
+	assert.Contains(t, text, "Last announced high: 2026-10-31")
+
+	for eventType := range map[string]bool{domain.Events.PriceTarget: true, domain.Events.InstrumentDrawdown: true, domain.Events.InstrumentATH: true} {
+		_, err = renderers[eventType][defaultFormat].Render(context.Background(), domain.Event{Data: []byte("[")})
+		assert.Error(t, err, eventType)
+	}
+
+	bad, err := json.Marshal(domain.InstrumentDrawdownData{Instrument: "QQQ", DrawdownPercent: "abc"})
+	require.NoError(t, err)
+
+	_, err = renderers[domain.Events.InstrumentDrawdown][defaultFormat].Render(context.Background(), domain.Event{Data: bad})
 	assert.Error(t, err)
 }

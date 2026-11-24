@@ -45,6 +45,14 @@ type fakeStore struct {
 	volErrs    map[string]error
 	lookback   duration.Duration
 	volQueries []string
+
+	instrumentDrawdown map[string]domain.DrawdownState
+	instrumentHigh     map[string]*domain.HighState
+	instrumentErrs     map[string]error // by ticker, for every instrument read
+	priceTargets       map[string]*domain.PriceTarget
+	targetQueries      []string
+	held               []string
+	heldErr            error
 }
 
 func (s *fakeStore) GetAllocationDrift(_ context.Context, groups []domain.AllocationGroup) (*domain.AllocationDrift, error) {

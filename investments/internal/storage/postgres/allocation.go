@@ -206,6 +206,22 @@ func (s *Store) resolveTickers(ctx context.Context, tickers []string) (map[strin
 	return ids, nil
 }
 
+// resolveTicker returns the instrument id of one ticker: domain.ErrInstrumentNotFound when it is not
+// registered and domain.ErrInvalidInput when it matches several instruments.
+func (s *Store) resolveTicker(ctx context.Context, ticker string) (int, error) {
+	ids, err := s.resolveTickers(ctx, []string{ticker})
+	if err != nil {
+		return 0, err
+	}
+
+	id, ok := ids[ticker]
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", domain.ErrInstrumentNotFound, ticker)
+	}
+
+	return id, nil
+}
+
 func (s *Store) addMemberShares(ctx context.Context, args allocationArgs, byName map[string]*domain.GroupAllocation) error {
 	rows, err := s.db.QueryxContext(ctx, allocationMemberSharesSQL, args.names, args.mins, args.maxs, args.memberGroups, args.memberIDs)
 	if err != nil {
