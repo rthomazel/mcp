@@ -170,6 +170,7 @@ type PriceTargetData struct {
 	Low        Decimal `json:"low"`
 	High       Decimal `json:"high"`
 	Close      Decimal `json:"close"`
+	Note       string  `json:"note,omitempty"`
 }
 
 // InstrumentDrawdownData is the payload of Events.InstrumentDrawdown. The

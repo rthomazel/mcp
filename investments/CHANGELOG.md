@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.6.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.6.0) feat: note on price targets
+
+### feat
+
+- **(monitors)** each target of `price.target` takes an optional `note`, the reason the target exists. It is sent as the last line of the `notification.price.target` message and documents the monitors file. Targets without a note are announced as before.
+
 ## [0.5.0](https://github.com/rthomazel/mcp/releases/tag/investments/v0.5.0) feat: eight new monitors, durations and configurable run times
 
 ### feat

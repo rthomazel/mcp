@@ -133,6 +133,7 @@ monitors:
         price: "232"
       - instrument: QQQ
         price: "250"
+        note: sell a third, see the March plan   # optional: why, sent with the notification
   instrument.drawdown:
     increment_pct: "5"
     instruments: [QQQ, VOO]      # a list of tickers, or: held

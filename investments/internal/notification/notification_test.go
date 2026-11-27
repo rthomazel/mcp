@@ -537,6 +537,14 @@ func TestInstrumentRenderers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, text, "QQQ reached its target price of $232.00 on 2026-11-20")
 	assert.Contains(t, text, "Low $230.00, high $237.00, close $234.50")
+	assert.NotContains(t, text, "Note:")
+
+	target, err = json.Marshal(domain.PriceTargetData{Instrument: "QQQ", Price: "232", Date: day, Low: "230", High: "236", Close: "234", Note: "add to the position"})
+	require.NoError(t, err)
+
+	text, err = renderers[domain.Events.PriceTarget][defaultFormat].RenderPlainText(context.Background(), domain.Event{Data: target})
+	require.NoError(t, err)
+	assert.True(t, strings.HasSuffix(text, "\nNote: add to the position"), text)
 
 	drawdown, err := json.Marshal(domain.InstrumentDrawdownData{
 		Instrument: "QQQ", Level: "-5", CrossedOn: day.AddDate(0, 0, -2), Date: day, DrawdownPercent: "-7.2499",

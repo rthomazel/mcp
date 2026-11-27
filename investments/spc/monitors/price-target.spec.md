@@ -42,7 +42,7 @@ price is already within the range, it is announced at the next run. Removing the
 target announce again if the price is still within the range.
 
 The message names the instrument, the target price, the date, and the day's low,
-high and close. The wording is the renderer's.
+high and close, and ends with the target's note when it has one. The wording is the renderer's.
 
 ### Configuration
 
@@ -57,9 +57,13 @@ monitors:
         price: "232"
       - instrument: QQQ
         price: "250"
+        note: sell a third, see the March plan
 ```
 
 - `instrument` is a ticker; `price` is a positive decimal written as quoted text.
+- `note` is optional text, the reason the target exists. It is sent with the notification and
+  documents the file; it plays no part in what makes a target the same, the subject or the
+  validation beyond being text.
 - The same instrument may have several targets; the same instrument and price twice is
   invalid.
 - Any other key is invalid, whether or not the entry is disabled. A ticker that is not
@@ -76,6 +80,8 @@ monitors:
 - Two targets of one instrument are announced independently.
 - A price that is not positive, a repeated instrument and price
   pair or an unknown key makes the monitors file invalid.
+- A target with a note records an event whose message ends with the note; a target without one
+  has no note line. A note that is not text makes the monitors file invalid.
 - With no enabled entry, nothing is recorded.
 
 ## Decisions
@@ -84,6 +90,8 @@ monitors:
   captures a touch within the day.
 - Once a year comes from the outbox's one year retention of handled events, so the subject
   carries no year and the monitor needs nothing extra.
+- The note is per target, since each target has its own reason, and lives in the event data so the
+  renderer needs nothing but the event.
 - The range needs no direction or tolerance: a target is reached whether the price comes from
   above or below.
 
