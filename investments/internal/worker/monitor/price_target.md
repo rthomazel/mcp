@@ -2,6 +2,7 @@
 
 targetsKey = "targets", the one setting.
 priceKey = "price", a field of a target; the instrument field is instrumentKey.
+noteKey = "note", an optional field of a target.
 
 # Types
 
@@ -16,8 +17,9 @@ The monitor for instrument daily price ranges reaching target prices.
 
 1. ticker string, upper case
 2. price Decimal, normalized with Decimal.Normalized
+3. note string, trimmed, empty when not set
 
-Comparable, so a repeated pair is found with a map.
+A repeated pair is found with a map keyed by the ticker, an at sign and the price; the note is not part of the key.
 
 # Functions
 
@@ -57,7 +59,7 @@ Return domain.Events.PriceTarget without domain.NotificationPrefix, price.target
 1. Read the range through store.GetPriceTarget.
 2. if the ticker is not registered, log a warning and return nil.
 3. if there is no price on the latest date or the target is not reached, return nil.
-4. Record a price target event through events.Record, with the ticker, an at sign and the normalized price as its subject and a PriceTargetData as its payload.
+4. Record a price target event through events.Record, with the ticker, an at sign and the normalized price as its subject and a PriceTargetData, with the note, as its payload.
 
 The subject carries no date, so a target is announced once however long the price stays in range; the outbox deletes handled events after a year, which announces it again if the price is in range then. Weekends and holidays judge the same date again and record nothing new.
 
@@ -82,10 +84,11 @@ The subject carries no date, so a target is announced once however long the pric
 
 ## priceTargetFrom(item Params) (priceTargetEntry, error)
 
-1. Reject any key other than instrumentKey and priceKey.
+1. Reject any key other than instrumentKey, priceKey and noteKey.
 2. Read the instrument as text, trimmed and upper case, which may not be empty.
 3. Read the price with Params.Decimal, which is required and greater than zero by Decimal.Sign, and normalize it.
-4. Return the entry.
+4. Read the note with Params.Text, trimmed; it is optional.
+5. Return the entry.
 
 #### Errors
 
@@ -98,3 +101,7 @@ The subject carries no date, so a target is announced once however long the pric
 ---
 
 - **3.** return an error naming the setting when it is missing, not quoted text, not a decimal or not positive.
+
+---
+
+- **4.** return an error naming the setting when the note is not text.

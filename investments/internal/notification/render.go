@@ -278,7 +278,7 @@ func (r *PriceVolatilityRenderer) RenderPlainText(_ context.Context, event domai
 		data.Window, volatility, data.Moves, data.Lookback), nil
 }
 
-// RenderPlainText names the instrument, the target, the date and the day's low, high and close.
+// RenderPlainText names the instrument, the target, the date and the day's low, high and close, then the note if any.
 func (r *PriceTargetRenderer) RenderPlainText(_ context.Context, event domain.Event) (string, error) {
 	var data domain.PriceTargetData
 	if err := json.Unmarshal(event.Data, &data); err != nil {
@@ -290,9 +290,15 @@ func (r *PriceTargetRenderer) RenderPlainText(_ context.Context, event domain.Ev
 		return "", err
 	}
 
-	return fmt.Sprintf("%s reached its target price of $%s on %s.\n"+
+	text := fmt.Sprintf("%s reached its target price of $%s on %s.\n"+
 		"Low $%s, high $%s, close $%s. Prices are not adjusted.",
-		data.Instrument, amounts[0], data.Date.Format(time.DateOnly), amounts[1], amounts[2], amounts[3]), nil
+		data.Instrument, amounts[0], data.Date.Format(time.DateOnly), amounts[1], amounts[2], amounts[3])
+
+	if data.Note != "" {
+		text += "\nNote: " + data.Note
+	}
+
+	return text, nil
 }
 
 // RenderPlainText names the instrument, the level, the drawdown, the high, the current close and the crossing date.

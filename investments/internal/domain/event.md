@@ -151,6 +151,7 @@ Payload of Events.PriceVolatility. The subject of the event is the ticker, Date 
 4. Low Decimal, the day's low
 5. High Decimal, the day's high
 6. Close Decimal, the day's close
+7. Note string, why the target exists; omitted from the JSON when empty
 
 Payload of Events.PriceTarget. The subject of the event is the ticker and Price joined by an at sign, for example QQQ@232. Prices are unadjusted. The subject carries no date, so a target is announced once until the event is deleted, which the outbox does a year after it was handled.
 

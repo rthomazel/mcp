@@ -167,7 +167,9 @@ It never repeats the failed event's payload.
 
 1. Decode the event data as PriceTargetData.
 2. Round the target, the low, the high and the close to cents with dollars.
-3. Return a message naming the instrument, the target and the date, the day's low, high and close, and saying the prices are not adjusted.
+3. Build a message naming the instrument, the target and the date, the day's low, high and close, and saying the prices are not adjusted.
+4. When the note is not empty, add a last line, Note: and the note.
+5. Return the message.
 
 #### Errors
 

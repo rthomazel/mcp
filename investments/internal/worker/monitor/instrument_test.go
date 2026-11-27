@@ -215,6 +215,20 @@ func TestPriceTargetRecordsTargetsWithinTheRange(t *testing.T) {
 	assert.Equal(t, domain.PriceTargetData{Instrument: "QQQ", Price: "232", Date: day(11, 20), Low: "230", High: "236", Close: "234"}, data)
 }
 
+func TestPriceTargetCarriesTheNote(t *testing.T) {
+	store := &fakeStore{created: true, priceTargets: map[string]*domain.PriceTarget{
+		"QQQ@232": {Date: day(11, 20), Low: "230", High: "236", Close: "234", Reached: true},
+	}}
+
+	require.NoError(t, NewPriceTarget(store, store).Run(context.Background(),
+		yamlParams(t, "targets:\n  - {instrument: QQQ, price: \"232\", note: \" add to the position \"}\n")))
+	require.Len(t, store.recorded, 1)
+
+	var data domain.PriceTargetData
+	require.NoError(t, json.Unmarshal(store.recorded[0].Data, &data))
+	assert.Equal(t, "add to the position", data.Note)
+}
+
 func TestPriceTargetSkipsUnpricedAndUnregisteredAndReportsFailures(t *testing.T) {
 	store := &fakeStore{created: true, instrumentErrs: map[string]error{"NOPE": domain.ErrInstrumentNotFound, "VOO": errors.New("boom")}}
 	monitor := NewPriceTarget(store, store)
@@ -233,6 +247,7 @@ func TestPriceTargetValidatesSettings(t *testing.T) {
 	monitor := NewPriceTarget(&fakeStore{}, &fakeStore{})
 
 	assert.NoError(t, monitor.ValidateParams(yamlParams(t, targetSettings)))
+	assert.NoError(t, monitor.ValidateParams(yamlParams(t, "targets:\n  - {instrument: QQQ, price: \"232\", note: buy the dip}\n")))
 	assert.NoError(t, monitor.ValidateParams(yamlParams(t, "targets:\n  - {instrument: QQQ, price: \"232\"}\n  - {instrument: VOO, price: \"232\"}\n")))
 
 	for name, content := range map[string]string{
@@ -245,6 +260,7 @@ func TestPriceTargetValidatesSettings(t *testing.T) {
 		"no instrument": "targets:\n  - {price: \"232\"}\n",
 		"repeated":      "targets:\n  - {instrument: QQQ, price: \"232\"}\n  - {instrument: qqq, price: \"232.0\"}\n",
 		"unknown key":   "targets:\n  - {instrument: QQQ, price: \"232\", side: up}\n",
+		"note not text": "targets:\n  - {instrument: QQQ, price: \"232\", note: [a]}\n",
 		"unknown":       "targets:\n  - {instrument: QQQ, price: \"232\"}\nwindow: 1d\n",
 	} {
 		assert.Error(t, monitor.ValidateParams(yamlParams(t, content)), name)

@@ -14,6 +14,7 @@ import (
 const (
 	targetsKey = "targets"
 	priceKey   = "price"
+	noteKey    = "note"
 )
 
 // PriceTarget watches instrument daily price ranges reaching target prices.
@@ -25,6 +26,7 @@ type PriceTarget struct {
 type priceTargetEntry struct {
 	ticker string
 	price  domain.Decimal // normalized, so the same number is the same subject
+	note   string         // why the target exists, sent with the notification
 }
 
 // NewPriceTarget builds the monitor.
@@ -80,7 +82,7 @@ func (m *PriceTarget) judge(ctx context.Context, target priceTargetEntry) error 
 	}
 
 	data, err := json.Marshal(domain.PriceTargetData{
-		Instrument: target.ticker, Price: target.price, Date: result.Date, Low: result.Low, High: result.High, Close: result.Close,
+		Instrument: target.ticker, Price: target.price, Date: result.Date, Low: result.Low, High: result.High, Close: result.Close, Note: target.note,
 	})
 	if err != nil {
 		return fmt.Errorf("encoding event data: %w", err)
@@ -111,7 +113,7 @@ func priceTargetsFrom(params Params) ([]priceTargetEntry, error) {
 
 	var (
 		targets []priceTargetEntry
-		seen    = map[priceTargetEntry]bool{}
+		seen    = map[string]bool{}
 	)
 
 	for i, item := range items {
@@ -120,11 +122,13 @@ func priceTargetsFrom(params Params) ([]priceTargetEntry, error) {
 			return nil, fmt.Errorf("target %d: %w", i+1, err)
 		}
 
-		if seen[target] {
+		key := target.ticker + "@" + string(target.price)
+
+		if seen[key] {
 			return nil, fmt.Errorf("target %d: %s at %s is listed more than once", i+1, target.ticker, target.price)
 		}
 
-		seen[target] = true
+		seen[key] = true
 		targets = append(targets, target)
 	}
 
@@ -134,7 +138,7 @@ func priceTargetsFrom(params Params) ([]priceTargetEntry, error) {
 func priceTargetFrom(item Params) (priceTargetEntry, error) {
 	var target priceTargetEntry
 
-	if err := item.Unknown(instrumentKey, priceKey); err != nil {
+	if err := item.Unknown(instrumentKey, priceKey, noteKey); err != nil {
 		return target, err
 	}
 
@@ -161,6 +165,13 @@ func priceTargetFrom(item Params) (priceTargetEntry, error) {
 	}
 
 	target.price = price.Normalized()
+
+	note, _, err := item.Text(noteKey)
+	if err != nil {
+		return target, err
+	}
+
+	target.note = strings.TrimSpace(note)
 
 	return target, nil
 }
